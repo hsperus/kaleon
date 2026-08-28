@@ -44,7 +44,7 @@
 - **Çıkış kriteri:** "Burçelik" / "BURÇELİK A.Ş." / VKN / entegratör cari ID'si aynı varlığa çözülür ✅
 - **Kalan:** Prisma adaptörü (indeksli ön eleme), merge workflow tool'u (L2), employee/item resolution
 
-### Aşama 3 — Operations Core (5-6 hafta) — en kritik aşama
+### Aşama 3 — Operations Core 🟡 ÇEKİRDEK DEĞİŞMEZLER TAMAM
 - Ürün ve revizyon kartları, BOM + revizyon disiplini, configured BOM
 - Rota, iş merkezi, kapasite blokları
 - **Process-gated iş emri**: kalite kapısından geçmeyen operasyon ilerleyemez — kural
@@ -53,6 +53,10 @@
 - Tool'lar: ~45 adet, hepsi `defineTool` ile
 - **Çıkış kriteri:** Orthaus'ta 50 gerçek iş emri uçtan uca; negatif stok oluşmaz;
   kalite kapısı atlanamaz
+- **Tamam:** hareket tipli stok defteri (negatif stok imkânsız, iptal=ters hareket),
+  process-gated iş emri (kapı atlanamaz, override görünür), BOM revizyon dondurma
+- **Kalan:** ~40 tool (`defineTool` sarmalayıcıları), Prisma kalıcılığı, configured BOM,
+  kapasite blokları, WMS Lite, mal kabul
 
 ### Aşama 4 — Chat arayüzü + Boss Mode (4-5 hafta)
 - Prototipteki ana ekranın gerçek uygulaması: sohbet ana yüzey, üç seviyeli sessizlik,
@@ -79,12 +83,15 @@
 - Beyanname güven skoru hesabı
 - **Çıkış kriteri:** KDV taslağı hazırlanır, riskler işaretlenir, onaya düşer; gönderim yok
 
-### Aşama 7 — Evaluation framework (sürekli, Aşama 3'te başlar)
+### Aşama 7 — Evaluation framework 🟡 KOŞUM TAMAM
 - Golden question seti: 80 Türkçe soru, beklenen cevap + zorunlu kaynak alanları
 - Her prompt/tool değişikliğinde regresyon koşusu
 - Halüsinasyon tespiti: sayı doğrulama, kaynak kontrolü
 - Maliyet ve gecikme metrikleri, model/effort karşılaştırması
 - **Çıkış kriteri:** satışa çıkış eşiği — 80 golden question'da kaynaklı doğru cevap
+- **Tamam:** çalıştırılabilir golden fixture'lar (16 soru), kapılı notlandırıcı
+  (güvenlik ihlali puan kırmaz, soruyu düşürür), paket raporu
+- **Kalan:** 64 soru daha, gerçek modele karşı ilk koşu (API anahtarı gerekli), CI bağlantısı
 
 ### Aşama 8 — Pilot sertleştirme (4 hafta)
 - Orthaus + Zerey canlı geçiş, veri migrasyonu, çapraz doğrulama dönemi
