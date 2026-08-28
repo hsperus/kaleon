@@ -182,6 +182,122 @@ CREATE TABLE "stock_movements" (
     CONSTRAINT "stock_movements_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "purchase_orders" (
+    "id" TEXT NOT NULL,
+    "partner_id" TEXT NOT NULL,
+    "currency" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'open',
+    "ordered_at" TIMESTAMP(3) NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "purchase_orders_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "purchase_order_lines" (
+    "id" UUID NOT NULL,
+    "po_id" TEXT NOT NULL,
+    "line_no" INTEGER NOT NULL,
+    "item_id" TEXT NOT NULL,
+    "quantity" DECIMAL(18,4) NOT NULL,
+    "unit_price" DECIMAL(18,4) NOT NULL,
+    "currency" TEXT NOT NULL,
+
+    CONSTRAINT "purchase_order_lines_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "goods_receipts" (
+    "id" UUID NOT NULL,
+    "po_id" TEXT NOT NULL,
+    "po_line_no" INTEGER NOT NULL,
+    "quantity" DECIMAL(18,4) NOT NULL,
+    "received_at" TIMESTAMP(3) NOT NULL,
+    "movement_id" UUID,
+
+    CONSTRAINT "goods_receipts_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "invoices" (
+    "id" UUID NOT NULL,
+    "partner_id" TEXT NOT NULL,
+    "document_no" TEXT NOT NULL,
+    "issued_at" TIMESTAMP(3) NOT NULL,
+    "currency" TEXT NOT NULL,
+    "match_status" TEXT NOT NULL DEFAULT 'pending',
+    "total_variance" DECIMAL(18,4),
+    "matched_at" TIMESTAMP(3),
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "invoices_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "invoice_lines" (
+    "id" UUID NOT NULL,
+    "invoice_id" UUID NOT NULL,
+    "line_no" INTEGER NOT NULL,
+    "po_id" TEXT,
+    "po_line_no" INTEGER,
+    "item_id" TEXT NOT NULL,
+    "quantity" DECIMAL(18,4) NOT NULL,
+    "unit_price" DECIMAL(18,4) NOT NULL,
+    "currency" TEXT NOT NULL,
+
+    CONSTRAINT "invoice_lines_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "invoice_findings" (
+    "id" UUID NOT NULL,
+    "invoice_id" UUID NOT NULL,
+    "line_no" INTEGER NOT NULL,
+    "item_id" TEXT NOT NULL,
+    "reason" TEXT NOT NULL,
+    "message" TEXT NOT NULL,
+    "impact" DECIMAL(18,4) NOT NULL,
+    "detail" JSONB NOT NULL,
+
+    CONSTRAINT "invoice_findings_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "approval_workspaces" (
+    "id" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "title" TEXT NOT NULL,
+    "state" TEXT NOT NULL,
+    "prepared_by" UUID NOT NULL,
+    "approved_by" UUID,
+    "amount" DECIMAL(18,4),
+    "currency" TEXT,
+    "required_permission" TEXT NOT NULL,
+    "payload" JSONB NOT NULL,
+    "risks" TEXT[],
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+    "version" INTEGER NOT NULL DEFAULT 0,
+
+    CONSTRAINT "approval_workspaces_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "approval_events" (
+    "id" UUID NOT NULL,
+    "workspace_id" TEXT NOT NULL,
+    "at" TIMESTAMP(3) NOT NULL,
+    "from_state" TEXT NOT NULL,
+    "to_state" TEXT NOT NULL,
+    "by" TEXT NOT NULL,
+    "channel" TEXT NOT NULL,
+    "note" TEXT,
+    "seq" INTEGER NOT NULL,
+
+    CONSTRAINT "approval_events_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "partners_code_key" ON "partners"("code");
 
@@ -254,6 +370,39 @@ CREATE INDEX "stock_movements_reversal_of_idx" ON "stock_movements"("reversal_of
 -- CreateIndex
 CREATE INDEX "stock_movements_at_idx" ON "stock_movements"("at");
 
+-- CreateIndex
+CREATE INDEX "purchase_orders_partner_id_idx" ON "purchase_orders"("partner_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "purchase_order_lines_po_id_line_no_key" ON "purchase_order_lines"("po_id", "line_no");
+
+-- CreateIndex
+CREATE INDEX "goods_receipts_po_id_po_line_no_idx" ON "goods_receipts"("po_id", "po_line_no");
+
+-- CreateIndex
+CREATE INDEX "invoices_match_status_idx" ON "invoices"("match_status");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "invoices_partner_id_document_no_key" ON "invoices"("partner_id", "document_no");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "invoice_lines_invoice_id_line_no_key" ON "invoice_lines"("invoice_id", "line_no");
+
+-- CreateIndex
+CREATE INDEX "invoice_findings_invoice_id_idx" ON "invoice_findings"("invoice_id");
+
+-- CreateIndex
+CREATE INDEX "approval_workspaces_state_idx" ON "approval_workspaces"("state");
+
+-- CreateIndex
+CREATE INDEX "approval_workspaces_kind_state_idx" ON "approval_workspaces"("kind", "state");
+
+-- CreateIndex
+CREATE INDEX "approval_events_workspace_id_idx" ON "approval_events"("workspace_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "approval_events_workspace_id_seq_key" ON "approval_events"("workspace_id", "seq");
+
 -- AddForeignKey
 ALTER TABLE "partner_aliases" ADD CONSTRAINT "partner_aliases_partner_id_fkey" FOREIGN KEY ("partner_id") REFERENCES "partners"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -265,4 +414,16 @@ ALTER TABLE "partner_external_refs" ADD CONSTRAINT "partner_external_refs_partne
 
 -- AddForeignKey
 ALTER TABLE "work_order_operations" ADD CONSTRAINT "work_order_operations_work_order_id_fkey" FOREIGN KEY ("work_order_id") REFERENCES "work_orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "purchase_order_lines" ADD CONSTRAINT "purchase_order_lines_po_id_fkey" FOREIGN KEY ("po_id") REFERENCES "purchase_orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "invoice_lines" ADD CONSTRAINT "invoice_lines_invoice_id_fkey" FOREIGN KEY ("invoice_id") REFERENCES "invoices"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "invoice_findings" ADD CONSTRAINT "invoice_findings_invoice_id_fkey" FOREIGN KEY ("invoice_id") REFERENCES "invoices"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "approval_events" ADD CONSTRAINT "approval_events_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "approval_workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

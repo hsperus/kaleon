@@ -53,7 +53,7 @@ beforeEach(async () => {
 
 function call(tool: string, input: unknown, principal = uretim) {
   return invokeTool(tool, input, {
-    registry: buildRegistry(new InMemoryDataSource(), repo),
+    registry: buildRegistry(new InMemoryDataSource(), { operations: repo }),
     audit,
     principal,
     tenant: TENANT,
@@ -65,17 +65,17 @@ function call(tool: string, input: unknown, principal = uretim) {
 
 describe("görevler ayrılığı — kalite override", () => {
   it("üretim müdürü kalite KARARI verebilir", () => {
-    const registry = buildRegistry(new InMemoryDataSource(), repo);
+    const registry = buildRegistry(new InMemoryDataSource(), { operations: repo });
     expect(registry.catalogFor(uretim).names).toContain("record_quality_decision");
   });
 
   it("üretim müdürü kalite kapısını ATLAYAMAZ — tool listesinde yok", () => {
-    const registry = buildRegistry(new InMemoryDataSource(), repo);
+    const registry = buildRegistry(new InMemoryDataSource(), { operations: repo });
     expect(registry.catalogFor(uretim).names).not.toContain("override_quality_gate");
   });
 
   it("patron atlayabilir", () => {
-    const registry = buildRegistry(new InMemoryDataSource(), repo);
+    const registry = buildRegistry(new InMemoryDataSource(), { operations: repo });
     expect(registry.catalogFor(patron).names).toContain("override_quality_gate");
   });
 
@@ -220,7 +220,7 @@ describe("stok tool'ları", () => {
   });
 
   it("depo sorumlusu sayım düzeltmesi YAPAMAZ", async () => {
-    const registry = buildRegistry(new InMemoryDataSource(), repo);
+    const registry = buildRegistry(new InMemoryDataSource(), { operations: repo });
     expect(registry.catalogFor(depo).names).not.toContain("post_stock_correction");
   });
 

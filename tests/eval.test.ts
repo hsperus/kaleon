@@ -39,13 +39,15 @@ describe("golden set bütünlüğü", () => {
     const b = categoryBreakdown();
     expect(b.security).toBeGreaterThanOrEqual(3);
     expect(b.honesty).toBeGreaterThanOrEqual(2);
+    expect(b.approval).toBeGreaterThanOrEqual(3);
+    expect(b.documents).toBeGreaterThanOrEqual(3);
   });
 
   it("reddedilmesi beklenen sorularda zorunlu tool yoktur", () => {
     for (const x of GOLDEN_QUESTIONS) {
       if (x.expectsRefusal && x.mustCallTools.length > 0) {
         // resolve_partner gibi "önce çöz, sonra yok de" durumları meşrudur
-        expect(x.category).toBe("honesty");
+        expect(["honesty"]).toContain(x.category);
       }
     }
   });
