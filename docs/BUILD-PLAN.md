@@ -58,8 +58,11 @@
 - **Tamam (devam):** 12 üretim/stok tool'u, repository portu (değişmezler kilit
   altında — eşzamanlı sarf testi mevcut), görevler ayrılığı (üretim müdürü kalite
   kararı verir, kapıyı ATLAYAMAZ)
-- **Kalan:** Prisma kalıcılığı, configured BOM, kapasite blokları, WMS Lite,
-  mal kabul/PO eşleştirme, ~25 tool daha
+- **Tamam (devam):** Prisma kalıcılığı — iş emri, operasyon, kalite kararı, BOM
+  revizyonu ve stok defteri gerçek veritabanında; bakiye SQL'de toplanıyor;
+  eşzamanlılık advisory lock ile korunuyor ve MUTASYON TESTİYLE doğrulandı
+- **Kalan:** configured BOM, kapasite blokları, WMS Lite, mal kabul/PO eşleştirme,
+  ~25 tool daha
 
 ### Aşama 4 — Chat arayüzü + Boss Mode (4-5 hafta)
 - Prototipteki ana ekranın gerçek uygulaması: sohbet ana yüzey, üç seviyeli sessizlik,
@@ -113,6 +116,8 @@
 6b. Değişmezler kilit altında uygulanır — oku-kontrol-et-yaz deseni yasak.
 6c. Görevler ayrılığı: bir rol hem işi yapıp hem kendi kontrolünü atlayamaz.
 7. `tsc --noEmit` ve testler yeşil olmadan commit yok.
+8. Bir koruma yazıldıysa, korumayı KALDIRINCA kırılan bir test de yazılır.
+   Yanlış sebepten geçen test, testsizlikten beterdir.
 
 ## Ölçüm
 

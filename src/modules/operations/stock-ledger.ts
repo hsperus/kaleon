@@ -125,14 +125,32 @@ export interface PostMovementInput {
 }
 
 /**
- * Hareketi doğrular ve deftere ekler. Değişmezleri BURADA uygular —
- * çağıranın disiplinine güvenmez.
+ * Doğrulama bağlamı.
+ *
+ * Alan mantığı defteri TARAMAZ — çağıran, kararı vermek için gereken üç şeyi
+ * getirir. Bu ayrım kritik: bellek adaptörü bunları diziden hesaplar, Postgres
+ * adaptörü tek bir SQL SUM'ı ve indeksli iki sorguyla getirir. Aynı kural,
+ * iki farklı erişim biçimi.
  */
-export function postMovement(
-  ledger: readonly StockMovement[],
+export interface MovementContext {
+  readonly authority: AuthorityLevel;
+  /** Hareketten ÖNCEKİ bakiye — kilit altında okunmuş olmalıdır. */
+  readonly currentBalance: number;
+  /** İptal ediliyorsa asıl hareket. */
+  readonly original: StockMovement | null;
+  /** Asıl hareket daha önce iptal edilmiş mi? */
+  readonly alreadyReversed: boolean;
+}
+
+/**
+ * Hareketi doğrular ve kanonik biçimini döndürür. Kaydetmez.
+ *
+ * Buradaki kuralların hiçbiri çağıranın disiplinine bırakılmaz.
+ */
+export function validateMovement(
   input: PostMovementInput,
-  opts: { authority: AuthorityLevel },
-): readonly StockMovement[] {
+  ctx: MovementContext,
+): StockMovement {
   const type = MOVEMENT_TYPES[input.movementType];
   if (!type) {
     throw new BusinessRuleError(
@@ -148,7 +166,7 @@ export function postMovement(
     );
   }
 
-  if (opts.authority < type.authority) {
+  if (ctx.authority < type.authority) {
     throw new BusinessRuleError(
       `"${type.label}" için L${type.authority} yetki gerekir.`,
       "authority_insufficient",
@@ -173,28 +191,27 @@ export function postMovement(
   }
 
   if (type.reverses) {
-    const original = ledger.find((m) => m.id === input.reversalOf);
-    if (!original) {
+    if (!ctx.original) {
       throw new BusinessRuleError(
         "İptal edilecek hareket bulunamadı. İptal, aslına referans vermek zorundadır.",
         "reversal_target_missing",
       );
     }
-    if (original.movementType !== type.reverses) {
+    if (ctx.original.movementType !== type.reverses) {
       throw new BusinessRuleError(
         `"${type.label}" yalnızca ${type.reverses} tipini iptal edebilir.`,
         "reversal_type_mismatch",
       );
     }
-    if (ledger.some((m) => m.reversalOf === original.id)) {
+    if (ctx.alreadyReversed) {
       throw new BusinessRuleError(
         "Bu hareket zaten iptal edilmiş. Aynı hareket iki kez iptal edilemez.",
         "already_reversed",
       );
     }
-    if (input.quantity > original.quantity) {
+    if (input.quantity > ctx.original.quantity) {
       throw new BusinessRuleError(
-        `İptal miktarı aslından büyük olamaz (${input.quantity} > ${original.quantity}).`,
+        `İptal miktarı aslından büyük olamaz (${input.quantity} > ${ctx.original.quantity}).`,
         "reversal_exceeds_original",
       );
     }
@@ -215,22 +232,37 @@ export function postMovement(
   };
 
   // ── En sert değişmez: negatif stok oluşamaz.
-  const key: StockKey = {
-    itemId: movement.itemId,
-    locationId: movement.locationId,
-    batchId: movement.batchId,
-  };
-  const after = balanceOf(ledger, key) + signedQuantity(movement);
+  const after = ctx.currentBalance + signedQuantity(movement);
   if (after < 0) {
     throw new BusinessRuleError(
-      `Bu hareket stoğu negatife düşürür (mevcut ${balanceOf(ledger, key)}, ` +
+      `Bu hareket stoğu negatife düşürür (mevcut ${ctx.currentBalance}, ` +
         `hareket ${signedQuantity(movement)}). Negatif stok kabul edilmez — ` +
         `eksik varsa sayım farkı (702) ile gerekçeli kaydedilmelidir.`,
       "negative_stock",
     );
   }
 
-  return [...ledger, Object.freeze(movement)];
+  return Object.freeze(movement);
+}
+
+/** Bellek adaptörü için ince sarmalayıcı — bağlamı diziden hesaplar. */
+export function postMovement(
+  ledger: readonly StockMovement[],
+  input: PostMovementInput,
+  opts: { authority: AuthorityLevel },
+): readonly StockMovement[] {
+  const original = input.reversalOf ? (ledger.find((m) => m.id === input.reversalOf) ?? null) : null;
+  const movement = validateMovement(input, {
+    authority: opts.authority,
+    currentBalance: balanceOf(ledger, {
+      itemId: input.itemId,
+      locationId: input.locationId,
+      batchId: input.batchId ?? null,
+    }),
+    original,
+    alreadyReversed: original ? ledger.some((m) => m.reversalOf === original.id) : false,
+  });
+  return [...ledger, movement];
 }
 
 /** Defterdeki tüm bakiyeler — sıfır olanlar elenir. */

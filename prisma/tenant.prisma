@@ -180,3 +180,86 @@ model AuditEntry {
   @@index([correlationId])
   @@map("audit_entries")
 }
+
+// ─────────────────────────── Operations Core ───────────────────────────
+
+model WorkOrder {
+  id            String   @id
+  itemId        String   @map("item_id")
+  quantity      Decimal  @db.Decimal(18, 4)
+  status        String
+  /// Serbest bırakmada dondurulan BOM revizyonu.
+  bomRevision   String?  @map("bom_revision")
+  bomFrozenAt   DateTime? @map("bom_frozen_at")
+  overrideCount Int      @default(0) @map("override_count")
+  /// İyimser kilit — eşzamanlı güncellemede çakışmayı yakalar.
+  version       Int      @default(0)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  operations WorkOrderOperation[]
+
+  @@index([status])
+  @@index([itemId])
+  @@map("work_orders")
+}
+
+model WorkOrderOperation {
+  id                 String  @id @default(uuid()) @db.Uuid
+  workOrderId        String  @map("work_order_id")
+  seq                Int
+  workCenter         String  @map("work_center")
+  description        String
+  gateCharacteristic String? @map("gate_characteristic")
+  gateDecidedBy      String? @map("gate_decided_by")
+  gateToleranceMin   Decimal? @map("gate_tolerance_min") @db.Decimal(18, 4)
+  gateToleranceMax   Decimal? @map("gate_tolerance_max") @db.Decimal(18, 4)
+  gateToleranceUnit  String? @map("gate_tolerance_unit")
+  state              String
+  confirmedQty       Decimal @default(0) @map("confirmed_qty") @db.Decimal(18, 4)
+  scrapQty           Decimal @default(0) @map("scrap_qty") @db.Decimal(18, 4)
+  gateDecision       Json?   @map("gate_decision")
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@unique([workOrderId, seq])
+  @@map("work_order_operations")
+}
+
+/// Ürünün aktif BOM revizyonu.
+model BomRevision {
+  id        String   @id @default(uuid()) @db.Uuid
+  itemId    String   @map("item_id")
+  revision  String
+  isActive  Boolean  @default(false) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([itemId, revision])
+  @@index([itemId, isActive])
+  @@map("bom_revisions")
+}
+
+/// Stok hareket defteri. Append-only; bakiye bu tablodan TÜRETİLİR.
+model StockMovement {
+  id            String   @id @default(uuid()) @db.Uuid
+  at            DateTime
+  itemId        String   @map("item_id")
+  locationId    String   @map("location_id")
+  batchId       String?  @map("batch_id")
+  /// Her zaman pozitif.
+  quantity      Decimal  @db.Decimal(18, 4)
+  /// +1 giriş, -1 çıkış. Hareket tipinden türetilip YAZILIR; böylece bakiye
+  /// tek bir SQL SUM'ı olur ve JS'te kayan nokta birikmesi olmaz.
+  direction     Int
+  movementType  String   @map("movement_type")
+  referenceKind String?  @map("reference_kind")
+  referenceId   String?  @map("reference_id")
+  userId        String   @map("user_id") @db.Uuid
+  reason        String?
+  reversalOf    String?  @map("reversal_of") @db.Uuid
+
+  @@index([itemId, locationId, batchId])
+  @@index([reversalOf])
+  @@index([at])
+  @@map("stock_movements")
+}

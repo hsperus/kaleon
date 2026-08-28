@@ -116,6 +116,72 @@ CREATE TABLE "audit_entries" (
     CONSTRAINT "audit_entries_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "work_orders" (
+    "id" TEXT NOT NULL,
+    "item_id" TEXT NOT NULL,
+    "quantity" DECIMAL(18,4) NOT NULL,
+    "status" TEXT NOT NULL,
+    "bom_revision" TEXT,
+    "bom_frozen_at" TIMESTAMP(3),
+    "override_count" INTEGER NOT NULL DEFAULT 0,
+    "version" INTEGER NOT NULL DEFAULT 0,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "work_orders_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "work_order_operations" (
+    "id" UUID NOT NULL,
+    "work_order_id" TEXT NOT NULL,
+    "seq" INTEGER NOT NULL,
+    "work_center" TEXT NOT NULL,
+    "description" TEXT NOT NULL,
+    "gate_characteristic" TEXT,
+    "gate_decided_by" TEXT,
+    "gate_tolerance_min" DECIMAL(18,4),
+    "gate_tolerance_max" DECIMAL(18,4),
+    "gate_tolerance_unit" TEXT,
+    "state" TEXT NOT NULL,
+    "confirmed_qty" DECIMAL(18,4) NOT NULL DEFAULT 0,
+    "scrap_qty" DECIMAL(18,4) NOT NULL DEFAULT 0,
+    "gate_decision" JSONB,
+
+    CONSTRAINT "work_order_operations_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "bom_revisions" (
+    "id" UUID NOT NULL,
+    "item_id" TEXT NOT NULL,
+    "revision" TEXT NOT NULL,
+    "is_active" BOOLEAN NOT NULL DEFAULT false,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "bom_revisions_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "stock_movements" (
+    "id" UUID NOT NULL,
+    "at" TIMESTAMP(3) NOT NULL,
+    "item_id" TEXT NOT NULL,
+    "location_id" TEXT NOT NULL,
+    "batch_id" TEXT,
+    "quantity" DECIMAL(18,4) NOT NULL,
+    "direction" INTEGER NOT NULL,
+    "movement_type" TEXT NOT NULL,
+    "reference_kind" TEXT,
+    "reference_id" TEXT,
+    "user_id" UUID NOT NULL,
+    "reason" TEXT,
+    "reversal_of" UUID,
+
+    CONSTRAINT "stock_movements_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "partners_code_key" ON "partners"("code");
 
@@ -164,6 +230,30 @@ CREATE INDEX "audit_entries_tool_name_at_idx" ON "audit_entries"("tool_name", "a
 -- CreateIndex
 CREATE INDEX "audit_entries_correlation_id_idx" ON "audit_entries"("correlation_id");
 
+-- CreateIndex
+CREATE INDEX "work_orders_status_idx" ON "work_orders"("status");
+
+-- CreateIndex
+CREATE INDEX "work_orders_item_id_idx" ON "work_orders"("item_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "work_order_operations_work_order_id_seq_key" ON "work_order_operations"("work_order_id", "seq");
+
+-- CreateIndex
+CREATE INDEX "bom_revisions_item_id_is_active_idx" ON "bom_revisions"("item_id", "is_active");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "bom_revisions_item_id_revision_key" ON "bom_revisions"("item_id", "revision");
+
+-- CreateIndex
+CREATE INDEX "stock_movements_item_id_location_id_batch_id_idx" ON "stock_movements"("item_id", "location_id", "batch_id");
+
+-- CreateIndex
+CREATE INDEX "stock_movements_reversal_of_idx" ON "stock_movements"("reversal_of");
+
+-- CreateIndex
+CREATE INDEX "stock_movements_at_idx" ON "stock_movements"("at");
+
 -- AddForeignKey
 ALTER TABLE "partner_aliases" ADD CONSTRAINT "partner_aliases_partner_id_fkey" FOREIGN KEY ("partner_id") REFERENCES "partners"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -172,4 +262,7 @@ ALTER TABLE "partner_tax_ids" ADD CONSTRAINT "partner_tax_ids_partner_id_fkey" F
 
 -- AddForeignKey
 ALTER TABLE "partner_external_refs" ADD CONSTRAINT "partner_external_refs_partner_id_fkey" FOREIGN KEY ("partner_id") REFERENCES "partners"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "work_order_operations" ADD CONSTRAINT "work_order_operations_work_order_id_fkey" FOREIGN KEY ("work_order_id") REFERENCES "work_orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
