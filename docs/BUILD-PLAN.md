@@ -93,8 +93,11 @@
 - **Tamam:** 8 durumlu makine; hazırlayan onaylayamaz (SoD), onay limiti ve para
   birimi kontrolü, riskler teyit edilmeden onay yok, `submitted_externally`
   yalnızca `job` kanalından — kullanıcı 'gönderildi' işaretleyemez
-- **Kalan:** L1 taslak tool'ları (KDV, işten çıkış, ödeme planı), Prisma kalıcılığı,
-  eskalasyon zinciri
+- **Tamam (devam):** 7 belge/onay tool'u; fatura → eşleştirme → onay kaydı →
+  inceleme → onay/düzeltme zinciri uçtan uca; Prisma modelleri hazır
+  (mükerrer fatura veritabanı kısıtıyla da korunuyor)
+- **Kalan:** L1 taslak tool'ları (KDV, işten çıkış, ödeme planı), Prisma
+  adaptörleri, eskalasyon zinciri
 
 ### Aşama 7 — Evaluation framework 🟡 KOŞUM TAMAM
 - Golden question seti: 80 Türkçe soru, beklenen cevap + zorunlu kaynak alanları
@@ -102,9 +105,9 @@
 - Halüsinasyon tespiti: sayı doğrulama, kaynak kontrolü
 - Maliyet ve gecikme metrikleri, model/effort karşılaştırması
 - **Çıkış kriteri:** satışa çıkış eşiği — 80 golden question'da kaynaklı doğru cevap
-- **Tamam:** çalıştırılabilir golden fixture'lar (16 soru), kapılı notlandırıcı
+- **Tamam:** çalıştırılabilir golden fixture'lar (22 soru), kapılı notlandırıcı
   (güvenlik ihlali puan kırmaz, soruyu düşürür), paket raporu
-- **Kalan:** 64 soru daha, gerçek modele karşı ilk koşu (API anahtarı gerekli), CI bağlantısı
+- **Kalan:** 58 soru daha, gerçek modele karşı ilk koşu (API anahtarı gerekli), CI bağlantısı
 
 ### Aşama 8 — Pilot sertleştirme (4 hafta)
 - Orthaus + Zerey canlı geçiş, veri migrasyonu, çapraz doğrulama dönemi

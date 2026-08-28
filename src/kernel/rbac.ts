@@ -45,6 +45,7 @@ export const ROLE_PERMISSIONS: Record<RoleId, readonly Permission[]> = {
     "operations:cost.read",
     "inventory:valuation.read",
     "sales:order.read",
+    "approval:read",
     "approval:finance.submit",
   ],
   ik_muduru: [
@@ -54,6 +55,7 @@ export const ROLE_PERMISSIONS: Record<RoleId, readonly Permission[]> = {
     "hr:overtime.read",
     "hr:payroll.read",
     "hr:termination.draft",
+    "approval:read",
     "approval:hr.submit",
   ],
   uretim_muduru: [
@@ -75,6 +77,7 @@ export const ROLE_PERMISSIONS: Record<RoleId, readonly Permission[]> = {
     // Departman mesai özeti görür; maaş alanı `redact` ile maskelenir
     // çünkü "hr:payroll.read" izni yoktur.
     "hr:overtime.read",
+    "approval:read",
     "approval:operations.submit",
   ],
   satin_alma: [
@@ -84,6 +87,7 @@ export const ROLE_PERMISSIONS: Record<RoleId, readonly Permission[]> = {
     "documents:po.read",
     "documents:po.draft",
     "inventory:stock.read",
+    "approval:read",
     "approval:procurement.submit",
   ],
   depo_sorumlusu: [

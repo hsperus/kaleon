@@ -263,3 +263,150 @@ model StockMovement {
   @@index([at])
   @@map("stock_movements")
 }
+
+// ─────────────────── Document Intelligence / Procurement ───────────────────
+
+model PurchaseOrder {
+  id        String   @id
+  partnerId String   @map("partner_id")
+  currency  String
+  status    String   @default("open")
+  orderedAt DateTime @map("ordered_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  lines PurchaseOrderLine[]
+
+  @@index([partnerId])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderLine {
+  id        String  @id @default(uuid()) @db.Uuid
+  poId      String  @map("po_id")
+  lineNo    Int     @map("line_no")
+  itemId    String  @map("item_id")
+  quantity  Decimal @db.Decimal(18, 4)
+  unitPrice Decimal @map("unit_price") @db.Decimal(18, 4)
+  currency  String
+
+  purchaseOrder PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
+
+  @@unique([poId, lineNo])
+  @@map("purchase_order_lines")
+}
+
+model GoodsReceipt {
+  id         String   @id @default(uuid()) @db.Uuid
+  poId       String   @map("po_id")
+  poLineNo   Int      @map("po_line_no")
+  quantity   Decimal  @db.Decimal(18, 4)
+  receivedAt DateTime @map("received_at")
+  /// Bu mal kabulü hangi stok hareketini doğurdu.
+  movementId String?  @map("movement_id") @db.Uuid
+
+  @@index([poId, poLineNo])
+  @@map("goods_receipts")
+}
+
+model Invoice {
+  id            String   @id @default(uuid()) @db.Uuid
+  partnerId     String   @map("partner_id")
+  documentNo    String   @map("document_no")
+  issuedAt      DateTime @map("issued_at")
+  currency      String
+  /// matched | blocked | pending
+  matchStatus   String   @default("pending") @map("match_status")
+  totalVariance Decimal? @map("total_variance") @db.Decimal(18, 4)
+  matchedAt     DateTime? @map("matched_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  lines    InvoiceLine[]
+  findings InvoiceFinding[]
+
+  /// MÜKERRER FATURA KORUMASI — veritabanı seviyesinde.
+  /// Uygulama katmanındaki kontrol TOCTOU yarışına açıktır: iki eşzamanlı
+  /// kayıt da "daha önce yok" görür ve ikisi de yazar. Benzersizlik kısıtı
+  /// bu yarışı kapatır; uygulama kontrolü kullanıcıya ERKEN ve anlamlı
+  /// mesaj vermek içindir, tek savunma değildir.
+  @@unique([partnerId, documentNo])
+  @@index([matchStatus])
+  @@map("invoices")
+}
+
+model InvoiceLine {
+  id        String  @id @default(uuid()) @db.Uuid
+  invoiceId String  @map("invoice_id") @db.Uuid
+  lineNo    Int     @map("line_no")
+  poId      String? @map("po_id")
+  poLineNo  Int?    @map("po_line_no")
+  itemId    String  @map("item_id")
+  quantity  Decimal @db.Decimal(18, 4)
+  unitPrice Decimal @map("unit_price") @db.Decimal(18, 4)
+  currency  String
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@unique([invoiceId, lineNo])
+  @@map("invoice_lines")
+}
+
+/// Eşleştirme bulguları — neden bloklandığının kalıcı kaydı.
+model InvoiceFinding {
+  id        String  @id @default(uuid()) @db.Uuid
+  invoiceId String  @map("invoice_id") @db.Uuid
+  lineNo    Int     @map("line_no")
+  itemId    String  @map("item_id")
+  reason    String
+  message   String
+  impact    Decimal @db.Decimal(18, 4)
+  detail    Json
+
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@index([invoiceId])
+  @@map("invoice_findings")
+}
+
+// ─────────────────────────── Approval Workspace ───────────────────────────
+
+model ApprovalWorkspace {
+  id                 String   @id
+  kind               String
+  title              String
+  state              String
+  preparedBy         String   @map("prepared_by") @db.Uuid
+  approvedBy         String?  @map("approved_by") @db.Uuid
+  amount             Decimal? @db.Decimal(18, 4)
+  currency           String?
+  requiredPermission String   @map("required_permission")
+  payload            Json
+  risks              String[]
+  createdAt          DateTime @default(now()) @map("created_at")
+  updatedAt          DateTime @updatedAt @map("updated_at")
+  version            Int      @default(0)
+
+  events ApprovalEvent[]
+
+  @@index([state])
+  @@index([kind, state])
+  @@map("approval_workspaces")
+}
+
+/// Onay geçmişi — append-only. Kim, ne zaman, hangi kanaldan.
+model ApprovalEvent {
+  id          String   @id @default(uuid()) @db.Uuid
+  workspaceId String   @map("workspace_id")
+  at          DateTime
+  fromState   String   @map("from_state")
+  toState     String   @map("to_state")
+  by          String
+  channel     String
+  note        String?
+  seq         Int
+
+  workspace ApprovalWorkspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, seq])
+  @@index([workspaceId])
+  @@map("approval_events")
+}
