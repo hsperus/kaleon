@@ -82,7 +82,10 @@
 - Gece belge hattı: Haiku 4.5 + Batch API ile fatura okuma
 - **Çıkış kriteri:** e-fatura → kanonik → PO eşleştirme → onay akışı uçtan uca
 - **Tamam:** üç yönlü eşleştirme motoru (fiyat/miktar/mal kabul/mükerrer/para birimi),
-  çift eşikli tolerans, bulgular parasal etkiye göre sıralı
+  çift eşikli tolerans, bulgular parasal etkiye göre sıralı, Prisma kalıcılığı;
+  mükerrer fatura VERİTABANI kısıtıyla korunuyor (eşzamanlı kayıt testi mevcut)
+- **Kalan:** entegratör adaptörleri (e-fatura, banka, PDKS), BullMQ kuyrukları,
+  gece belge hattı (Haiku + Batch API)
 
 ### Aşama 6 — Approval Workspace 🟡 DURUM MAKİNESİ TAMAM
 - Sekiz durumlu state machine, çoklu onay seviyeleri
@@ -96,8 +99,9 @@
 - **Tamam (devam):** 7 belge/onay tool'u; fatura → eşleştirme → onay kaydı →
   inceleme → onay/düzeltme zinciri uçtan uca; Prisma modelleri hazır
   (mükerrer fatura veritabanı kısıtıyla da korunuyor)
-- **Kalan:** L1 taslak tool'ları (KDV, işten çıkış, ödeme planı), Prisma
-  adaptörleri, eskalasyon zinciri
+- **Tamam (devam):** Prisma adaptörleri; onay geçmişi append-only (mutasyon
+  eski olayları yeniden yazmaz), iyimser kilit eşzamanlı onayı reddediyor
+- **Kalan:** L1 taslak tool'ları (KDV, işten çıkış, ödeme planı), eskalasyon zinciri
 
 ### Aşama 7 — Evaluation framework 🟡 KOŞUM TAMAM
 - Golden question seti: 80 Türkçe soru, beklenen cevap + zorunlu kaynak alanları

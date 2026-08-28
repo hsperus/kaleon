@@ -221,7 +221,7 @@ CREATE TABLE "goods_receipts" (
 
 -- CreateTable
 CREATE TABLE "invoices" (
-    "id" UUID NOT NULL,
+    "id" TEXT NOT NULL,
     "partner_id" TEXT NOT NULL,
     "document_no" TEXT NOT NULL,
     "issued_at" TIMESTAMP(3) NOT NULL,
@@ -237,7 +237,7 @@ CREATE TABLE "invoices" (
 -- CreateTable
 CREATE TABLE "invoice_lines" (
     "id" UUID NOT NULL,
-    "invoice_id" UUID NOT NULL,
+    "invoice_id" TEXT NOT NULL,
     "line_no" INTEGER NOT NULL,
     "po_id" TEXT,
     "po_line_no" INTEGER,
@@ -252,7 +252,7 @@ CREATE TABLE "invoice_lines" (
 -- CreateTable
 CREATE TABLE "invoice_findings" (
     "id" UUID NOT NULL,
-    "invoice_id" UUID NOT NULL,
+    "invoice_id" TEXT NOT NULL,
     "line_no" INTEGER NOT NULL,
     "item_id" TEXT NOT NULL,
     "reason" TEXT NOT NULL,
