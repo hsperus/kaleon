@@ -1,0 +1,176 @@
+/* KAELON hareket dili — yay fiziği. Prototipteki eğrilerin aynısı. */
+:root {
+  --spring-soft: linear(0, .0118 2.17%, .043 4.35%, .0877 6.52%, .1415 8.7%, .2008 10.87%, .2629 13.04%, .3257 15.22%, .3875 17.39%, .4472 19.57%, .5041 21.74%, .5575 23.91%, .6071 26.09%, .6529 28.26%, .6947 30.43%, .7326 32.61%, .7668 34.78%, .7975 36.96%, .8248 39.13%, .8491 41.3%, .8705 43.48%, .8894 45.65%, .9058 47.83%, .9202 50%, .9327 52.17%, .9435 54.35%, .9527 56.52%, .9607 58.7%, .9675 60.87%, .9733 63.04%, .9782 65.22%, .9823 67.39%, .9858 69.57%, .9887 71.74%, .9911 73.91%, .9931 76.09%, .9947 78.26%, .996 80.43%, .9971 82.61%, .998 84.78%, .9987 86.96%, .9992 89.13%, .9996 91.3%, .9999 93.48%, 1.0002 95.65%, 1.0004 97.83%, 1);
+  --spring: linear(0, .0191 2.17%, .0687 4.35%, .1391 6.52%, .2222 8.7%, .3118 10.87%, .4028 13.04%, .4917 15.22%, .5756 17.39%, .653 19.57%, .7226 21.74%, .7841 23.91%, .8372 26.09%, .8824 28.26%, .9199 30.43%, .9506 32.61%, .9749 34.78%, .9938 36.96%, 1.008 39.13%, 1.0182 41.3%, 1.025 43.48%, 1.0292 45.65%, 1.0312 47.83%, 1.0315 50%, 1.0306 52.17%, 1.0288 54.35%, 1.0265 56.52%, 1.0238 58.7%, 1.021 60.87%, 1.0181 63.04%, 1.0153 65.22%, 1.0127 67.39%, 1.0103 69.57%, 1.0082 71.74%, 1.0063 73.91%, 1.0047 76.09%, 1.0034 78.26%, 1.0022 80.43%, 1.0013 82.61%, 1.0006 84.78%, 1.0001 86.96%, .9997 89.13%, .9994 91.3%, .9992 93.48%, .9991 95.65%, .999 97.83%, 1);
+  --glide: cubic-bezier(.32, .72, 0, 1);
+
+  --bg: #f6f7f9;
+  --surface: #fff;
+  --surface-2: #eff1f5;
+  --spec: rgba(255, 255, 255, .9);
+  --ink: #0b111a;
+  --ink-2: #39424f;
+  --muted: #6a7481;
+  --faint: #98a1ad;
+  --line: #e1e5eb;
+  --line-soft: #eceff3;
+  --accent: #0a7c8c;
+  --accent-veil: rgba(10, 124, 140, .09);
+  --crit: #b23a2e;
+  --crit-veil: rgba(178, 58, 46, .09);
+  --warn: #96620a;
+  --warn-veil: rgba(150, 98, 10, .1);
+  --ok: #22684c;
+  --sh-s: 0 1px 2px rgba(11, 17, 26, .05), 0 2px 8px -4px rgba(11, 17, 26, .1);
+  --sh-m: 0 2px 6px rgba(11, 17, 26, .05), 0 20px 44px -24px rgba(11, 17, 26, .3);
+  --sh-l: 0 4px 14px rgba(11, 17, 26, .07), 0 44px 96px -44px rgba(11, 17, 26, .42);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #070a0f;
+    --surface: #131a24;
+    --surface-2: #1a2230;
+    --spec: rgba(255, 255, 255, .07);
+    --ink: #ecf1f7;
+    --ink-2: #c2cbd7;
+    --muted: #8a94a3;
+    --faint: #626d7b;
+    --line: #222a37;
+    --line-soft: #19212c;
+    --accent: #45cbdd;
+    --accent-veil: rgba(69, 203, 221, .12);
+    --crit: #e8776a;
+    --crit-veil: rgba(232, 119, 106, .12);
+    --warn: #dfa94a;
+    --warn-veil: rgba(223, 169, 74, .13);
+    --ok: #5bbf93;
+    --sh-s: 0 1px 2px rgba(0, 0, 0, .5), 0 2px 8px -4px rgba(0, 0, 0, .5);
+    --sh-m: 0 2px 6px rgba(0, 0, 0, .5), 0 20px 44px -24px rgba(0, 0, 0, .75);
+    --sh-l: 0 4px 14px rgba(0, 0, 0, .5), 0 44px 96px -44px rgba(0, 0, 0, .9);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15.5px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 10px; }
+
+.shell { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+
+.topbar {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 16px;
+  padding: 14px 22px; border-bottom: 1px solid var(--line-soft);
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  backdrop-filter: saturate(180%) blur(22px);
+  position: relative; z-index: 20;
+}
+.brand { display: flex; align-items: center; gap: 9px; font-weight: 700; letter-spacing: -.02em; font-size: 15px; }
+.brand i { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-veil); }
+.who { font-size: 12.5px; color: var(--muted); padding-left: 16px; border-left: 1px solid var(--line); white-space: nowrap; }
+.who b { color: var(--ink-2); font-weight: 600; }
+.spacer { flex: 1; }
+
+.demo-badge {
+  font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 8px;
+  background: var(--warn-veil); color: var(--warn); white-space: nowrap;
+}
+
+select.role {
+  font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 9px;
+  background: var(--surface-2); color: var(--ink); border: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.stage {
+  flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  padding: 0 24px 24px; scroll-behavior: smooth;
+}
+.col { width: 100%; max-width: 700px; margin: 0 auto; display: flex; flex-direction: column; }
+.tail { flex: 0 0 auto; }
+
+.hero { display: flex; flex-direction: column; align-items: center; gap: 5px; padding-bottom: 26px; overflow: hidden; }
+.kicker { font-size: 12px; letter-spacing: .15em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+.greet { font-size: clamp(28px, 5vw, 40px); font-weight: 600; letter-spacing: -.036em; line-height: 1.12; margin: 3px 0 0; text-align: center; }
+.greet em { font-style: normal; color: var(--muted); }
+
+.in { animation: blurIn .78s var(--spring-soft) both; }
+@keyframes blurIn { from { opacity: 0; transform: translateY(16px) scale(.985); filter: blur(7px); } to { opacity: 1; transform: none; filter: blur(0); } }
+
+.signals { display: flex; flex-direction: column; gap: 11px; padding-bottom: 20px; }
+.sig1 { display: flex; align-items: flex-start; gap: 11px; font-size: 14px; color: var(--muted); }
+.sig1 i { width: 5px; height: 5px; border-radius: 50%; background: var(--faint); flex: 0 0 auto; margin-top: 9px; }
+.sig1 b { color: var(--ink-2); font-weight: 600; }
+
+.stream { display: flex; flex-direction: column; gap: 26px; padding-bottom: 20px; }
+.turn { display: flex; flex-direction: column; gap: 14px; }
+.ask {
+  align-self: flex-end; max-width: 82%; background: var(--surface-2);
+  border-radius: 19px 19px 6px 19px; padding: 11px 16px; font-size: 15px;
+  box-shadow: inset 0 1px 0 var(--spec);
+  animation: askIn .7s var(--spring) both;
+}
+@keyframes askIn { from { opacity: 0; transform: translateY(14px) scale(.94); filter: blur(5px); } to { opacity: 1; transform: none; filter: blur(0); } }
+
+.reply { display: flex; flex-direction: column; gap: 12px; animation: blurIn .6s var(--spring-soft) both; }
+.reply .txt { font-size: 15.5px; line-height: 1.68; white-space: pre-wrap; }
+
+.think { display: flex; flex-direction: column; gap: 9px; }
+.think i {
+  display: block; height: 11px; border-radius: 6px;
+  background: linear-gradient(100deg, var(--surface-2) 12%, var(--line) 34%, var(--surface-2) 58%);
+  background-size: 250% 100%; animation: sweep 1.5s linear infinite;
+}
+.think i:nth-child(1) { width: 88%; }
+.think i:nth-child(2) { width: 62%; animation-delay: .16s; }
+@keyframes sweep { from { background-position: 180% 0; } to { background-position: -80% 0; } }
+
+.calls { display: flex; flex-wrap: wrap; gap: 6px; }
+.call {
+  font-family: ui-monospace, "SF Mono", monospace; font-size: 11px;
+  padding: 3px 9px; border-radius: 7px; background: var(--accent-veil); color: var(--accent);
+  animation: blurIn .5s var(--glide) both;
+}
+.call.bad { background: var(--crit-veil); color: var(--crit); }
+
+.source { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 11.5px; color: var(--faint); padding-top: 10px; border-top: 1px solid var(--line-soft); font-family: ui-monospace, "SF Mono", monospace; }
+
+.risk { display: flex; gap: 9px; align-items: flex-start; font-size: 13.5px; line-height: 1.5; padding: 10px 13px; border-radius: 11px; background: var(--warn-veil); color: var(--ink-2); }
+.risk.crit { background: var(--crit-veil); }
+.risk b { flex: 0 0 auto; color: var(--warn); font-weight: 700; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; margin-top: 2px; }
+.risk.crit b { color: var(--crit); }
+
+.dock { position: relative; z-index: 5; }
+.composer {
+  display: flex; align-items: flex-end; gap: 10px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 22px;
+  padding: 10px 10px 10px 19px; box-shadow: var(--sh-m), inset 0 1px 0 var(--spec);
+  transition: box-shadow .62s var(--glide), border-color .34s var(--glide);
+}
+.composer:focus-within { border-color: color-mix(in srgb, var(--accent) 42%, var(--line)); box-shadow: var(--sh-l), inset 0 1px 0 var(--spec), 0 0 0 4px var(--accent-veil); }
+.composer textarea { flex: 1; background: none; border: none; resize: none; outline: none; font: inherit; font-size: 15.5px; line-height: 1.5; color: var(--ink); max-height: 150px; padding: 6px 0; }
+.composer textarea::placeholder { color: var(--faint); }
+
+.send {
+  flex: 0 0 auto; width: 37px; height: 37px; border-radius: 13px; display: grid; place-items: center;
+  background: var(--ink); color: var(--bg); opacity: .24; pointer-events: none; transform: scale(.86);
+  transition: opacity .34s var(--glide), transform .62s var(--spring);
+}
+.send.on { opacity: 1; pointer-events: auto; transform: scale(1); }
+.send:active { transform: scale(.9); transition-duration: .1s; }
+.send svg { width: 16px; height: 16px; }
+
+.foot { text-align: center; font-size: 11.5px; color: var(--faint); padding-top: 12px; }
+.foot code { font-family: ui-monospace, monospace; }
