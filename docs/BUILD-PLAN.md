@@ -1,0 +1,111 @@
+# KAELON — İnşa Planı
+
+> Ürün Mantığı Raporu §17'deki 12-15 aylık faz planının mühendislik granülaritesinde
+> karşılığı. Her aşamanın çıkışı çalışan ve test edilmiş koddur, doküman değil.
+>
+> v0.1 · Ağustos 2026
+
+## Mimari kararlar (kilitli)
+
+| Karar | Seçim | Gerekçe |
+|---|---|---|
+| Model | **Tek konuşma modeli: Claude Opus 5** | Önbellek modele özeldir; kademe önbelleği böler, prompt kütüphanesini ve eval matrisini katlar. Kademe yerine `effort` kadranı. |
+| İstisna | Haiku 4.5 + Batch API, yalnız gece belge hattı | Ayrı önbellek alanı, konuşmayı bölmez. %50 batch indirimi. |
+| Platform | Birinci-parti Anthropic API | `inference_geo` ve Message Batches yalnız burada var; Bedrock/Vertex ikisini de kaybettirir. |
+| Kapsam dışı | Claude Fable 5 | Sıfır veri saklama altında kullanılamıyor — veri egemenliği vaadiyle çelişir. |
+| Tool disiplini | Her iş kuralı bir tool; UI/AI/mobil/API aynı tool'u çağırır | Tek implementasyon, dört çağrı noktası. |
+| L4 | Tool olarak tanımlanamaz | Prompt talimatı değil, tipte yokluk. |
+| Veri | PostgreSQL 16, schema-per-tenant, Prisma 6 | Mimari v1 §3.1, §6.2. |
+| Uygulama | Next.js 15 App Router + tRPC | Mimari v1 §3.3. |
+
+## Aşamalar
+
+### Aşama 0 — Tool çekirdeği ✅ TAMAM
+`defineTool` primitifi, registry, invoker, RBAC, audit, LLM gateway, ajan döngüsü.
+30 test, `tsc --noEmit` temiz.
+
+**Neden önce bu:** 240 tool'un hepsi bu primitiften türeyecek. Çekirdek yanlışsa
+240 tool yanlış olur; doğruysa gerisi mekanik iş.
+
+### Aşama 1 — Kalıcılık ve kimlik (2-3 hafta)
+- Prisma şeması: `shared` (tenants, users, roles, billing) + `tenant_*` (işletmesel veri)
+- Schema-per-tenant yönlendirmesi tek yerde — bağlantı havuzu ve migration stratejisi
+- `DataSource` portunun Prisma adaptörü (bellek adaptörü testlerde kalır)
+- Better Auth + JWT, oturum yönetimi, 2FA (admin zorunlu)
+- Audit sink'in Postgres adaptörü: append-only tablo, `UPDATE`/`DELETE` yetkisi hiçbir role verilmez
+- **Çıkış kriteri:** iki tenant'ın verisi birbirini göremediğini kanıtlayan izolasyon testi
+
+### Aşama 2 — Master Data + Entity Resolution (3-4 hafta)
+- `partners`, `partner_aliases`, `partner_tax_ids`, `employees`, `items`, `locations`
+- Entity Resolution motoru: VKN deterministik eşleşme → alias tablosu → fuzzy unvan → güven skoru
+- Belirsiz eşleşmelerde manuel doğrulama akışı ve merge workflow
+- Tool'lar: `resolve_partner`, `get_partner`, `list_partners`, `merge_partners` (L2)
+- **Çıkış kriteri:** "Burçelik" / "BURÇELİK A.Ş." / VKN / entegratör cari ID'si aynı varlığa çözülür
+
+### Aşama 3 — Operations Core (5-6 hafta) — en kritik aşama
+- Ürün ve revizyon kartları, BOM + revizyon disiplini, configured BOM
+- Rota, iş merkezi, kapasite blokları
+- **Process-gated iş emri**: kalite kapısından geçmeyen operasyon ilerleyemez — kural
+  tool katmanında, kullanıcı katmanında değil
+- Stok hareketleri (hareket tipi disiplini), mal kabul, WMS Lite
+- Tool'lar: ~45 adet, hepsi `defineTool` ile
+- **Çıkış kriteri:** Orthaus'ta 50 gerçek iş emri uçtan uca; negatif stok oluşmaz;
+  kalite kapısı atlanamaz
+
+### Aşama 4 — Chat arayüzü + Boss Mode (4-5 hafta)
+- Prototipteki ana ekranın gerçek uygulaması: sohbet ana yüzey, üç seviyeli sessizlik,
+  panel sistemi ([prototype/ana-ekran.html](../prototype/ana-ekran.html))
+- Streaming, tool çağrısı ilerlemesi, kaynak satırı, drilldown
+- Boss Mode v1 ekranları: Bugünün Gerçeği, Saklanan Riskler, Fabrika Canlı, Kalite,
+  Sevkiyat Riski, Bugün Ne Yapmalıyım
+- Rol bazlı ana ekranlar: CFO cockpit, Üretim Müdürü cockpit
+- Saha dokunmatik katmanı (operatör/kalite/depo terminalleri)
+- **Çıkış kriteri:** patron sorgusundan cevaba p95 < 3 sn
+
+### Aşama 5 — Entegrasyon katmanı (3-4 hafta)
+- Adapter deseni: `connect / sync / send / validate / normalize`
+- E-Fatura (tek standart entegratör), banka, PDKS, bordro
+- Raw Data Layer → Canonical Layer dönüşümü, `source_reference` bağı
+- BullMQ kuyrukları, retry politikası, hata sınıflandırması
+- Gece belge hattı: Haiku 4.5 + Batch API ile fatura okuma
+- **Çıkış kriteri:** e-fatura → kanonik → PO eşleştirme → onay akışı uçtan uca
+
+### Aşama 6 — Approval Workspace + taslak tool'ları (3 hafta)
+- Sekiz durumlu state machine, çoklu onay seviyeleri
+- L1 taslak tool'ları: `draft_vat_return`, `draft_termination_calc`, `draft_payment_plan`
+- L2: `submit_for_approval`
+- Beyanname güven skoru hesabı
+- **Çıkış kriteri:** KDV taslağı hazırlanır, riskler işaretlenir, onaya düşer; gönderim yok
+
+### Aşama 7 — Evaluation framework (sürekli, Aşama 3'te başlar)
+- Golden question seti: 80 Türkçe soru, beklenen cevap + zorunlu kaynak alanları
+- Her prompt/tool değişikliğinde regresyon koşusu
+- Halüsinasyon tespiti: sayı doğrulama, kaynak kontrolü
+- Maliyet ve gecikme metrikleri, model/effort karşılaştırması
+- **Çıkış kriteri:** satışa çıkış eşiği — 80 golden question'da kaynaklı doğru cevap
+
+### Aşama 8 — Pilot sertleştirme (4 hafta)
+- Orthaus + Zerey canlı geçiş, veri migrasyonu, çapraz doğrulama dönemi
+- Güvenlik sertleştirme, sızma testi, KVKK uyum kontrol listesi
+- Implementation Partner Playbook
+- **Çıkış kriteri:** Ürün Mantığı §17'deki on satışa çıkış koşulunun tamamı
+
+## Değişmezler — her PR'da denetlenir
+
+1. `tool.execute` doğrudan çağrılmaz; her yol `invokeTool`'dan geçer.
+2. Yeni tool → yeni test. RBAC testi olmayan tool merge edilmez.
+3. Sistem promptuna değişken veri girmez (önbellek öneki).
+4. Tool katalogu deterministik sıralı kalır.
+5. Audit'te `UPDATE`/`DELETE` yoktur; migration'da bile.
+6. L4 sınırını ima eden tool adı reddedilir.
+7. `tsc --noEmit` ve testler yeşil olmadan commit yok.
+
+## Ölçüm
+
+| Metrik | Hedef |
+|---|---|
+| AI maliyeti | < $1 / kullanıcı / ay (uyarı $1,5, cap $2) |
+| Önbellek isabet oranı | > %80 (mesai saatlerinde) |
+| Sorgu p95 gecikme | < 3 sn |
+| Golden question doğruluğu | > %90 |
+| Kaynaksız cevap oranı | %0 — tipte imkânsız |
