@@ -60,8 +60,16 @@ export const ROLE_PERMISSIONS: Record<RoleId, readonly Permission[]> = {
     "master-data:item.read",
     "master-data:partner.read",
     "operations:*",
-    "quality:*",
+    // GÖREVLER AYRILIĞI (SoD): üretim müdürüne "quality:*" jokeri VERİLMEZ.
+    // Üretimden sorumlu kişinin kendi kalite kapısını atlayabilmesi, sistemin
+    // engellemesi gereken çıkar çatışmasının kendisidir. Kapı kararı verebilir
+    // (release), ama kapıyı ATLAYAMAZ (override) — o yetki patrondadır.
+    "quality:result.write",
+    "quality:gate.release",
+    "quality:hold.write",
     "inventory:stock.read",
+    "inventory:movement.write",
+    "inventory:adjustment.write",
     "maintenance:machine.read",
     "hr:attendance.department",
     // Departman mesai özeti görür; maaş alanı `redact` ile maskelenir
@@ -86,6 +94,7 @@ export const ROLE_PERMISSIONS: Record<RoleId, readonly Permission[]> = {
     "operations:shipment.read",
   ],
   operator: [
+    "operations:workorder.read",
     "operations:workorder.own",
     "quality:result.write",
     "hr:attendance.own",

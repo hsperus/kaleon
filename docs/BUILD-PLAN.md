@@ -55,8 +55,11 @@
   kalite kapısı atlanamaz
 - **Tamam:** hareket tipli stok defteri (negatif stok imkânsız, iptal=ters hareket),
   process-gated iş emri (kapı atlanamaz, override görünür), BOM revizyon dondurma
-- **Kalan:** ~40 tool (`defineTool` sarmalayıcıları), Prisma kalıcılığı, configured BOM,
-  kapasite blokları, WMS Lite, mal kabul
+- **Tamam (devam):** 12 üretim/stok tool'u, repository portu (değişmezler kilit
+  altında — eşzamanlı sarf testi mevcut), görevler ayrılığı (üretim müdürü kalite
+  kararı verir, kapıyı ATLAYAMAZ)
+- **Kalan:** Prisma kalıcılığı, configured BOM, kapasite blokları, WMS Lite,
+  mal kabul/PO eşleştirme, ~25 tool daha
 
 ### Aşama 4 — Chat arayüzü + Boss Mode (4-5 hafta)
 - Prototipteki ana ekranın gerçek uygulaması: sohbet ana yüzey, üç seviyeli sessizlik,
@@ -107,6 +110,8 @@
 4. Tool katalogu deterministik sıralı kalır.
 5. Audit'te `UPDATE`/`DELETE` yoktur; migration'da bile.
 6. L4 sınırını ima eden tool adı reddedilir.
+6b. Değişmezler kilit altında uygulanır — oku-kontrol-et-yaz deseni yasak.
+6c. Görevler ayrılığı: bir rol hem işi yapıp hem kendi kontrolünü atlayamaz.
 7. `tsc --noEmit` ve testler yeşil olmadan commit yok.
 
 ## Ölçüm
