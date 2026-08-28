@@ -1,0 +1,117 @@
+// KAELON kontrol düzlemi (control plane).
+//
+// Bu şema TÜM tenant'lar için ortaktır ve yalnızca kiracı kaydı, kullanıcı
+// kimliği ve faturalama/kullanım verisi tutar. İşletmesel veri BURAYA GİRMEZ —
+// o her tenant'ın kendi şemasındadır (bkz. prisma/tenant.prisma).
+//
+// Ayrım kritiktir: KVKK silme talebi bir tenant şemasının DROP'u ile karşılanır;
+// kontrol düzlemi bundan etkilenmez.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/db/generated/shared"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("SHARED_DATABASE_URL")
+}
+
+model Tenant {
+  id           String   @id @default(uuid()) @db.Uuid
+  slug         String   @unique
+  name         String
+  /// Bu tenant'ın işletmesel verisinin yaşadığı Postgres şeması.
+  schemaName   String   @unique @map("schema_name")
+  locale       String   @default("tr-TR")
+  baseCurrency String   @default("TRY") @map("base_currency")
+  status       TenantStatus @default(provisioning)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  memberships Membership[]
+  usage       AiUsage[]
+
+  @@map("tenants")
+}
+
+enum TenantStatus {
+  provisioning
+  active
+  suspended
+  archived
+}
+
+model User {
+  id           String   @id @default(uuid()) @db.Uuid
+  email        String   @unique
+  displayName  String   @map("display_name")
+  passwordHash String?  @map("password_hash")
+  totpSecret   String?  @map("totp_secret")
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  memberships Membership[]
+  sessions    Session[]
+
+  @@map("users")
+}
+
+/// Kullanıcı ↔ tenant ilişkisi ve o tenant'taki rolleri.
+/// Bir kullanıcı birden çok tenant'ta farklı rollerde olabilir.
+model Membership {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  /// RoleId değerleri (src/kernel/types.ts) — örn. ["patron"]
+  roles     String[]
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, tenantId])
+  @@index([tenantId])
+  @@map("memberships")
+}
+
+model Session {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  tenantId  String   @map("tenant_id") @db.Uuid
+  tokenHash String   @unique @map("token_hash")
+  expiresAt DateTime @map("expires_at")
+  revokedAt DateTime? @map("revoked_at")
+  ip        String?
+  userAgent String?  @map("user_agent")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+/// AI Usage Ledger — tenant ve kullanıcı bazında token/maliyet.
+/// Bütçe kapısı (uyarı 1,5 USD, cap 2 USD) bu tablodan beslenir.
+model AiUsage {
+  id               String   @id @default(uuid()) @db.Uuid
+  tenantId         String   @map("tenant_id") @db.Uuid
+  userId           String   @map("user_id") @db.Uuid
+  correlationId    String   @map("correlation_id")
+  model            String
+  inputTokens      Int      @map("input_tokens")
+  outputTokens     Int      @map("output_tokens")
+  cacheReadTokens  Int      @map("cache_read_tokens")
+  cacheWriteTokens Int      @map("cache_write_tokens")
+  costUsd          Decimal  @map("cost_usd") @db.Decimal(12, 6)
+  createdAt        DateTime @default(now()) @map("created_at")
+
+  tenant Tenant @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, userId, createdAt])
+  @@map("ai_usage")
+}

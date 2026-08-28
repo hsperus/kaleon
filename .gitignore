@@ -5,3 +5,4 @@ dist/
 *.log
 .DS_Store
 .vitest/
+src/db/generated/
