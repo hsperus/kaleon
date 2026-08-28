@@ -12,6 +12,8 @@ import { InMemoryDataSource } from "./data/memory.js";
 import type { DataSource } from "./data/port.js";
 import { masterDataTools } from "./modules/master-data/tools.js";
 import { operationsTools } from "./modules/operations/tools.js";
+import { productionTools } from "./modules/operations/production-tools.js";
+import { InMemoryOperationsRepository, type OperationsRepository } from "./modules/operations/repository.js";
 import { financeTools } from "./modules/finance/tools.js";
 import { hrTools } from "./modules/hr/tools.js";
 import type { Tool } from "./kernel/tool.js";
@@ -23,11 +25,13 @@ export interface Kaelon {
   readonly gateway: LlmGateway;
 }
 
-export function buildRegistry(db: DataSource): ToolRegistry {
+export function buildRegistry(db: DataSource, repo?: OperationsRepository): ToolRegistry {
   const registry = new ToolRegistry();
+  const operations = repo ?? new InMemoryOperationsRepository();
   const all = [
     ...masterDataTools(db),
     ...operationsTools(db),
+    ...productionTools(operations),
     ...financeTools(db),
     ...hrTools(db),
   ];
@@ -37,6 +41,7 @@ export function buildRegistry(db: DataSource): ToolRegistry {
 
 export function createKaelon(options?: {
   db?: DataSource;
+  repo?: OperationsRepository;
   audit?: AuditSink;
   ledger?: UsageLedger;
   client?: Anthropic;
@@ -47,7 +52,7 @@ export function createKaelon(options?: {
   const client = options?.client ?? new Anthropic();
 
   return {
-    registry: buildRegistry(db),
+    registry: buildRegistry(db, options?.repo),
     audit,
     ledger,
     gateway: new LlmGateway({ client, ledger, systemPrompt: SYSTEM_PROMPT }),
