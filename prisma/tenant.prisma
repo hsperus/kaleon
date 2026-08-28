@@ -309,7 +309,9 @@ model GoodsReceipt {
 }
 
 model Invoice {
-  id            String   @id @default(uuid()) @db.Uuid
+  /// Belge kimliği entegratörden gelebilir; UUID zorunluluğu yoktur.
+  /// İş anahtarı zaten (partnerId, documentNo) çiftidir.
+  id            String   @id @default(uuid())
   partnerId     String   @map("partner_id")
   documentNo    String   @map("document_no")
   issuedAt      DateTime @map("issued_at")
@@ -335,7 +337,7 @@ model Invoice {
 
 model InvoiceLine {
   id        String  @id @default(uuid()) @db.Uuid
-  invoiceId String  @map("invoice_id") @db.Uuid
+  invoiceId String  @map("invoice_id")
   lineNo    Int     @map("line_no")
   poId      String? @map("po_id")
   poLineNo  Int?    @map("po_line_no")
@@ -353,7 +355,7 @@ model InvoiceLine {
 /// Eşleştirme bulguları — neden bloklandığının kalıcı kaydı.
 model InvoiceFinding {
   id        String  @id @default(uuid()) @db.Uuid
-  invoiceId String  @map("invoice_id") @db.Uuid
+  invoiceId String  @map("invoice_id")
   lineNo    Int     @map("line_no")
   itemId    String  @map("item_id")
   reason    String
