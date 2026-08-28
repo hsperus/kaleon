@@ -27,20 +27,22 @@
 **Neden önce bu:** 240 tool'un hepsi bu primitiften türeyecek. Çekirdek yanlışsa
 240 tool yanlış olur; doğruysa gerisi mekanik iş.
 
-### Aşama 1 — Kalıcılık ve kimlik (2-3 hafta)
+### Aşama 1 — Kalıcılık ve kimlik ✅ ÇEKİRDEK TAMAM
 - Prisma şeması: `shared` (tenants, users, roles, billing) + `tenant_*` (işletmesel veri)
 - Schema-per-tenant yönlendirmesi tek yerde — bağlantı havuzu ve migration stratejisi
 - `DataSource` portunun Prisma adaptörü (bellek adaptörü testlerde kalır)
 - Better Auth + JWT, oturum yönetimi, 2FA (admin zorunlu)
 - Audit sink'in Postgres adaptörü: append-only tablo, `UPDATE`/`DELETE` yetkisi hiçbir role verilmez
-- **Çıkış kriteri:** iki tenant'ın verisi birbirini göremediğini kanıtlayan izolasyon testi
+- **Çıkış kriteri:** iki tenant'ın verisi birbirini göremediğini kanıtlayan izolasyon testi ✅
+- **Kalan:** Better Auth entegrasyonu, oturum/2FA akışı, var olan tenant'lara şema değişikliği uygulayan migration runner
 
-### Aşama 2 — Master Data + Entity Resolution (3-4 hafta)
+### Aşama 2 — Master Data + Entity Resolution ✅ MOTOR TAMAM
 - `partners`, `partner_aliases`, `partner_tax_ids`, `employees`, `items`, `locations`
 - Entity Resolution motoru: VKN deterministik eşleşme → alias tablosu → fuzzy unvan → güven skoru
 - Belirsiz eşleşmelerde manuel doğrulama akışı ve merge workflow
 - Tool'lar: `resolve_partner`, `get_partner`, `list_partners`, `merge_partners` (L2)
-- **Çıkış kriteri:** "Burçelik" / "BURÇELİK A.Ş." / VKN / entegratör cari ID'si aynı varlığa çözülür
+- **Çıkış kriteri:** "Burçelik" / "BURÇELİK A.Ş." / VKN / entegratör cari ID'si aynı varlığa çözülür ✅
+- **Kalan:** Prisma adaptörü (indeksli ön eleme), merge workflow tool'u (L2), employee/item resolution
 
 ### Aşama 3 — Operations Core (5-6 hafta) — en kritik aşama
 - Ürün ve revizyon kartları, BOM + revizyon disiplini, configured BOM

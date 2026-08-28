@@ -85,4 +85,30 @@ export class InMemoryDataSource implements DataSource {
     if (args.department) rows = rows.filter((r) => r.department === args.department);
     return fresh(rows, rows.length);
   }
+
+  async partnerCandidates(): Promise<
+    WithFreshness<readonly import("./port.js").PartnerCandidateRow[]>
+  > {
+    return fresh(PARTNERS, PARTNERS.length);
+  }
 }
+
+const PARTNERS: readonly import("./port.js").PartnerCandidateRow[] = [
+  {
+    partnerId: "p-burcelik",
+    legalName: "Burçelik Bursa Çelik Döküm Sanayi A.Ş.",
+    taxIds: [{ kind: "vkn", value: "1234567890", valid: true }],
+    externalRefs: [{ system: "uyumsoft", externalId: "SUP-00432" }],
+    aliases: [
+      { alias: "Burçelik", source: "confirmed" },
+      { alias: "BURÇELİK A.Ş.", source: "confirmed" },
+    ],
+  },
+  {
+    partnerId: "p-volvo",
+    legalName: "Volvo Group Sweden AB",
+    taxIds: [],
+    externalRefs: [{ system: "uyumsoft", externalId: "CUS-04521" }],
+    aliases: [{ alias: "Volvo", source: "confirmed" }],
+  },
+];

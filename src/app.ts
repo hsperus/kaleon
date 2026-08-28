@@ -10,6 +10,7 @@ import { InMemoryLedger, type UsageLedger } from "./ai/ledger.js";
 import { SYSTEM_PROMPT } from "./ai/system-prompt.js";
 import { InMemoryDataSource } from "./data/memory.js";
 import type { DataSource } from "./data/port.js";
+import { masterDataTools } from "./modules/master-data/tools.js";
 import { operationsTools } from "./modules/operations/tools.js";
 import { financeTools } from "./modules/finance/tools.js";
 import { hrTools } from "./modules/hr/tools.js";
@@ -24,7 +25,12 @@ export interface Kaelon {
 
 export function buildRegistry(db: DataSource): ToolRegistry {
   const registry = new ToolRegistry();
-  const all = [...operationsTools(db), ...financeTools(db), ...hrTools(db)];
+  const all = [
+    ...masterDataTools(db),
+    ...operationsTools(db),
+    ...financeTools(db),
+    ...hrTools(db),
+  ];
   registry.register(...(all as unknown as Tool<never, unknown>[]));
   return registry;
 }

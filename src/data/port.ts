@@ -73,4 +73,22 @@ export interface DataSource {
     tenantId: string,
     args: { employeeQuery: string | null; department: string | null; period: string },
   ): Promise<WithFreshness<readonly OvertimeRecord[]>>;
+  /**
+   * Entity resolution adayları. Gerçek adaptörde indeksli ön eleme yapar
+   * (normalized prefix, token GIN indeksi); motor saf kalır.
+   */
+  partnerCandidates(
+    tenantId: string,
+    hint: { name: string | null; taxId: string | null },
+  ): Promise<WithFreshness<readonly PartnerCandidateRow[]>>;
+}
+
+/** Entity resolution için ön elemeli aday getirme. */
+export interface PartnerCandidateRow {
+  readonly partnerId: string;
+  readonly legalName: string;
+  readonly taxIds: readonly { kind: string; value: string; valid: boolean }[];
+  readonly externalRefs: readonly { system: string; externalId: string }[];
+  readonly aliases: readonly { alias: string; source: "observed" | "confirmed" | "automatic" }[];
+  readonly mergedInto?: string | null;
 }
