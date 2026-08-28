@@ -81,13 +81,20 @@
 - BullMQ kuyrukları, retry politikası, hata sınıflandırması
 - Gece belge hattı: Haiku 4.5 + Batch API ile fatura okuma
 - **Çıkış kriteri:** e-fatura → kanonik → PO eşleştirme → onay akışı uçtan uca
+- **Tamam:** üç yönlü eşleştirme motoru (fiyat/miktar/mal kabul/mükerrer/para birimi),
+  çift eşikli tolerans, bulgular parasal etkiye göre sıralı
 
-### Aşama 6 — Approval Workspace + taslak tool'ları (3 hafta)
+### Aşama 6 — Approval Workspace 🟡 DURUM MAKİNESİ TAMAM
 - Sekiz durumlu state machine, çoklu onay seviyeleri
 - L1 taslak tool'ları: `draft_vat_return`, `draft_termination_calc`, `draft_payment_plan`
 - L2: `submit_for_approval`
 - Beyanname güven skoru hesabı
 - **Çıkış kriteri:** KDV taslağı hazırlanır, riskler işaretlenir, onaya düşer; gönderim yok
+- **Tamam:** 8 durumlu makine; hazırlayan onaylayamaz (SoD), onay limiti ve para
+  birimi kontrolü, riskler teyit edilmeden onay yok, `submitted_externally`
+  yalnızca `job` kanalından — kullanıcı 'gönderildi' işaretleyemez
+- **Kalan:** L1 taslak tool'ları (KDV, işten çıkış, ödeme planı), Prisma kalıcılığı,
+  eskalasyon zinciri
 
 ### Aşama 7 — Evaluation framework 🟡 KOŞUM TAMAM
 - Golden question seti: 80 Türkçe soru, beklenen cevap + zorunlu kaynak alanları
