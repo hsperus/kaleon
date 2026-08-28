@@ -6,3 +6,5 @@ dist/
 .DS_Store
 .vitest/
 src/db/generated/
+.next/
+next-env.d.ts

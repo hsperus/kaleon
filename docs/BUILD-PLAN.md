@@ -64,7 +64,7 @@
 - **Kalan:** configured BOM, kapasite blokları, WMS Lite, mal kabul/PO eşleştirme,
   ~25 tool daha
 
-### Aşama 4 — Chat arayüzü + Boss Mode (4-5 hafta)
+### Aşama 4 — Chat arayüzü 🟡 UÇTAN UCA ÇALIŞIYOR
 - Prototipteki ana ekranın gerçek uygulaması: sohbet ana yüzey, üç seviyeli sessizlik,
   panel sistemi ([prototype/ana-ekran.html](../prototype/ana-ekran.html))
 - Streaming, tool çağrısı ilerlemesi, kaynak satırı, drilldown
@@ -73,6 +73,12 @@
 - Rol bazlı ana ekranlar: CFO cockpit, Üretim Müdürü cockpit
 - Saha dokunmatik katmanı (operatör/kalite/depo terminalleri)
 - **Çıkış kriteri:** patron sorgusundan cevaba p95 < 3 sn
+- **Tamam:** Next.js 15 + tRPC iskeleti, chat ana ekranı gerçek uca bağlı,
+  rol değiştirici (geliştirme), tool çağrısı rozetleri, kaynak satırı,
+  audit uç noktası. Model bağlı değilken senaryo tabanlı completer devreye
+  giriyor ve arayüz bunu AÇIKÇA yazıyor
+- **Kalan:** streaming, panel sistemi, Boss Mode ekranları, saha dokunmatik
+  katmanı, gerçek oturum (Better Auth)
 
 ### Aşama 5 — Entegrasyon katmanı (3-4 hafta)
 - Adapter deseni: `connect / sync / send / validate / normalize`
