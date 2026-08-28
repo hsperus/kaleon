@@ -1,0 +1,182 @@
+// KAELON tenant şeması — her müşterinin işletmesel verisi.
+//
+// Bu datamodel her tenant için ayrı bir Postgres şemasına (tenant_<slug>)
+// uygulanır. Bağlantı dizesindeki `?schema=` parametresi hangi tenant'ta
+// çalışıldığını belirler; uygulama kodu şema adını asla elle yazmaz.
+//
+// İzolasyon garantisi: bir tenant'ın client'ı başka bir şemayı GÖREMEZ,
+// çünkü search_path tek şemaya sabitlenir.
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../src/db/generated/tenant"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("TENANT_DATABASE_URL")
+}
+
+// ─────────────────────────── Master Data Core ───────────────────────────
+
+/// Tedarikçi ve müşteri tek varlıktır (S/4HANA'daki Business Partner mantığı).
+/// Rol alanı hangi yönde çalıştığını söyler.
+model Partner {
+  id         String   @id @default(uuid()) @db.Uuid
+  code       String   @unique
+  legalName  String   @map("legal_name")
+  /// Normalize edilmiş ad — entity resolution'ın deterministik anahtarı.
+  /// Türkçe küçültme + tüzel ek temizliği uygulanmış hâli.
+  normalized String
+  isSupplier Boolean  @default(false) @map("is_supplier")
+  isCustomer Boolean  @default(false) @map("is_customer")
+  country    String   @default("TR")
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+  /// Yanlış açılmış kayıt başka bir partner'a birleştirildiyse hedefi.
+  mergedInto String?  @map("merged_into") @db.Uuid
+
+  aliases      PartnerAlias[]
+  taxIds       PartnerTaxId[]
+  externalRefs PartnerExternalRef[]
+
+  @@index([normalized])
+  @@index([mergedInto])
+  @@map("partners")
+}
+
+/// Aynı firmanın farklı kaynaklarda göründüğü isimler.
+/// "Burçelik", "BURÇELİK A.Ş.", "Burcelik Bursa Celik Dokum Sanayi" → tek partner.
+model PartnerAlias {
+  id         String   @id @default(uuid()) @db.Uuid
+  partnerId  String   @map("partner_id") @db.Uuid
+  alias      String
+  normalized String
+  /// Eşleşme nasıl kuruldu — otomatik mi, insan mı onayladı?
+  source     AliasSource @default(observed)
+  confidence Decimal  @db.Decimal(4, 3)
+  confirmedBy String?  @map("confirmed_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@unique([partnerId, normalized])
+  @@index([normalized])
+  @@map("partner_aliases")
+}
+
+enum AliasSource {
+  /// Entegratör verisinden gözlendi, henüz doğrulanmadı.
+  observed
+  /// Yetkili kullanıcı onayladı.
+  confirmed
+  /// Sistem tarafından yüksek güvenle otomatik eşleştirildi.
+  automatic
+}
+
+/// Vergi/TC kimlik numarası — entity resolution'ın en güçlü anahtarı.
+model PartnerTaxId {
+  id        String   @id @default(uuid()) @db.Uuid
+  partnerId String   @map("partner_id") @db.Uuid
+  kind      TaxIdKind
+  value     String
+  country   String   @default("TR")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@unique([country, kind, value])
+  @@index([value])
+  @@map("partner_tax_ids")
+}
+
+enum TaxIdKind {
+  /// Vergi Kimlik Numarası (10 hane)
+  vkn
+  /// TC Kimlik Numarası (11 hane)
+  tckn
+  /// EU VAT
+  vat
+}
+
+/// Entegratör/dış sistem kimlikleri — "SUP-00432" gibi.
+model PartnerExternalRef {
+  id         String   @id @default(uuid()) @db.Uuid
+  partnerId  String   @map("partner_id") @db.Uuid
+  system     String
+  externalId String   @map("external_id")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
+
+  @@unique([system, externalId])
+  @@map("partner_external_refs")
+}
+
+model Employee {
+  id           String   @id @default(uuid()) @db.Uuid
+  code         String   @unique
+  fullName     String   @map("full_name")
+  normalized   String
+  department   String
+  position     String
+  hiredAt      DateTime @map("hired_at") @db.Date
+  terminatedAt DateTime? @map("terminated_at") @db.Date
+  grossSalary  Decimal? @map("gross_salary") @db.Decimal(14, 2)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@index([normalized])
+  @@index([department])
+  @@map("employees")
+}
+
+model Location {
+  id       String  @id @default(uuid()) @db.Uuid
+  code     String  @unique
+  name     String
+  kind     LocationKind
+  parentId String? @map("parent_id") @db.Uuid
+  isActive Boolean @default(true) @map("is_active")
+
+  @@map("locations")
+}
+
+enum LocationKind {
+  plant
+  warehouse
+  storage_location
+  work_center
+  office
+}
+
+// ─────────────────────────── Audit ───────────────────────────
+
+/// Append-only. UPDATE ve DELETE veritabanı seviyesinde de engellenir
+/// (bkz. migration sonrası uygulanan tetikleyici).
+model AuditEntry {
+  id            String   @id @db.Uuid
+  at            DateTime
+  userId        String   @map("user_id") @db.Uuid
+  roles         String[]
+  channel       String
+  correlationId String   @map("correlation_id")
+  toolName      String   @map("tool_name")
+  authority     Int
+  outcome       String
+  input         Json
+  resultSummary Json?    @map("result_summary")
+  errorCode     String?  @map("error_code")
+  durationMs    Int      @map("duration_ms")
+  aiModel       String?  @map("ai_model")
+  aiPromptVersion String? @map("ai_prompt_version")
+  aiToolUseId   String?  @map("ai_tool_use_id")
+
+  @@index([at])
+  @@index([userId, at])
+  @@index([toolName, at])
+  @@index([correlationId])
+  @@map("audit_entries")
+}
