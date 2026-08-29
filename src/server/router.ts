@@ -6,6 +6,7 @@
  * API katmanına iş kuralı sızarsa, UI ve AI farklı davranmaya başlar.
  */
 
+import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { procedure, router } from "./trpc.js";
 import { runConversation } from "../ai/runner.js";
@@ -92,6 +93,38 @@ export const appRouter = router({
       errorCode: e.errorCode ?? null,
     }));
   }),
+
+  /**
+   * Kullanıcının konuşmaları.
+   *
+   * Depo baştan beri vardı ama arayüzü yoktu: kullanıcı dünkü konuşmasına
+   * dönemiyordu. Sohbet tabanlı bir üründe geçmişe erişememek, defterini
+   * her akşam çöpe atmak gibidir.
+   */
+  conversations: procedure.query(async ({ ctx }) => {
+    const rows = await ctx.conversations.list(ctx.principal.userId, 30);
+    return rows.map((c) => ({ id: c.id, title: c.title, updatedAt: c.updatedAt }));
+  }),
+
+  /** Bir konuşmanın turları. Sahiplik depo katmanında doğrulanır. */
+  conversation: procedure
+    .input(z.object({ id: z.string().min(1).max(64) }))
+    .query(async ({ ctx, input }) => {
+      const turns = await ctx.conversations.history(input.id, ctx.principal.userId);
+      // Sahibi değilse null döner; "bulunamadı" ile "yetkiniz yok" ayrımı
+      // yapılmaz — kimliği bilen birine varlığını doğrulamak da bilgidir.
+      if (turns === null) throw new TRPCError({ code: "NOT_FOUND" });
+      return turns.map((t) => ({ question: t.question, answer: t.answer }));
+    }),
+
+  /** Konuşmayı siler. Sahiplik silme sorgusunun içinde doğrulanır. */
+  deleteConversation: procedure
+    .input(z.object({ id: z.string().min(1).max(64) }))
+    .mutation(async ({ ctx, input }) => {
+      const removed = await ctx.conversations.remove(input.id, ctx.principal.userId);
+      if (!removed) throw new TRPCError({ code: "NOT_FOUND" });
+      return { ok: true };
+    }),
 
   /** Golden question seti — arayüzde deneme soruları olarak da kullanılır. */
   goldenQuestions: procedure.query(() =>

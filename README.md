@@ -130,6 +130,61 @@ kataloğu atlayan bir çağrı (eski konuşma, elle istek) ikinci kapıya çarpa
 kişinin kendi kalite kapısını atlaması, sistemin engellemesi gereken çıkar
 çatışmasının kendisidir.
 
+## Denetim kaydı
+
+Her tool çağrısı tenant şemasına yazılır ve **veritabanı seviyesinde
+değiştirilemez** (`UPDATE`/`DELETE` tetikleyiciyle reddedilir — doğrudan SQL
+ile bile).
+
+```bash
+npm run audit -- orthaus                      # son 50 işlem
+npm run audit -- orthaus --failed             # reddedilen/başarısız olanlar
+npm run audit -- orthaus --writes             # yalnızca veri değiştirenler
+npm run audit -- orthaus --user <uuid> --from 2026-05-01 --to 2026-05-31
+```
+
+## Yedekleme ve geri yükleme
+
+Kontrol düzlemi ve tenant şemaları **aynı veritabanındadır**; tek bir dump
+her şeyi kapsar.
+
+```bash
+pg_dump --format=custom --file=kaelon-$(date +%F).dump "$SHARED_DATABASE_URL"
+```
+
+Tek bir tenant'ı almak (müşteriye veri teslimi, taşıma):
+
+```bash
+pg_dump --format=custom --schema=tenant_orthaus --file=orthaus.dump "$SHARED_DATABASE_URL"
+```
+
+Geri yükleme:
+
+```bash
+pg_restore --dbname="$SHARED_DATABASE_URL" --clean --if-exists kaelon-2026-05-16.dump
+```
+
+**Geri yükleme provası yapılmamış yedek, yedek değildir.** En az üç ayda bir
+boş bir veritabanına geri yükleyip `npm run tenant -- list` ile şema
+sürümlerini doğrulayın.
+
+**KVKK silme talebi** bir tenant'ın tüm işletmesel verisini kaldırır:
+
+```bash
+KAELON_CONFIRM_DROP=orthaus npm run tenant -- drop orthaus
+```
+
+Kontrol düzlemindeki kayıt `archived` olarak kalır; denetim izi için gerekli.
+
+## İzleme
+
+Loglar tek satır JSON (üretimde). Her satırda `correlationId` vardır; bir
+isteğin tüm izleri o anahtarla toplanır. Parola, token, TOTP kodu, tool
+girdisi ve dosya içeriği **asla loglanmaz**.
+
+Kullanıcıya bir hata gösterildiğinde ekranda **destek kodu** çıkar; logda
+`ref` alanıyla aranır.
+
 ## Testler
 
 ```bash

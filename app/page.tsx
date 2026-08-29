@@ -130,6 +130,10 @@ export default function Page() {
     { id: string; filename: string; rowCount: number; headers: string[] } | null
   >(null);
   const [uploading, setUploading] = useState(false);
+  /** Geçmiş konuşmalar. Açılınca yüklenir; her istekte çekmek gereksiz. */
+  const [history, setHistory] = useState<
+    { id: string; title: string; updatedAt: string }[] | null
+  >(null);
 
   useEffect(() => {
     const c = client(role);
@@ -251,6 +255,43 @@ export default function Page() {
     inputRef.current?.focus();
   }, []);
 
+  /** Geçmişi açar ve listeyi tazeler. */
+  const openHistory = useCallback(async () => {
+    setHistory([]);
+    try {
+      const rows = await client(role).conversations.query();
+      setHistory([...rows]);
+    } catch {
+      setHistory([]);
+    }
+  }, [role]);
+
+  /** Bir konuşmayı geri yükler. */
+  const loadConversation = useCallback(
+    async (id: string) => {
+      try {
+        const rows = await client(role).conversation.query({ id });
+        conversationIdRef.current = id;
+        setConversationId(id);
+        setTurns(
+          rows.map((t) => ({
+            question: t.question,
+            answer: t.answer,
+            toolCalls: [],
+            risks: [],
+            running: null,
+          })),
+        );
+        setPanels([]);
+        setHistory(null);
+      } catch {
+        // Konuşma silinmiş veya başkasına ait: listeyi tazele.
+        void openHistory();
+      }
+    },
+    [role, openHistory],
+  );
+
   const attachFile = useCallback(async (file: File) => {
     setUploading(true);
     try {
@@ -335,6 +376,22 @@ export default function Page() {
 
         {/* Konuşma sürüyorsa yeni konuşma açılabilsin; sürmüyorsa buton
             gereksiz gürültüdür. */}
+        <button
+          className="icon-btn"
+          type="button"
+          onClick={() => void (history === null ? openHistory() : setHistory(null))}
+          title="Geçmiş konuşmalar"
+          aria-label="Geçmiş konuşmalar"
+        >
+          <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+            <path
+              d="M2.5 4h11M2.5 8h11M2.5 12h7"
+              stroke="currentColor"
+              strokeWidth="1.5"
+              strokeLinecap="round"
+            />
+          </svg>
+        </button>
         {conversationId && turns.length > 0 && (
           <button
             className="icon-btn"
@@ -393,6 +450,38 @@ export default function Page() {
           </button>
         )}
       </header>
+
+      {history !== null && (
+        <>
+          {/* Dışına tıklayınca kapanır: her panelin bir X'i olması gerekmez. */}
+          <div className="scrim" onClick={() => setHistory(null)} aria-hidden />
+          <aside className="history" aria-label="Geçmiş konuşmalar">
+            <div className="history-head">Konuşmalar</div>
+            {history.length === 0 ? (
+              <p className="history-empty">Henüz konuşma yok.</p>
+            ) : (
+              <div className="history-list">
+                {history.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`history-item${c.id === conversationId ? " on" : ""}`}
+                    onClick={() => void loadConversation(c.id)}
+                  >
+                    <span className="t">{c.title}</span>
+                    <span className="d">
+                      {new Date(c.updatedAt).toLocaleDateString("tr-TR", {
+                        day: "numeric",
+                        month: "short",
+                      })}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            )}
+          </aside>
+        </>
+      )}
 
       <div className={`stage${panels.length ? " shifted" : ""}`} ref={stageRef}>
         <div className="col">

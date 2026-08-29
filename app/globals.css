@@ -106,7 +106,14 @@ body {
 button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
 :focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 10px; }
 
-.shell { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+/* `overflow: clip`, `hidden` DEĞİL.
+   Kapalı panel çekmecesi `translateX(100%)` ile sağa taşar ve `hidden`
+   ile kırpılsa bile KAYDIRILABİLİR BİR KAP yaratır. Odak yeni açılan bir
+   panele gittiğinde tarayıcı o kabı kaydırır ve TÜM DÜZEN yana kayar —
+   kullanıcı bozuk bir ekran görür. `clip` görüntüyü kırpar ama kaydırma
+   kabı OLUŞTURMAZ; hatanın sınıfı tamamen ortadan kalkar.
+   (Gerçekten yaşandı: geçmiş paneli açılınca ekran 405px sola kaydı.) */
+.shell { height: 100dvh; display: flex; flex-direction: column; overflow: clip; }
 
 .topbar {
   flex: 0 0 auto; display: flex; align-items: center; gap: 16px;
@@ -555,3 +562,50 @@ button.role, select.role {
 .clip:hover:not(:disabled) { color: var(--accent); background: var(--accent-veil); }
 .clip:disabled { opacity: .4; cursor: default; }
 .clip:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-veil); }
+
+/* ─────────────────── Geçmiş konuşmalar ───────────────────
+   Soldan açılan ince bir liste. Kalıcı bir kenar çubuğu DEĞİL: sohbet
+   ekranının tamamı içeriğe ait olmalı, gezinme yalnızca istendiğinde
+   görünmeli. macOS'ta da kenar çubukları gizlenebilir. */
+
+.scrim {
+  position: absolute; inset: 0; z-index: 25;
+  background: color-mix(in srgb, var(--bg) 40%, transparent);
+  animation: scrimIn .2s var(--glide) both;
+}
+@keyframes scrimIn { from { opacity: 0; } to { opacity: 1; } }
+
+.history {
+  position: absolute; top: 57px; left: 0; bottom: 0; width: 268px; z-index: 30;
+  background: var(--surface); border-right: 1px solid var(--line);
+  display: flex; flex-direction: column;
+  box-shadow: var(--sh-m);
+  animation: historyIn .42s var(--spring-soft) both;
+}
+@keyframes historyIn { from { transform: translateX(-100%); } to { transform: none; } }
+
+.history-head {
+  flex: 0 0 auto; padding: 14px 16px 10px;
+  font-size: 12px; font-weight: 600; color: var(--muted);
+}
+.history-empty { margin: 0; padding: 4px 16px; font-size: 13px; color: var(--faint); }
+.history-list { flex: 1; overflow-y: auto; padding: 0 8px 12px; display: flex; flex-direction: column; gap: 1px; }
+
+.history-item {
+  display: flex; align-items: baseline; gap: 10px; text-align: left;
+  padding: 9px 10px; border-radius: 8px; border: 0; background: none;
+  color: var(--ink); font: inherit; font-size: 13.5px; cursor: pointer;
+  transition: background .14s var(--glide);
+}
+.history-item .t {
+  flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.history-item .d { font-size: 12px; color: var(--faint); flex: 0 0 auto; }
+.history-item:hover { background: var(--surface-2); }
+/* Açık olan konuşma vurgulanır — kullanıcı nerede olduğunu bilmeli. */
+.history-item.on { background: var(--accent-veil); color: var(--accent-ink); }
+.history-item.on .d { color: var(--accent); }
+
+@media (max-width: 900px) {
+  .history { width: 84%; max-width: 300px; }
+}
