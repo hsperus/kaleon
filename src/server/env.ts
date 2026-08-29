@@ -26,6 +26,15 @@ export interface EnvInput {
   readonly SHARED_DATABASE_URL?: string | undefined;
   readonly TENANT_DATABASE_URL?: string | undefined;
   readonly ANTHROPIC_API_KEY?: string | undefined;
+  /**
+   * Modelsiz (demo) çalışmaya AÇIK İZİN.
+   *
+   * Üretimde model olmadan açılmak varsayılan olarak yasaktır. Ama pilot
+   * kurulumlarda anahtar henüz alınmamış olabilir. Bu bayrak farkı korur:
+   * sistem sessizce demo moduna DÜŞMEZ, operatör bilerek demo modunu SEÇER
+   * ve bu her açılışta loglanır. Kaza ile karar arasındaki fark budur.
+   */
+  readonly KAELON_ALLOW_DEMO_MODE?: string | undefined;
 }
 
 /** Bağlantı dizesi gerçekten bir Postgres URL'i mi? */
@@ -64,11 +73,21 @@ export function checkEnv(env: EnvInput): EnvReport {
     if (problem) errors.push(`${key} kullanılamaz: ${problem}.`);
   }
 
+  const demoAllowed = env.KAELON_ALLOW_DEMO_MODE === "1";
   if (!env.ANTHROPIC_API_KEY) {
-    // Üretimde demo moduna düşmek KABUL EDİLEMEZ: müşteri uydurma verileri
-    // gerçek sanır. Bu sessiz düşüş, açık bir çökmeden çok daha pahalıdır.
-    (production ? errors : warnings).push(
-      "ANTHROPIC_API_KEY tanımlı değil — model bağlı değil, demo modu devrede.",
+    // Üretimde demo moduna DÜŞMEK kabul edilemez: müşteri uydurma verileri
+    // gerçek sanır. Demo modunu SEÇMEK başka bir şeydir ve açıkça istenir.
+    if (production && !demoAllowed) {
+      errors.push(
+        "ANTHROPIC_API_KEY tanımlı değil. Üretimde model olmadan açılmak için " +
+          "KAELON_ALLOW_DEMO_MODE=1 açıkça verilmelidir.",
+      );
+    } else {
+      warnings.push("ANTHROPIC_API_KEY yok — model bağlı değil, DEMO MODU devrede.");
+    }
+  } else if (demoAllowed) {
+    warnings.push(
+      "KAELON_ALLOW_DEMO_MODE açık ama API anahtarı da var; bayrak gereksiz, kaldırın.",
     );
   }
 

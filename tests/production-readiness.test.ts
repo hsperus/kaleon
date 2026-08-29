@@ -83,3 +83,31 @@ describe("ortam doğrulaması", () => {
     expect(log.warn).toHaveBeenCalled();
   });
 });
+
+describe("demo modu — kaza ile karar arasındaki fark", () => {
+  const noKey = { ...OK_ENV, ANTHROPIC_API_KEY: undefined, NODE_ENV: "production" };
+
+  it("üretimde anahtarsız açılış varsayılan olarak REDDEDİLİR", () => {
+    expect(checkEnv(noKey).ok).toBe(false);
+  });
+
+  it("AÇIK İZİNLE demo modu üretimde de kabul edilir", () => {
+    // Sessizce düşmek değil; operatörün bilerek seçmesi.
+    const r = checkEnv({ ...noKey, KAELON_ALLOW_DEMO_MODE: "1" });
+    expect(r.ok).toBe(true);
+    expect(r.warnings.join(" ")).toContain("DEMO MODU");
+  });
+
+  it("izin bayrağı yalnızca tam olarak '1' ile açılır", () => {
+    // "true", "yes", "0" gibi değerler kazara açılmayı davet eder.
+    for (const v of ["true", "yes", "0", "", "evet"]) {
+      expect(checkEnv({ ...noKey, KAELON_ALLOW_DEMO_MODE: v }).ok, v).toBe(false);
+    }
+  });
+
+  it("anahtar varken bayrak kalmışsa uyarır", () => {
+    const r = checkEnv({ ...OK_ENV, NODE_ENV: "production", KAELON_ALLOW_DEMO_MODE: "1" });
+    expect(r.ok).toBe(true);
+    expect(r.warnings.join(" ")).toContain("gereksiz");
+  });
+});
