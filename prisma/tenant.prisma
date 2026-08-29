@@ -40,6 +40,7 @@ model Partner {
   aliases      PartnerAlias[]
   taxIds       PartnerTaxId[]
   externalRefs PartnerExternalRef[]
+  salesOrders  SalesOrder[]
 
   @@index([normalized])
   @@index([mergedInto])
@@ -199,7 +200,16 @@ model WorkOrder {
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
+  /// Planlanan bitiş — planlamanın taahhüdü.
+  ///
+  /// TAHMİN DEĞİL, PLAN. Sistem bir bitiş tarihi UYDURMAZ; planlama bu
+  /// alanı doldurur veya boş bırakır. Boşsa sevkiyat riski hesaplanamaz
+  /// ve o sipariş "riski bilinmiyor" olarak raporlanır — sıfır risk
+  /// olarak DEĞİL. En tehlikeli cevap, bilmediği şeye "sorun yok" demektir.
+  plannedEndDate DateTime? @map("planned_end_date") @db.Date
+
   operations WorkOrderOperation[]
+  salesOrderLines SalesOrderLine[]
 
   @@index([status])
   @@index([itemId])
@@ -572,4 +582,51 @@ model AttendanceDay {
   @@unique([employeeId, workDate])
   @@index([workDate])
   @@map("attendance_days")
+}
+
+
+// ─────────────────────── Satış siparişi ───────────────────────
+
+/// Müşteri siparişi — sevkiyat taahhüdünün ve ceza riskinin kaynağı.
+model SalesOrder {
+  id          String   @id @default(uuid()) @db.Uuid
+  orderNo     String   @unique @map("order_no")
+  partnerId   String   @map("partner_id") @db.Uuid
+  /// Müşteriye verilen teslim taahhüdü.
+  committedDate DateTime @map("committed_date") @db.Date
+  /// Sözleşmedeki günlük gecikme cezası. Yoksa null — SIFIR DEĞİL.
+  /// Sıfır "ceza yok" demektir; null "sözleşmede yazmıyor" demektir ve
+  /// ikisi farklı cevaplar üretir.
+  penaltyPerDay Decimal? @map("penalty_per_day") @db.Decimal(18, 2)
+  /// Cezanın sözleşmedeki üst sınırı. Çoğu sözleşmede vardır ve
+  /// hesaplanmazsa risk olduğundan büyük gösterilir.
+  penaltyCap    Decimal? @map("penalty_cap") @db.Decimal(18, 2)
+  currency      String   @default("TRY")
+  status        String   @default("open")
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  partner Partner          @relation(fields: [partnerId], references: [id])
+  lines   SalesOrderLine[]
+
+  @@index([status, committedDate])
+  @@index([partnerId])
+  @@map("sales_orders")
+}
+
+model SalesOrderLine {
+  id           String  @id @default(uuid()) @db.Uuid
+  salesOrderId String  @map("sales_order_id") @db.Uuid
+  lineNo       Int     @map("line_no")
+  itemId       String  @map("item_id")
+  quantity     Decimal @db.Decimal(18, 4)
+  /// Bu kalemi üreten iş emri. Bağlanmamışsa sevkiyat tarihi bilinemez.
+  workOrderId  String? @map("work_order_id")
+
+  salesOrder SalesOrder @relation(fields: [salesOrderId], references: [id], onDelete: Cascade)
+  workOrder  WorkOrder? @relation(fields: [workOrderId], references: [id])
+
+  @@unique([salesOrderId, lineNo])
+  @@index([workOrderId])
+  @@map("sales_order_lines")
 }

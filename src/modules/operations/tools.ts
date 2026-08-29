@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import { caveatRisks, confidenceWithCaveats } from "../../data/caveats.js";
 import { defineTool } from "../../kernel/tool.js";
 import type { DataSource } from "../../data/port.js";
 import type { Risk, ToolOk } from "../../kernel/types.js";
@@ -80,7 +81,10 @@ export function operationsTools(db: DataSource) {
     }),
     requires: ["operations:shipment.read"],
     async execute(input, ctx) {
-      const { rows, freshness } = await db.shipmentRisks(ctx.tenant.tenantId, input.isoWeek);
+      const { rows, freshness, caveats } = await db.shipmentRisks(
+        ctx.tenant.tenantId,
+        input.isoWeek,
+      );
       const totalPenalty = rows.reduce((s, r) => s + r.penaltyRiskTry, 0);
       return {
         ok: true,
@@ -88,16 +92,19 @@ export function operationsTools(db: DataSource) {
         sources: [
           { system: "İş emri + kapasite planı", kind: "derived", recordCount: rows.length, syncedAt: freshness.syncedAt },
         ],
-        risks:
-          totalPenalty > 0
+        risks: [
+          ...(totalPenalty > 0
             ? [
                 {
                   severity: "critical" as const,
                   message: `Toplam gecikme cezası riski yaklaşık ${totalPenalty.toLocaleString("tr-TR")} TL.`,
                 },
               ]
-            : [],
-        confidence: 88,
+            : []),
+          // Tarihi bilinemeyen siparişler cevabın parçasıdır.
+          ...caveatRisks(caveats),
+        ],
+        confidence: confidenceWithCaveats(88, caveats),
       };
     },
   });

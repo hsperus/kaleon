@@ -6,6 +6,7 @@
  */
 
 import { z } from "zod";
+import { caveatRisks, confidenceWithCaveats } from "../../data/caveats.js";
 import { defineTool } from "../../kernel/tool.js";
 import type { DataSource } from "../../data/port.js";
 
@@ -28,7 +29,7 @@ export function financeTools(db: DataSource) {
     }),
     requires: ["finance:bank.read"],
     async execute(input, ctx) {
-      const { rows, freshness } = await db.bankBalances(ctx.tenant.tenantId, input.currency);
+      const { rows, freshness, caveats } = await db.bankBalances(ctx.tenant.tenantId, input.currency);
       const blocked = rows.reduce((s, r) => s + r.blocked, 0);
       return {
         ok: true,
@@ -36,16 +37,18 @@ export function financeTools(db: DataSource) {
         sources: [
           { system: "Banka entegratörü", kind: "integrator", recordCount: rows.length, syncedAt: freshness.syncedAt },
         ],
-        risks:
-          blocked > 0
+        risks: [
+          ...(blocked > 0
             ? [
                 {
                   severity: "info" as const,
                   message: `Toplam ${blocked.toLocaleString("tr-TR")} blokeli bakiye var; kullanılabilir tutara dahil değil.`,
                 },
               ]
-            : [],
-        confidence: 95,
+            : []),
+          ...caveatRisks(caveats),
+        ],
+        confidence: confidenceWithCaveats(95, caveats),
       };
     },
   });

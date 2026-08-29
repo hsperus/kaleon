@@ -18,6 +18,15 @@ export interface Freshness {
 export interface WithFreshness<T> {
   readonly rows: T;
   readonly freshness: Freshness;
+  /**
+   * Verinin EKSİK olduğu yerler.
+   *
+   * Bir kaynak "3 sipariş için sevkiyat tarihi bilinmiyor" diyebilmelidir.
+   * Bu bilgi port sınırında düşerse, tool'un cevabı sessizce eksik olur:
+   * kullanıcı 2 riskli sipariş görür ve 3 tanesinin hiç bakılmadığını
+   * asla öğrenmez. Bilinmeyeni saklamak, yanlış cevap vermekten beterdir.
+   */
+  readonly caveats?: readonly string[];
 }
 
 export interface StationLoad {

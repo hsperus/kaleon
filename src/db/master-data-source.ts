@@ -28,6 +28,7 @@ import type { DataSource, PartnerCandidateRow, PartnerHint, WithFreshness } from
 import { normalizeName } from "../modules/master-data/normalize.js";
 import { isValidTckn, isValidVkn } from "../modules/master-data/identifiers.js";
 import { PrismaAttendanceSource } from "./attendance-source.js";
+import { PrismaShipmentSource } from "./shipment-source.js";
 import type { TenantDb } from "./client.js";
 
 /** Bir sorguda belleğe alınacak en fazla aday. */
@@ -242,8 +243,8 @@ export class PrismaBankSource {
 /**
  * Bir tenant için tam veri kaynağı.
  *
- * Cari çözümleme, banka ve puantaj Postgres'ten geliyor; sevkiyat ve WIP için
- * tenant şemasında henüz tablo yok. Bu sınıf o metotlarda BOŞ
+ * Cari, banka, puantaj ve sevkiyat Postgres'ten geliyor; WIP için makine ve
+ * vardiya master data'sı gerekiyor, henüz yok. Bu sınıf o metotta BOŞ
  * döner — uydurma veri değil, boş. Hangi kanalın bağlı olduğu
  * `connectedChannels` ile dışarıya bildirilir; arayüz "veri yok" ile
  * "bağlanmadı" arasındaki farkı gösterebilsin diye.
@@ -252,14 +253,16 @@ export class PrismaDataSource implements DataSource {
   readonly #master: PrismaMasterDataSource;
   readonly #bank: PrismaBankSource;
   readonly #attendance: PrismaAttendanceSource;
+  readonly #shipment: PrismaShipmentSource;
 
   constructor(db: TenantDb) {
     this.#master = new PrismaMasterDataSource(db);
     this.#bank = new PrismaBankSource(db);
     this.#attendance = new PrismaAttendanceSource(db);
+    this.#shipment = new PrismaShipmentSource(db);
   }
 
-  readonly connectedChannels = ["partners", "bank", "attendance"] as const;
+  readonly connectedChannels = ["partners", "bank", "attendance", "sales"] as const;
 
   async wipSnapshot(): Promise<WithFreshness<import("../data/port.js").WipSnapshot>> {
     return empty({
@@ -275,7 +278,7 @@ export class PrismaDataSource implements DataSource {
   }
 
   async shipmentRisks(): Promise<WithFreshness<readonly import("../data/port.js").ShipmentRisk[]>> {
-    return empty([]);
+    return this.#shipment.shipmentRisks();
   }
 
   async bankBalances(

@@ -7,6 +7,7 @@
  */
 
 import { z } from "zod";
+import { caveatRisks, confidenceWithCaveats } from "../../data/caveats.js";
 import { defineTool } from "../../kernel/tool.js";
 import { redactFields } from "../../kernel/rbac.js";
 import type { DataSource, OvertimeRecord } from "../../data/port.js";
@@ -38,7 +39,7 @@ export function hrTools(db: DataSource) {
     }),
     requires: ["hr:overtime.read"],
     async execute(input, ctx) {
-      const { rows, freshness } = await db.overtime(ctx.tenant.tenantId, input);
+      const { rows, freshness, caveats } = await db.overtime(ctx.tenant.tenantId, input);
       const pending = rows.reduce((s, r) => s + r.pendingApprovalMinutes, 0);
       return {
         ok: true,
@@ -47,16 +48,18 @@ export function hrTools(db: DataSource) {
           { system: "PDKS", kind: "integrator", recordCount: rows.length, syncedAt: freshness.syncedAt },
           { system: "Vardiya planı", kind: "module", recordCount: rows.length, syncedAt: freshness.syncedAt },
         ],
-        risks:
-          pending > 0
+        risks: [
+          ...(pending > 0
             ? [
                 {
                   severity: "warning" as const,
                   message: `${Math.round(pending / 60)} saatlik mesai hâlâ yönetici onayı bekliyor; tutar kesinleşmemiştir.`,
                 },
               ]
-            : [],
-        confidence: pending > 0 ? 74 : 90,
+            : []),
+          ...caveatRisks(caveats),
+        ],
+        confidence: confidenceWithCaveats(pending > 0 ? 74 : 90, caveats),
       };
     },
     /**

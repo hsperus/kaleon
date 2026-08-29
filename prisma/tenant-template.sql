@@ -128,6 +128,7 @@ CREATE TABLE "work_orders" (
     "version" INTEGER NOT NULL DEFAULT 0,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
+    "planned_end_date" DATE,
 
     CONSTRAINT "work_orders_pkey" PRIMARY KEY ("id")
 );
@@ -388,6 +389,34 @@ CREATE TABLE "attendance_days" (
     CONSTRAINT "attendance_days_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "sales_orders" (
+    "id" UUID NOT NULL,
+    "order_no" TEXT NOT NULL,
+    "partner_id" UUID NOT NULL,
+    "committed_date" DATE NOT NULL,
+    "penalty_per_day" DECIMAL(18,2),
+    "penalty_cap" DECIMAL(18,2),
+    "currency" TEXT NOT NULL DEFAULT 'TRY',
+    "status" TEXT NOT NULL DEFAULT 'open',
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "sales_orders_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "sales_order_lines" (
+    "id" UUID NOT NULL,
+    "sales_order_id" UUID NOT NULL,
+    "line_no" INTEGER NOT NULL,
+    "item_id" TEXT NOT NULL,
+    "quantity" DECIMAL(18,4) NOT NULL,
+    "work_order_id" TEXT,
+
+    CONSTRAINT "sales_order_lines_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "partners_code_key" ON "partners"("code");
 
@@ -526,6 +555,21 @@ CREATE INDEX "attendance_days_work_date_idx" ON "attendance_days"("work_date");
 -- CreateIndex
 CREATE UNIQUE INDEX "attendance_days_employee_id_work_date_key" ON "attendance_days"("employee_id", "work_date");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "sales_orders_order_no_key" ON "sales_orders"("order_no");
+
+-- CreateIndex
+CREATE INDEX "sales_orders_status_committed_date_idx" ON "sales_orders"("status", "committed_date");
+
+-- CreateIndex
+CREATE INDEX "sales_orders_partner_id_idx" ON "sales_orders"("partner_id");
+
+-- CreateIndex
+CREATE INDEX "sales_order_lines_work_order_id_idx" ON "sales_order_lines"("work_order_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "sales_order_lines_sales_order_id_line_no_key" ON "sales_order_lines"("sales_order_id", "line_no");
+
 -- AddForeignKey
 ALTER TABLE "partner_aliases" ADD CONSTRAINT "partner_aliases_partner_id_fkey" FOREIGN KEY ("partner_id") REFERENCES "partners"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -558,4 +602,13 @@ ALTER TABLE "bank_balance_snapshots" ADD CONSTRAINT "bank_balance_snapshots_acco
 
 -- AddForeignKey
 ALTER TABLE "attendance_days" ADD CONSTRAINT "attendance_days_employee_id_fkey" FOREIGN KEY ("employee_id") REFERENCES "employees"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "sales_orders" ADD CONSTRAINT "sales_orders_partner_id_fkey" FOREIGN KEY ("partner_id") REFERENCES "partners"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "sales_order_lines" ADD CONSTRAINT "sales_order_lines_sales_order_id_fkey" FOREIGN KEY ("sales_order_id") REFERENCES "sales_orders"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "sales_order_lines" ADD CONSTRAINT "sales_order_lines_work_order_id_fkey" FOREIGN KEY ("work_order_id") REFERENCES "work_orders"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
