@@ -4,6 +4,7 @@
 
 import Anthropic from "@anthropic-ai/sdk";
 import { ToolRegistry } from "./kernel/registry.js";
+import { importTools, type ImportDeps } from "./modules/import/tools.js";
 import { InMemoryAuditSink, type AuditSink } from "./kernel/audit.js";
 import { LlmGateway } from "./ai/gateway.js";
 import { InMemoryLedger, type UsageLedger } from "./ai/ledger.js";
@@ -36,6 +37,12 @@ export interface Repositories {
   readonly operations?: OperationsRepository;
   readonly documents?: DocumentsRepository;
   readonly approvals?: ApprovalRepository;
+  /**
+   * İçe aktarma bağımlılıkları. Verilmezse içe aktarma tool'ları KAYDEDİLMEZ:
+   * çağrılınca patlayan bir tool'u kataloğa koymak, modele olmayan bir
+   * yetenek vaat etmektir.
+   */
+  readonly imports?: ImportDeps;
 }
 
 export function buildRegistry(db: DataSource, repos: Repositories = {}): ToolRegistry {
@@ -50,6 +57,7 @@ export function buildRegistry(db: DataSource, repos: Repositories = {}): ToolReg
     ...documentTools(documents, approvals),
     ...financeTools(db),
     ...hrTools(db),
+    ...(repos.imports ? importTools(repos.imports) : []),
   ];
   registry.register(...(all as unknown as Tool<never, unknown>[]));
   return registry;

@@ -82,6 +82,9 @@ export const ROLE_PERMISSIONS: Record<RoleId, readonly Permission[]> = {
   ],
   satin_alma: [
     "master-data:partner.read",
+    // Cari kartı açmak/güncellemek satın almanın işidir; tedarikçiyi tanıyan
+    // ve listeyi elinde tutan roldür. Patron da yapabilir (joker izinle).
+    "master-data:partner.write",
     "master-data:item.read",
     "documents:invoice.read",
     "documents:po.read",

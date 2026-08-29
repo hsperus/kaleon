@@ -37,6 +37,8 @@ import { sharedClient, tenantClient } from "../db/client.js";
 import { PrismaDataSource } from "../db/master-data-source.js";
 import { PrismaOperationsRepository } from "../db/operations-repository.js";
 import { PrismaConversationRepository } from "../db/conversation-repository.js";
+import { PartnerImporter } from "../db/partner-import.js";
+import { InMemoryUploadStore } from "../modules/import/uploads.js";
 import {
   InMemoryConversationRepository,
   type ConversationRepository,
@@ -173,6 +175,12 @@ async function demoTenantContext(): Promise<TenantContext> {
  * bir bağlam üretiyordu.
  */
 const registryByTenant = new Map<string, ToolRegistry>();
+
+/**
+ * Yüklenen dosyalar — süreç ömrü boyunca, tenant sınırlı, süreli.
+ * Tek bir depo yeterli: tenant kontrolü deponun içinde yapılıyor.
+ */
+export const uploads = new InMemoryUploadStore();
 const conversationsByTenant = new Map<string, ConversationRepository>();
 
 /**
@@ -205,6 +213,14 @@ function registryFor(tenant: TenantContext, isDemo: boolean): ToolRegistry {
   const cached = registryByTenant.get(tenant.tenantId);
   if (cached) return cached;
 
+  /**
+   * DEMO TENANT'INDA İÇE AKTARMA TOOL'LARI YOKTUR.
+   *
+   * Demo verisi bellekte sabit bir gösteri kümesidir. İçe aktarma gerçek
+   * şemaya yazardı; kullanıcı cari eklerdi ama `resolve_partner` bellekten
+   * okuduğu için onu BULAMAZDI. "Ekledim ama yok" hâli, tool'un hiç
+   * olmamasından çok daha kötüdür. Gerçek tenant'ta zincirin tamamı çalışır.
+   */
   const registry = isDemo
     ? buildRegistry(new InMemoryDataSource(tenant.tenantId), {
         operations,
@@ -223,6 +239,12 @@ function buildRegistryForTenant(tenant: TenantContext): ToolRegistry {
     operations: new PrismaOperationsRepository(db),
     documents: new PrismaDocumentsRepository(db),
     approvals: new PrismaApprovalRepository(db),
+    imports: {
+      uploads,
+      // Yazıcı, isteğin tenant'ına bağlı client ile kurulur; tool içinden
+      // gelen tenantId bağlamla aynıdır (invoker bunu doğrular).
+      importerFor: () => new PartnerImporter(db),
+    },
   });
 }
 

@@ -27,6 +27,8 @@ export const dynamic = "force-dynamic";
 const Body = z.object({
   question: z.string().min(2).max(2000),
   conversationId: z.string().uuid().or(z.string().regex(/^conv-\d+$/)).optional(),
+  /** Sohbete eklenmiş dosya. İçeriği değil, KİMLİĞİ taşınır. */
+  uploadId: z.string().uuid().optional(),
 });
 
 export async function POST(req: Request): Promise<Response> {
@@ -55,6 +57,18 @@ export async function POST(req: Request): Promise<Response> {
   }
 
   const { question } = parsed.data;
+
+  /**
+   * Eklenen dosya modele CÜMLE olarak bildirilir, içerik olarak değil.
+   *
+   * Model dosyanın var olduğunu ve kimliğini bilmeli ki doğru tool'u doğru
+   * parametreyle çağırsın. İçeriği görmesine gerek yok: ayrıştırma ve
+   * doğrulama deterministik kodda yapılıyor ve dört bin satırı modele
+   * göndermek hem pahalı hem faydasız.
+   */
+  const questionWithFile = parsed.data.uploadId
+    ? `${question}\n\n[Kullanıcı bir dosya ekledi. uploadId: ${parsed.data.uploadId}]`
+    : question;
 
   // ── Konuşma: var olanı doğrula veya yenisini aç
   let conversationId = parsed.data.conversationId ?? null;
@@ -98,7 +112,7 @@ export async function POST(req: Request): Promise<Response> {
         const result = await runConversation(
           { gateway: ctx.completer, registry: ctx.registry, audit: ctx.audit },
           {
-            question,
+            question: questionWithFile,
             principal: ctx.principal,
             tenant: ctx.tenant,
             correlationId: crypto.randomUUID(),

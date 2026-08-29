@@ -102,6 +102,19 @@ export default function Page() {
   // `ask` closure'ı içinde güncel değeri okumak için ref; state tek başına
   // eski değeri yakalar ve ikinci soru yanlış konuşmaya gider.
   const conversationIdRef = useRef<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  // `ask` closure'ında güncel değeri okumak için.
+  const uploadRef = useRef<string | null>(null);
+  /**
+   * Eklenen dosya. İÇERİK BURADA DEĞİL — sunucuda. Elde yalnızca kimlik ve
+   * kullanıcının doğrulayabileceği bir özet var (ad, satır ve sütun sayısı).
+   * Ekranda özet göstermek önemli: kullanıcı yanlış dosyayı seçtiğini
+   * soruyu yazmadan ÖNCE anlamalı.
+   */
+  const [upload, setUpload] = useState<
+    { id: string; filename: string; rowCount: number; headers: string[] } | null
+  >(null);
+  const [uploading, setUploading] = useState(false);
 
   useEffect(() => {
     const c = client(role);
@@ -146,6 +159,7 @@ export default function Page() {
           body: JSON.stringify({
             question,
             ...(conversationIdRef.current ? { conversationId: conversationIdRef.current } : {}),
+            ...(uploadRef.current ? { uploadId: uploadRef.current } : {}),
           }),
         });
         if (!res.ok) {
@@ -215,7 +229,46 @@ export default function Page() {
     setConversationId(null);
     setTurns([]);
     setPanels([]);
+    setUpload(null);
+    uploadRef.current = null;
     inputRef.current?.focus();
+  }, []);
+
+  const attachFile = useCallback(async (file: File) => {
+    setUploading(true);
+    try {
+      const body = new FormData();
+      body.append("file", file);
+      const res = await fetch("/api/upload", { method: "POST", body });
+      const data = (await res.json()) as {
+        uploadId?: string;
+        filename?: string;
+        rowCount?: number;
+        headers?: string[];
+        error?: string;
+      };
+      if (!res.ok || !data.uploadId) {
+        // Hata sohbet akışında değil, dosya kutusunda gösterilir: kullanıcı
+        // düzeltmeyi burada yapacak.
+        setUpload(null);
+        uploadRef.current = null;
+        window.alert(data.error ?? "Dosya yüklenemedi.");
+        return;
+      }
+      uploadRef.current = data.uploadId;
+      setUpload({
+        id: data.uploadId,
+        filename: data.filename ?? file.name,
+        rowCount: data.rowCount ?? 0,
+        headers: data.headers ?? [],
+      });
+      inputRef.current?.focus();
+    } catch {
+      window.alert("Dosya yüklenemedi.");
+    } finally {
+      setUploading(false);
+      if (fileRef.current) fileRef.current.value = "";
+    }
   }, []);
 
   const chatting = turns.length > 0;
@@ -373,12 +426,55 @@ export default function Page() {
           </div>
 
           <div className="dock">
+            {upload && (
+              <div className="attach in">
+                <span className="attach-name">{upload.filename}</span>
+                <span className="attach-meta">
+                  {upload.rowCount} satır · {upload.headers.length} sütun
+                </span>
+                <button
+                  type="button"
+                  className="attach-x"
+                  aria-label="Dosyayı kaldır"
+                  onClick={() => {
+                    setUpload(null);
+                    uploadRef.current = null;
+                  }}
+                >
+                  ×
+                </button>
+              </div>
+            )}
             <div className="composer in" style={{ animationDelay: ".44s" }}>
+              <input
+                ref={fileRef}
+                type="file"
+                accept=".csv,.txt,.tsv"
+                hidden
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) void attachFile(f);
+                }}
+              />
+              <button
+                type="button"
+                className="clip"
+                aria-label="Dosya ekle"
+                title="CSV dosyası ekle"
+                disabled={uploading}
+                onClick={() => fileRef.current?.click()}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                  <path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.67 3.67 0 0 1 5.19 5.19l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.59l8.49-8.48" />
+                </svg>
+              </button>
               <textarea
                 ref={inputRef}
                 rows={1}
                 value={value}
-                placeholder="Şirketinize bir şey sorun…"
+                placeholder={
+                  upload ? "Bu dosyayla ne yapayım?" : "Şirketinize bir şey sorun…"
+                }
                 onChange={(e) => {
                   setValue(e.target.value);
                   e.target.style.height = "auto";
