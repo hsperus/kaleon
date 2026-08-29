@@ -9,3 +9,4 @@ src/db/generated/
 .next/
 next-env.d.ts
 tsconfig.tsbuildinfo
+.design-review/

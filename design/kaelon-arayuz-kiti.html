@@ -4,9 +4,6 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>KAELON · Arayüz Kiti</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
 <style>
 /* ═══════════════════════════════════════════════════════════════════
    AŞAĞIDAKİ CSS, KAELON'un app/globals.css DOSYASININ BİREBİR KOPYASIDIR.
@@ -19,50 +16,84 @@
   --spring: linear(0, .0191 2.17%, .0687 4.35%, .1391 6.52%, .2222 8.7%, .3118 10.87%, .4028 13.04%, .4917 15.22%, .5756 17.39%, .653 19.57%, .7226 21.74%, .7841 23.91%, .8372 26.09%, .8824 28.26%, .9199 30.43%, .9506 32.61%, .9749 34.78%, .9938 36.96%, 1.008 39.13%, 1.0182 41.3%, 1.025 43.48%, 1.0292 45.65%, 1.0312 47.83%, 1.0315 50%, 1.0306 52.17%, 1.0288 54.35%, 1.0265 56.52%, 1.0238 58.7%, 1.021 60.87%, 1.0181 63.04%, 1.0153 65.22%, 1.0127 67.39%, 1.0103 69.57%, 1.0082 71.74%, 1.0063 73.91%, 1.0047 76.09%, 1.0034 78.26%, 1.0022 80.43%, 1.0013 82.61%, 1.0006 84.78%, 1.0001 86.96%, .9997 89.13%, .9994 91.3%, .9992 93.48%, .9991 95.65%, .999 97.83%, 1);
   --glide: cubic-bezier(.32, .72, 0, 1);
 
-  --bg: #f6f7f9;
+  /* ── Yüzeyler ── macOS'un katmanlı grisi: zemin gri, kart beyaz.
+     Eski tasarımda ikisi de neredeyse beyazdı ve kartlar zeminden
+     ayrışmıyordu; ayrım gölgeye değil ZEMİN FARKINA dayanmalı. */
+  --bg: #f2f3f5;
   --surface: #fff;
-  --surface-2: #eff1f5;
+  --surface-2: #f0f1f4;
   --spec: rgba(255, 255, 255, .9);
-  --ink: #0b111a;
-  --ink-2: #39424f;
-  --muted: #6a7481;
-  --faint: #98a1ad;
-  --line: #e1e5eb;
-  --line-soft: #eceff3;
-  --accent: #0a7c8c;
-  --accent-veil: rgba(10, 124, 140, .09);
-  --crit: #b23a2e;
-  --crit-veil: rgba(178, 58, 46, .09);
-  --warn: #96620a;
-  --warn-veil: rgba(150, 98, 10, .1);
-  --ok: #22684c;
-  --sh-s: 0 1px 2px rgba(11, 17, 26, .05), 0 2px 8px -4px rgba(11, 17, 26, .1);
-  --sh-m: 0 2px 6px rgba(11, 17, 26, .05), 0 20px 44px -24px rgba(11, 17, 26, .3);
-  --sh-l: 0 4px 14px rgba(11, 17, 26, .07), 0 44px 96px -44px rgba(11, 17, 26, .42);
+
+  /* ── Metin ── dört kademe: başlık, gövde, ikincil, üçüncül. */
+  --ink: #16181c;
+  --ink-2: #3d434b;
+  --muted: #7c828b;
+  --faint: #a2a7ae;
+
+  --line: #e5e6ea;
+  --line-soft: #f0f1f4;
+
+  /* ── Vurgu ── turkuazdan macOS mavisine. Tek vurgu rengi; kritik ve
+     uyarı ANLAM taşır, vurgu değildir. */
+  --accent: #0a6ad4;
+  --accent-veil: rgba(10, 106, 212, .08);
+  --accent-ink: #0854a8;
+
+  --crit: #c4362b;
+  --crit-veil: rgba(196, 54, 43, .07);
+  --warn: #96650a;
+  --warn-veil: rgba(150, 101, 10, .09);
+  --ok: #1f7a52;
+  --ok-veil: rgba(31, 122, 82, .09);
+
+  /* ── Gölge ── iki katman: 1px'lik "kenar" + uzun yumuşak düşüş.
+     Tek katmanlı gölge ekranı bulanık gösterir; kenar katmanı formu
+     keskin tutar. */
+  --sh-s: 0 1px 2px rgba(20, 22, 26, .04);
+  --sh-m: 0 1px 2px rgba(20, 22, 26, .04), 0 16px 34px -22px rgba(20, 22, 26, .32);
+  --sh-l: 0 1px 2px rgba(20, 22, 26, .04), 0 20px 40px -28px rgba(20, 22, 26, .35);
+  --sh-accent: 0 1px 2px rgba(8, 52, 104, .28), 0 10px 22px -12px rgba(10, 106, 212, .55);
 }
 
+/*
+ * KOYU TEMA.
+ *
+ * Tasarım yalnızca açık temayı verdi; bu blok ondan TÜRETİLDİ.
+ * Koyu temayı "renkleri ters çevir" diye kurmak kontrastı bozar:
+ * macOS'ta koyu zemin saf siyah değil, mavi tarafa çekilmiş koyu gridir
+ * ve mavi vurgu açıldıkça parlar (#0a6ad4 → #4c9dff), yoksa koyu zeminde
+ * okunmaz. Kritik/uyarı renkleri de aynı sebeple açılır.
+ */
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #070a0f;
-    --surface: #131a24;
-    --surface-2: #1a2230;
-    --spec: rgba(255, 255, 255, .07);
-    --ink: #ecf1f7;
-    --ink-2: #c2cbd7;
-    --muted: #8a94a3;
-    --faint: #626d7b;
-    --line: #222a37;
-    --line-soft: #19212c;
-    --accent: #45cbdd;
-    --accent-veil: rgba(69, 203, 221, .12);
-    --crit: #e8776a;
-    --crit-veil: rgba(232, 119, 106, .12);
-    --warn: #dfa94a;
-    --warn-veil: rgba(223, 169, 74, .13);
+    --bg: #17181b;
+    --surface: #202226;
+    --surface-2: #292b30;
+    --spec: rgba(255, 255, 255, .045);
+
+    --ink: #f2f3f5;
+    --ink-2: #c9ced6;
+    --muted: #9298a1;
+    --faint: #6e747d;
+
+    --line: #303338;
+    --line-soft: #26282c;
+
+    --accent: #4c9dff;
+    --accent-veil: rgba(76, 157, 255, .14);
+    --accent-ink: #85bcff;
+
+    --crit: #f0736a;
+    --crit-veil: rgba(240, 115, 106, .13);
+    --warn: #e3a950;
+    --warn-veil: rgba(227, 169, 80, .14);
     --ok: #5bbf93;
-    --sh-s: 0 1px 2px rgba(0, 0, 0, .5), 0 2px 8px -4px rgba(0, 0, 0, .5);
-    --sh-m: 0 2px 6px rgba(0, 0, 0, .5), 0 20px 44px -24px rgba(0, 0, 0, .75);
-    --sh-l: 0 4px 14px rgba(0, 0, 0, .5), 0 44px 96px -44px rgba(0, 0, 0, .9);
+    --ok-veil: rgba(91, 191, 147, .13);
+
+    --sh-s: 0 1px 2px rgba(0, 0, 0, .4);
+    --sh-m: 0 1px 2px rgba(0, 0, 0, .4), 0 16px 34px -22px rgba(0, 0, 0, .8);
+    --sh-l: 0 1px 2px rgba(0, 0, 0, .45), 0 20px 40px -28px rgba(0, 0, 0, .9);
+    --sh-accent: 0 1px 2px rgba(0, 0, 0, .4), 0 10px 22px -12px rgba(76, 157, 255, .45);
   }
 }
 
@@ -72,9 +103,14 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--ink);
-  font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-  font-size: 15.5px;
-  line-height: 1.65;
+  /* Sistem yazı tipi. Önceki tanım "Plus Jakarta Sans" istiyordu ama font
+     hiç yüklenmiyordu — ekranda zaten sistem fontu görünüyordu. Artık bu
+     bir TERCİH: macOS'ta SF, Windows'ta Segoe. Yerel font indirme
+     beklemez, ilk boyamada doğru görünür. */
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
+    ui-sans-serif, system-ui, sans-serif;
+  font-size: 15px;
+  line-height: 1.6;
   -webkit-font-smoothing: antialiased;
   overflow: hidden;
 }
@@ -110,7 +146,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 .spacer { flex: 1; }
 
 .demo-badge {
-  font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 8px;
+  font-size: 12px; font-weight: 500; padding: 4px 10px; border-radius: 8px;
   background: var(--warn-veil); color: var(--warn); white-space: nowrap;
 }
 
@@ -161,9 +197,9 @@ button.role, select.role {
 .stream { display: flex; flex-direction: column; gap: 26px; padding-bottom: 20px; }
 .turn { display: flex; flex-direction: column; gap: 14px; }
 .ask {
-  align-self: flex-end; max-width: 82%; background: var(--surface-2);
-  border-radius: 19px 19px 6px 19px; padding: 11px 16px; font-size: 15px;
-  box-shadow: inset 0 1px 0 var(--spec);
+  align-self: flex-end; max-width: 80%;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 19px 19px 7px 19px; padding: 11px 16px; font-size: 15px;
   animation: askIn .7s var(--spring) both;
 }
 @keyframes askIn { from { opacity: 0; transform: translateY(14px) scale(.94); filter: blur(5px); } to { opacity: 1; transform: none; filter: blur(0); } }
@@ -181,49 +217,61 @@ button.role, select.role {
 .think i:nth-child(2) { width: 62%; animation-delay: .16s; }
 @keyframes sweep { from { background-position: 180% 0; } to { background-position: -80% 0; } }
 
-.calls { display: flex; flex-wrap: wrap; gap: 6px; }
+/* ADIMLAR TEK SATIRDA, SESSİZCE.
+   Eskiden her tool çağrısı renkli bir mono çipti; beş çağrılı bir cevapta
+   ekran teknik etiket çorbasına dönüyordu. Adımlar cevabın kanıtıdır ama
+   BAŞ AKTÖRÜ DEĞİLDİR: artık soluk gri bir cümle. Ham tool adı
+   `title` özniteliğinde duruyor — hata ararken hâlâ elimizde. */
+.calls { display: flex; flex-direction: column; gap: 3px; }
 .call {
-  font-family: ui-monospace, "SF Mono", monospace; font-size: 11px;
-  padding: 3px 9px; border-radius: 7px; background: var(--accent-veil); color: var(--accent);
+  font-size: 12.5px; color: var(--faint);
   animation: blurIn .5s var(--glide) both;
 }
-.call.bad { background: var(--crit-veil); color: var(--crit); }
+.call.bad { color: var(--crit); }
 
-.source { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 11.5px; color: var(--faint); padding-top: 10px; border-top: 1px solid var(--line-soft); font-family: ui-monospace, "SF Mono", monospace; }
+/* Kaynak satırı artık mono değil: teknik bir çıktı gibi değil, cevabın
+   dipnotu gibi okunmalı. Ama KALDIRILAMAZ — kullanıcının rakama güvenip
+   güvenmeyeceğini bu satır belirler. */
+.source { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 12px; color: var(--faint); padding-top: 11px; border-top: 1px solid var(--line-soft); }
 
-.risk { display: flex; gap: 9px; align-items: flex-start; font-size: 13.5px; line-height: 1.5; padding: 10px 13px; border-radius: 11px; background: var(--warn-veil); color: var(--ink-2); }
+/* Uyarı etiketi artık BÜYÜK HARF değil. Versal metin bağırır; bir ERP'de
+   her cevabın altında bağıran bir kutu varsa hiçbiri okunmaz olur.
+   Ayrım renkle kuruluyor, tipografik şiddetle değil. */
+.risk { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; line-height: 1.5; padding: 11px 14px; border-radius: 12px; background: var(--warn-veil); color: var(--ink-2); }
 .risk.crit { background: var(--crit-veil); }
-.risk b { flex: 0 0 auto; color: var(--warn); font-weight: 700; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; margin-top: 2px; }
+.risk.info { background: var(--surface-2); }
+.risk b { flex: 0 0 auto; color: var(--warn); font-weight: 600; }
 .risk.crit b { color: var(--crit); }
+.risk.info b { color: var(--muted); }
 
 .dock { position: relative; z-index: 5; }
 .composer {
-  display: flex; align-items: flex-end; gap: 10px;
+  display: flex; align-items: flex-end; gap: 8px;
   background: var(--surface); border: 1px solid var(--line); border-radius: 22px;
-  padding: 10px 10px 10px 19px; box-shadow: var(--sh-m), inset 0 1px 0 var(--spec);
-  transition: box-shadow .62s var(--glide), border-color .34s var(--glide);
+  padding: 8px 8px 8px 18px; box-shadow: var(--sh-m);
+  transition: box-shadow .5s var(--glide), border-color .3s var(--glide);
 }
-.composer:focus-within { border-color: color-mix(in srgb, var(--accent) 42%, var(--line)); box-shadow: var(--sh-l), inset 0 1px 0 var(--spec), 0 0 0 4px var(--accent-veil); }
-.composer textarea { flex: 1; background: none; border: none; resize: none; outline: none; font: inherit; font-size: 15.5px; line-height: 1.5; color: var(--ink); max-height: 150px; padding: 6px 0; }
+.composer:focus-within { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); box-shadow: var(--sh-m), 0 0 0 4px var(--accent-veil); }
+.composer textarea { flex: 1; background: none; border: none; resize: none; outline: none; font: inherit; font-size: 15px; line-height: 1.5; color: var(--ink); max-height: 150px; padding: 7px 0; }
 .composer textarea::placeholder { color: var(--faint); }
 
 .send {
-  flex: 0 0 auto; width: 37px; height: 37px; border-radius: 13px; display: grid; place-items: center;
-  background: var(--ink); color: var(--bg); opacity: .24; pointer-events: none; transform: scale(.86);
-  transition: opacity .34s var(--glide), transform .62s var(--spring);
+  flex: 0 0 auto; width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center;
+  background: var(--ink); color: var(--surface); opacity: .22; pointer-events: none; transform: scale(.9);
+  transition: opacity .3s var(--glide), transform .5s var(--spring), background .2s var(--glide);
 }
+/* Aktifken mavi: gönderilebilir olmak bir EYLEM durumudur, vurgu rengi
+   tam olarak bunun için var. */
+.send.on { background: var(--accent); color: #fff; box-shadow: var(--sh-accent); }
 .send.on { opacity: 1; pointer-events: auto; transform: scale(1); }
 .send:active { transform: scale(.9); transition-duration: .1s; }
-.send svg { width: 16px; height: 16px; }
+.send svg { width: 15px; height: 15px; }
 
 .foot { text-align: center; font-size: 11.5px; color: var(--faint); padding-top: 12px; }
 .foot code { font-family: ui-monospace, monospace; }
 
 /* ─────────────── canlı tool ilerlemesi ─────────────── */
-.call.live {
-  background: var(--warn-veil); color: var(--warn);
-  animation: pulse 1.4s var(--glide) infinite;
-}
+.call.live { color: var(--muted); animation: pulse 1.4s var(--glide) infinite; }
 @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
 
 /* kelime kelime beliriş — sunum efekti, akış değil */
@@ -252,8 +300,8 @@ button.role, select.role {
 .drawer-body { flex: 1; overflow-y: auto; padding: 16px 18px 28px; display: flex; flex-direction: column; gap: 14px; }
 
 .panel {
-  background: var(--surface); border: 1px solid var(--line); border-radius: 18px;
-  box-shadow: var(--sh-s), inset 0 1px 0 var(--spec); overflow: hidden;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 14px;
+  box-shadow: var(--sh-s); overflow: hidden;
   animation: panelIn .82s var(--spring) both;
 }
 @keyframes panelIn { from { opacity: 0; transform: translateX(26px) scale(.94); filter: blur(6px); } to { opacity: 1; transform: none; filter: blur(0); } }
@@ -305,20 +353,31 @@ button.role, select.role {
 }
 
 /* ─────────────── Seviye 2 · kritik müdahale kartı ─────────────── */
+/* Sol kenardaki kalın kırmızı şerit kaldırıldı. Üç kritik kart alt alta
+   geldiğinde ekran alarm paneline dönüyor ve aciliyet DEĞERSİZLEŞİYORDU.
+   Aciliyet artık sayının kendisinde: sağdaki büyük rakam. */
 .sig2 {
-  background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--crit);
-  border-radius: 16px; padding: 17px 19px; display: flex; flex-direction: column; gap: 9px;
-  box-shadow: var(--sh-m), inset 0 1px 0 var(--spec);
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: 16px; padding: 16px 18px; display: flex; flex-direction: column; gap: 9px;
+  box-shadow: var(--sh-m);
 }
-.sig2 .lbl { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--crit); font-weight: 700; }
-.sig2 .t { font-size: 16.5px; font-weight: 600; letter-spacing: -.018em; line-height: 1.35; }
+.sig2 .lbl { font-size: 12px; color: var(--muted); font-weight: 500; }
+/* Başlık + ölçü aynı satırda; göz önce rakama gider, sonra cümleye. */
+.sig2 .hd { display: flex; align-items: flex-start; gap: 14px; }
+.sig2 .hd .t { flex: 1; }
+.sig2 .num { font-size: 22px; font-weight: 600; letter-spacing: -.03em; font-variant-numeric: tabular-nums; color: var(--crit); white-space: nowrap; }
+.sig2 .num u { font-size: 13px; font-weight: 450; color: var(--faint); margin-left: 3px; text-decoration: none; }
+/* İnce ilerleme çizgisi: eşiğin ne kadar aşıldığını tek bakışta verir. */
+.sig2 .rule { height: 2px; border-radius: 2px; background: var(--line-soft); overflow: hidden; }
+.sig2 .rule i { display: block; height: 100%; background: var(--crit); border-radius: 2px; }
+.sig2 .t { font-size: 17px; font-weight: 600; letter-spacing: -.022em; line-height: 1.35; }
 .sig2 .d { font-size: 13.5px; color: var(--muted); line-height: 1.55; }
 .sig2 .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
 
 .act {
-  font-size: 13px; font-weight: 600; padding: 9px 15px; border-radius: 12px;
+  font-size: 13px; font-weight: 500; padding: 8px 14px; border-radius: 10px;
   background: var(--surface); border: 1px solid var(--line); color: var(--ink-2);
-  box-shadow: var(--sh-s), inset 0 1px 0 var(--spec);
+  box-shadow: var(--sh-s);
   transition: transform .34s var(--spring), box-shadow .34s var(--glide), color .2s var(--glide);
 }
 .act:hover { transform: translateY(-2px); box-shadow: var(--sh-m); color: var(--ink); }
@@ -407,9 +466,10 @@ button.role, select.role {
 }
 
 .login-submit {
-  font: inherit; font-size: 14px; font-weight: 650;
-  padding: 11px 14px; border-radius: 12px; border: 0;
-  background: var(--ink); color: var(--bg); cursor: pointer;
+  font: inherit; font-size: 14px; font-weight: 550;
+  padding: 12px 14px; border-radius: 12px; border: 0;
+  background: var(--accent); color: #fff; cursor: pointer;
+  box-shadow: var(--sh-accent);
   transition: transform .22s var(--spring), opacity .18s var(--glide);
 }
 .login-submit:hover:not(:disabled) { transform: translateY(-1px); }
@@ -466,7 +526,6 @@ button.role, select.role {
 .clip:hover:not(:disabled) { color: var(--accent); background: var(--accent-veil); }
 .clip:disabled { opacity: .4; cursor: default; }
 .clip:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-veil); }
-
 
 /* ═══════════════════════════════════════════════════════════════════
    GALERİ KABUĞU — yalnızca bu dosyaya ait.
@@ -583,10 +642,9 @@ body.gallery { overflow: auto; height: auto; }
     <div class="type-row"><span class="k">.call · mono 11px</span><span class="call">get_bank_balance · 8ms</span></div>
   </div>
 
-  <p class="note warn" style="margin-top:22px">
-    <b>Tespit:</b> CSS <code>"Plus Jakarta Sans"</code> istiyor ama uygulama bu fontu
-    hiç yüklemiyor — şu an sistem fontuna düşüyor. Bu dosyada fontu bilerek yükledim ki
-    tasarlanan hâli görün. Yazı tipini değiştirirseniz uygulamaya da eklememiz gerekecek.
+  <p class="note" style="margin-top:22px">
+    <b>Yazı tipi:</b> sistem yığını (macOS'ta SF, Windows'ta Segoe). Harici font
+    indirilmiyor; ilk boyamada doğru görünüyor.
   </p>
 </section>
 

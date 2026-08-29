@@ -16,6 +16,7 @@ import type { AppRouter } from "../src/server/router.js";
 import { PANEL_TOOLS, Panel, type PanelPayload } from "./panels.js";
 import { LoginScreen } from "./login.js";
 import type { RunEvent } from "../src/ai/runner.js";
+import { formatDuration, toolLabel } from "../src/ai/tool-labels.js";
 
 type Role =
   | "patron" | "cfo" | "ik_muduru" | "uretim_muduru"
@@ -37,6 +38,7 @@ interface Signal {
   readonly title: string;
   readonly detail: string;
   readonly impact: number | null;
+  readonly impactUnit?: string;
   readonly drilldown: { readonly tool: string; readonly input: unknown } | null;
 }
 
@@ -53,10 +55,23 @@ interface Session {
 
 interface ToolCall { readonly tool: string; readonly ok: boolean; readonly code?: string; readonly durationMs: number }
 
+interface TurnRisk {
+  readonly severity: string;
+  readonly message: string;
+}
+
 interface Turn {
   readonly question: string;
   readonly answer: string | null;
   readonly toolCalls: readonly ToolCall[];
+  /**
+   * Tool'ların ürettiği uyarılar.
+   *
+   * Bunlar modele de gidiyor ama YALNIZCA metne güvenmek yetmez: model
+   * "2 siparişin riski bilinmiyor" uyarısını cümleye katmayabilir ve o
+   * bilgi sessizce kaybolur. Yapısal uyarı, yapısal olarak gösterilir.
+   */
+  readonly risks: readonly TurnRisk[];
   /** Şu an çalışan tool — kullanıcı boş ekrana bakmasın. */
   readonly running: string | null;
 }
@@ -143,7 +158,7 @@ export default function Page() {
       if (!question.trim() || busy) return;
       setBusy(true);
       setValue("");
-      setTurns((t) => [...t, { question, answer: null, toolCalls: [], running: null }]);
+      setTurns((t) => [...t, { question, answer: null, toolCalls: [], risks: [], running: null }]);
 
       const patch = (fn: (t: Turn) => Turn) =>
         setTurns((list) => {
@@ -199,6 +214,8 @@ export default function Page() {
                   ...t.toolCalls,
                   { tool: ev.tool, ok: ev.ok, durationMs: ev.durationMs, ...(ev.code ? { code: ev.code } : {}) },
                 ],
+                // Aynı uyarı iki tool'dan da gelebilir; tekrarı gösterme.
+                risks: dedupeRisks([...t.risks, ...(ev.risks ?? [])]),
               }));
               if (ev.ok && PANEL_TOOLS.has(ev.tool) && ev.data !== undefined) {
                 setPanels((p) => [
@@ -403,12 +420,18 @@ export default function Page() {
                 {(t.toolCalls.length > 0 || t.running) && (
                   <div className="calls">
                     {t.toolCalls.map((c, k) => (
-                      <span className={`call${c.ok ? "" : " bad"}`} key={k}>
-                        {c.tool}
-                        {c.ok ? ` · ${c.durationMs}ms` : ` · ${c.code}`}
+                      // Ham tool adı `title`'da: kullanıcıya gösterilmiyor ama
+                      // hata ararken elimizden çıkmıyor.
+                      <span className={`call${c.ok ? "" : " bad"}`} key={k} title={c.tool}>
+                        {toolLabel(c.tool)}
+                        {c.ok ? ` · ${formatDuration(c.durationMs)}` : ` · ${c.code}`}
                       </span>
                     ))}
-                    {t.running && <span className="call live">{t.running} çalışıyor…</span>}
+                    {t.running && (
+                      <span className="call live" title={t.running}>
+                        {toolLabel(t.running)}…
+                      </span>
+                    )}
                   </div>
                 )}
                 {t.answer === null ? (
@@ -419,6 +442,12 @@ export default function Page() {
                 ) : (
                   <div className="reply">
                     <Reveal text={t.answer} />
+                    {t.risks.map((r, k) => (
+                      <div className={`risk ${riskClass(r.severity)}`} key={k}>
+                        <b>{RISK_LABEL[r.severity] ?? "Not"}</b>
+                        <span>{r.message}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -547,6 +576,41 @@ export default function Page() {
  * burada ölür. Ama fazlası GİZLENMEZ: kalanlar tek satırda sayıyla
  * duyurulur ve tıklanabilir. Sessizlik, saklamak değildir.
  */
+/**
+ * Etki rakamını kısaltır: 156000 → "156 bin".
+ *
+ * Tam rakam kartın yarısını kaplar ve zaten `detail` satırında yazıyor.
+ * Buradaki sayı okunmak için değil, BÜYÜKLÜK HİSSİ vermek için var.
+ */
+const RISK_LABEL: Readonly<Record<string, string>> = {
+  critical: "Kritik",
+  warning: "Uyarı",
+  info: "Bilgi",
+};
+
+function riskClass(severity: string): string {
+  if (severity === "critical") return "crit";
+  if (severity === "info") return "info";
+  return "";
+}
+
+/** Aynı mesaj birden çok tool'dan gelebilir; kullanıcıya bir kez gösterilir. */
+function dedupeRisks(risks: readonly TurnRisk[]): TurnRisk[] {
+  const seen = new Set<string>();
+  return risks.filter((r) => {
+    if (seen.has(r.message)) return false;
+    seen.add(r.message);
+    return true;
+  });
+}
+
+function formatImpact(value: number): string {
+  const abs = Math.abs(value);
+  if (abs >= 1_000_000) return `${(value / 1_000_000).toLocaleString("tr-TR", { maximumFractionDigits: 1 })}M`;
+  if (abs >= 1_000) return `${Math.round(value / 1_000)} bin`;
+  return value.toLocaleString("tr-TR");
+}
+
 function Signals({ signals, onAsk }: { signals: readonly Signal[]; onAsk: (q: string) => void }) {
   const [expandAll, setExpandAll] = useState(false);
   const critical = signals.filter((s) => s.level === 2);
@@ -559,7 +623,18 @@ function Signals({ signals, onAsk }: { signals: readonly Signal[]; onAsk: (q: st
       {shown.map((sig, i) => (
         <div className="sig2 in" key={sig.id} style={{ animationDelay: `${0.26 + i * 0.09}s` }}>
           <span className="lbl">Kritik · müdahale gerekiyor</span>
-          <div className="t">{sig.title}</div>
+          {/* Başlık ve ölçü aynı satırda: göz önce rakama gider. Ölçü YOKSA
+              uydurulmaz — bazı sinyaller sayıya indirgenmez ("kalite kapısı
+              bekliyor" gibi) ve sahte bir rakam koymak yanlış aciliyet üretir. */}
+          <div className="hd">
+            <div className="t">{sig.title}</div>
+            {sig.impact !== null && (
+              <div className="num">
+                {formatImpact(sig.impact)}
+                <u>{sig.impactUnit ?? "₺"}</u>
+              </div>
+            )}
+          </div>
           <div className="d">{sig.detail}</div>
           {sig.drilldown && (
             <div className="row">
