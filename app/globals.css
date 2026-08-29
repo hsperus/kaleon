@@ -99,6 +99,23 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   background: var(--warn-veil); color: var(--warn); white-space: nowrap;
 }
 
+/* Üst çubuktaki eylemler asla iki satıra kırılmaz; kırılırsa çubuk büyür
+   ve sayfa zıplar. */
+button.role, select.role { white-space: nowrap; }
+
+/* Sık kullanılan eylem için kompakt ikon. Metin etiket dar ekranda çubuğu
+   taşırıyordu; ikon aynı işi yerin onda birinde yapıyor. */
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; flex: 0 0 auto;
+  border-radius: 9px; border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--ink-2); cursor: pointer;
+  transition: transform .22s var(--spring), border-color .18s var(--glide), color .18s var(--glide);
+}
+.icon-btn:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+.icon-btn:active { transform: translateY(0) scale(.94); }
+.icon-btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-veil); }
+
 button.role, select.role {
   font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 9px;
   background: var(--surface-2); color: var(--ink); border: 1px solid var(--line);

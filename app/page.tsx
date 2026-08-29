@@ -266,8 +266,21 @@ export default function Page() {
         {/* Konuşma sürüyorsa yeni konuşma açılabilsin; sürmüyorsa buton
             gereksiz gürültüdür. */}
         {conversationId && turns.length > 0 && (
-          <button className="role" type="button" onClick={newConversation} title="Yeni konuşma">
-            Yeni konuşma
+          <button
+            className="icon-btn"
+            type="button"
+            onClick={newConversation}
+            title="Yeni konuşma"
+            aria-label="Yeni konuşma"
+          >
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+              <path
+                d="M8 3.2v9.6M3.2 8h9.6"
+                stroke="currentColor"
+                strokeWidth="1.6"
+                strokeLinecap="round"
+              />
+            </svg>
           </button>
         )}
         {/* Rol seçici YALNIZCA geliştirme kimliğiyle görünür. Gerçek oturumda
