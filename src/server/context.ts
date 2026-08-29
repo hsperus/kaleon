@@ -39,7 +39,7 @@ import { sharedClient, tenantClient } from "../db/client.js";
 import { PrismaDataSource } from "../db/master-data-source.js";
 import { PrismaOperationsRepository } from "../db/operations-repository.js";
 import { PrismaConversationRepository } from "../db/conversation-repository.js";
-import { PartnerImporter } from "../db/partner-import.js";
+import { importerFor } from "../db/importers.js";
 import { PrismaUploadStore } from "../db/upload-store.js";
 import {
   InMemoryConversationRepository,
@@ -271,7 +271,7 @@ function buildRegistryForTenant(tenant: TenantContext): ToolRegistry {
       uploads: new PrismaUploadStore(db),
       // Yazıcı, isteğin tenant'ına bağlı client ile kurulur; tool içinden
       // gelen tenantId bağlamla aynıdır (invoker bunu doğrular).
-      importerFor: () => new PartnerImporter(db),
+      importerFor: (objectId) => importerFor(objectId, db),
     },
   });
 }

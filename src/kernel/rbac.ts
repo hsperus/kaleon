@@ -39,17 +39,27 @@ export const ROLE_PERMISSIONS: Record<RoleId, readonly Permission[]> = {
   ],
   cfo: [
     "master-data:partner.read",
+    // Banka ekstresini sisteme alan roldür; nakit pozisyonundan sorumlu.
+    "finance:bank.write",
     "documents:invoice.read",
     "finance:*",
     "accounting:*",
     "operations:cost.read",
     "inventory:valuation.read",
     "sales:order.read",
+    // Satış siparişini sisteme alma yetkisi CFO'da: sipariş bir TAAHHÜTTÜR
+    // ve gecikme cezasının mali sonucunu taşıyan roldür. Ayrı bir "satış"
+    // rolü eklenene kadar doğru sahip budur — üretim müdürüne vermek,
+    // üretimin kendi terminini belirlemesi anlamına gelirdi.
+    "sales:order.write",
     "approval:read",
     "approval:finance.submit",
   ],
   ik_muduru: [
     "master-data:employee.read",
+    // Personel kartlarını ve PDKS çıktısını sisteme alan roldür.
+    "master-data:employee.write",
+    "hr:attendance.write",
     "hr:attendance.read",
     "hr:leave.read",
     "hr:overtime.read",

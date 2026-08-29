@@ -46,8 +46,9 @@ const LABELS: Readonly<Record<string, string>> = {
 
   // ── Ana veri ──
   resolve_partner: "Cari çözümlendi",
-  preview_partner_import: "Dosya okundu, önizleme hazırlandı",
-  commit_partner_import: "Cariler sisteme yazıldı",
+  preview_import: "Dosya okundu, önizleme hazırlandı",
+  commit_import: "Dosya sisteme yazıldı",
+  list_import_templates: "Yüklenebilir dosya türleri listelendi",
 
   // ── Belge ──
   match_invoice: "Fatura eşleştirildi",
