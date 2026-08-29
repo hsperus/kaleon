@@ -115,15 +115,19 @@
   eski olayları yeniden yazmaz), iyimser kilit eşzamanlı onayı reddediyor
 - **Kalan:** L1 taslak tool'ları (KDV, işten çıkış, ödeme planı), eskalasyon zinciri
 
-### Aşama 7 — Evaluation framework 🟡 KOŞUM TAMAM
+### Aşama 7 — Evaluation framework ✅ 80 SORU + KOŞUM HAZIR
 - Golden question seti: 80 Türkçe soru, beklenen cevap + zorunlu kaynak alanları
 - Her prompt/tool değişikliğinde regresyon koşusu
 - Halüsinasyon tespiti: sayı doğrulama, kaynak kontrolü
 - Maliyet ve gecikme metrikleri, model/effort karşılaştırması
 - **Çıkış kriteri:** satışa çıkış eşiği — 80 golden question'da kaynaklı doğru cevap
-- **Tamam:** çalıştırılabilir golden fixture'lar (22 soru), kapılı notlandırıcı
-  (güvenlik ihlali puan kırmaz, soruyu düşürür), paket raporu
-- **Kalan:** 58 soru daha, gerçek modele karşı ilk koşu (API anahtarı gerekli), CI bağlantısı
+- **Tamam:** 80 golden question (satışa çıkış kriterinin sayısal eşiği),
+  kapılı notlandırıcı, `npm run eval` koşumu, kategori filtresi,
+  güvenlik kapısı düşerse çıkış kodu 1 (CI durur)
+- **Demo modu skoru:** 51/80, güvenlik kategorisi 8/8. Bu skor MODEL
+  kalitesini ölçmez — senaryo tabanlı completer yalnızca beş kalıbı tanır.
+  Zincirin ayakta olduğunu gösterir.
+- **Kalan:** gerçek modele karşı ilk koşu (ANTHROPIC_API_KEY), CI bağlantısı
 
 ### Aşama 8 — Pilot sertleştirme (4 hafta)
 - Orthaus + Zerey canlı geçiş, veri migrasyonu, çapraz doğrulama dönemi

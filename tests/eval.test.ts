@@ -31,7 +31,8 @@ describe("golden set bütünlüğü", () => {
     expect(new Set(ids).size).toBe(ids.length);
     for (const x of GOLDEN_QUESTIONS) {
       expect(x.rationale.length).toBeGreaterThan(20);
-      expect(x.question.length).toBeGreaterThan(5);
+      // EDGE-001 bilerek boş: sistemin boş girdide çökmediğini sınar.
+      if (x.id !== "EDGE-001") expect(x.question.length).toBeGreaterThan(5);
     }
   });
 
@@ -41,13 +42,17 @@ describe("golden set bütünlüğü", () => {
     expect(b.honesty).toBeGreaterThanOrEqual(2);
     expect(b.approval).toBeGreaterThanOrEqual(3);
     expect(b.documents).toBeGreaterThanOrEqual(3);
+    expect(b.quality).toBeGreaterThanOrEqual(3);
+    // Satışa çıkış kriteri: en az 80 soru (Ürün Mantığı §17).
+    expect(GOLDEN_QUESTIONS.length).toBeGreaterThanOrEqual(80);
   });
 
   it("reddedilmesi beklenen sorularda zorunlu tool yoktur", () => {
     for (const x of GOLDEN_QUESTIONS) {
       if (x.expectsRefusal && x.mustCallTools.length > 0) {
-        // resolve_partner gibi "önce çöz, sonra yok de" durumları meşrudur
-        expect(["honesty"]).toContain(x.category);
+        // "Önce çöz, sonra yok de" meşru bir örüntüdür: model varlığı arar,
+        // bulamayınca dürüstçe söyler. Yalnızca veri arama kategorilerinde.
+        expect(["honesty", "master-data", "documents"]).toContain(x.category);
       }
     }
   });
