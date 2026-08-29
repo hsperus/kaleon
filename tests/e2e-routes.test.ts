@@ -25,6 +25,8 @@ const enabled = Boolean(process.env["SHARED_DATABASE_URL"] && process.env["TENAN
 
 const EMAIL = "e2e@kaelon.test";
 const PASSWORD = "E2eTestParola2026!";
+/** Var olmayan kullanıcı testi için — kilit sayacı da temizlenir. */
+const MISSING_EMAIL = "yok@kaelon.test";
 
 function req(url: string, init?: RequestInit & { cookie?: string }): Request {
   const headers = new Headers(init?.headers);
@@ -52,7 +54,11 @@ describe.skipIf(!enabled)("uçtan uca yollar", () => {
     });
     tenantId = demo.id;
 
-    await db.loginAttempt.deleteMany({ where: { email: EMAIL } });
+    // HER İKİ E-POSTANIN da sayacı temizlenir. Yalnızca EMAIL temizleniyordu;
+    // "olmayan kullanıcı" testinin kullandığı adres her koşuda bir başarısız
+    // deneme biriktiriyor ve beşinci koşuda hesap kilitlenip test kırılıyordu.
+    // Testin kendi geçmişine bağlı olması, testi zamanla yalancı yapar.
+    await db.loginAttempt.deleteMany({ where: { email: { in: [EMAIL, MISSING_EMAIL] } } });
     const user = await db.user.upsert({
       where: { email: EMAIL },
       create: {
@@ -113,7 +119,7 @@ describe.skipIf(!enabled)("uçtan uca yollar", () => {
 
   it("yanlış parola ile olmayan kullanıcı AYNI cevabı verir", async () => {
     const a = await login(req("/api/auth/login", { method: "POST", body: JSON.stringify({ email: EMAIL, password: "yanlisParola123" }) }));
-    const b = await login(req("/api/auth/login", { method: "POST", body: JSON.stringify({ email: "yok@kaelon.test", password: "yanlisParola123" }) }));
+    const b = await login(req("/api/auth/login", { method: "POST", body: JSON.stringify({ email: MISSING_EMAIL, password: "yanlisParola123" }) }));
     expect(a.status).toBe(b.status);
     expect(await a.json()).toEqual(await b.json());
   }, 30_000);

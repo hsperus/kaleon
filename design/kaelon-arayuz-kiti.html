@@ -135,8 +135,9 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   .topbar .who.meta { display: none; }
   .demo-badge { font-size: 11px; padding: 3px 8px; }
 }
-.brand { display: flex; align-items: center; gap: 9px; font-weight: 700; letter-spacing: -.02em; font-size: 15px; }
-.brand i { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-veil); }
+/* Sadece kelime işareti. Yanındaki renkli nokta her SaaS şablonunda var ve
+   markaya hiçbir şey katmıyordu; kelimenin kendisi yeterli. */
+.brand { display: flex; align-items: center; font-weight: 600; letter-spacing: -.01em; font-size: 14px; color: var(--ink); }
 .who {
   font-size: 12.5px; color: var(--muted);
   padding-left: 16px; border-left: 1px solid var(--line);
@@ -145,10 +146,16 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
 .who b { color: var(--ink-2); font-weight: 600; }
 .spacer { flex: 1; }
 
-.demo-badge {
-  font-size: 12px; font-weight: 500; padding: 4px 10px; border-radius: 8px;
-  background: var(--warn-veil); color: var(--warn); white-space: nowrap;
+/* DURUM İŞARETİ.
+   Eskiden üst çubukta iki amber hap duruyordu ("Demo veri", "Model bağlı
+   değil") ve ekranı bir demo sayfasına çeviriyordu. Bilgi kalmalı — ama
+   bağırarak değil. Artık tek, sessiz bir gri metin; noktanın rengi durumu
+   söylüyor. Gerçek kurulumda hiç görünmez. */
+.status {
+  display: inline-flex; align-items: center; gap: 6px;
+  font-size: 12px; color: var(--faint); white-space: nowrap;
 }
+.status i { width: 5px; height: 5px; border-radius: 50%; background: var(--warn); flex: 0 0 auto; }
 
 /* Üst çubuktaki eylemler asla iki satıra kırılmaz; kırılırsa çubuk büyür
    ve sayfa zıplar. */
@@ -237,10 +244,18 @@ button.role, select.role {
 /* Uyarı etiketi artık BÜYÜK HARF değil. Versal metin bağırır; bir ERP'de
    her cevabın altında bağıran bir kutu varsa hiçbiri okunmaz olur.
    Ayrım renkle kuruluyor, tipografik şiddetle değil. */
-.risk { display: flex; gap: 10px; align-items: flex-start; font-size: 13.5px; line-height: 1.5; padding: 11px 14px; border-radius: 12px; background: var(--warn-veil); color: var(--ink-2); }
-.risk.crit { background: var(--crit-veil); }
-.risk.info { background: var(--surface-2); }
-.risk b { flex: 0 0 auto; color: var(--warn); font-weight: 600; }
+/* UYARI SATIRI.
+   Dolu renkli blok, cevabın altına yapıştırılmış bir afiş gibi duruyordu.
+   Bir uyarı dikkat çekmeli ama sayfayı ele geçirmemeli: artık zeminsiz,
+   ince bir çizgiyle ayrılmış tek satır. Renk yalnızca küçük noktada ve
+   etikette — anlam orada zaten. */
+.risk {
+  display: flex; gap: 9px; align-items: baseline;
+  font-size: 13px; line-height: 1.55; color: var(--muted);
+  padding-top: 9px; border-top: 1px solid var(--line-soft);
+}
+.risk + .risk { padding-top: 7px; border-top: 0; }
+.risk b { flex: 0 0 auto; font-weight: 500; color: var(--warn); }
 .risk.crit b { color: var(--crit); }
 .risk.info b { color: var(--muted); }
 
@@ -383,43 +398,56 @@ button.role, select.role {
 .act:hover { transform: translateY(-2px); box-shadow: var(--sh-m); color: var(--ink); }
 .act:active { transform: translateY(0) scale(.96); transition-duration: .1s; }
 
+/* "Daha var" düğmesi kırmızı zeminliydi ve kendisi bir alarm gibi
+   duruyordu. O bir alarm değil, bir BAĞLANTI: gizlenen kartları açar. */
 .sig-more {
-  align-self: flex-start; font-size: 13px; font-weight: 600; color: var(--crit);
-  padding: 8px 14px; border-radius: 11px; background: var(--crit-veil);
-  transition: transform .34s var(--spring), opacity .2s var(--glide);
+  align-self: flex-start; font-size: 13.5px; color: var(--accent);
+  padding: 4px 0; background: none;
+  transition: color .16s var(--glide);
 }
-.sig-more:hover { transform: translateY(-1.5px); }
-.sig-more:active { transform: scale(.96); transition-duration: .1s; }
+.sig-more:hover { color: var(--accent-ink); }
 
 
 /* ─────────────────────── Giriş ekranı ───────────────────────
-   Ana ekranın sakinliğiyle aynı dilde: tek kart, iki alan, tek eylem.
-   Kart yay eğrisiyle bir kez oturur; her yenilemede animasyon tekrarı
-   sinir bozucu olurdu, o yüzden yalnızca giriş anında çalışır. */
+
+   ÖNCEKİ HÂLİ BOŞ BİR KUTUYDU. Ekranın ortasında küçük bir kart, içinde iki
+   alan ve bir düğme; etrafı bomboş. macOS'un giriş ekranları boş değildir,
+   SAKİNDİR — aradaki fark ORANTIDA ve RİTİMDE:
+
+     · Kart kâğıt gibi durmaz, yüzey gibi durur: kenarlık neredeyse yok,
+       derinlik uzun ve yumuşak bir gölgeden gelir.
+     · Alanlar 44px yüksekliğinde — Apple'ın dokunma hedefi ölçüsü. 10px'lik
+       kutucuklar ekranı oyuncak gösteriyordu.
+     · Etiketler alanın ÜSTÜNDE küçük ve soluk değil; alanın kendisi yeterince
+       büyük olduğu için etiket sessizleşebilir.
+     · Kart dikey olarak tam ortada değil, ortanın biraz ÜSTÜNDE durur
+       (optik merkez). Tam ortada duran bir kart aşağı kaymış görünür.
+     · Zeminde tek bir yumuşak ışık var, gradyan gösterisi yok.            */
 
 .shell.boot { background: var(--bg); }
 
 .login-shell {
   min-height: 100dvh;
-  display: grid;
-  place-items: center;
-  padding: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px 24px 96px; /* alttaki fazla boşluk kartı optik merkeze taşır */
   background:
-    radial-gradient(120% 90% at 50% -10%, var(--accent-veil), transparent 60%),
+    radial-gradient(90% 60% at 50% 0%, color-mix(in srgb, var(--surface) 55%, transparent), transparent 70%),
     var(--bg);
 }
 
 .login-card {
   width: 100%;
-  max-width: 360px;
+  max-width: 384px;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-  padding: 28px;
-  border-radius: 20px;
+  gap: 18px;
+  padding: 36px 34px 30px;
+  border-radius: 18px;
   background: var(--surface);
-  border: 1px solid var(--line);
-  box-shadow: var(--sh-m);
+  border: 1px solid color-mix(in srgb, var(--line) 55%, transparent);
+  box-shadow: var(--sh-l);
   animation: login-in .62s var(--spring-soft) both;
 }
 
@@ -432,62 +460,75 @@ button.role, select.role {
   .login-card { animation: none; }
 }
 
+/* Marka ve başlık tek blok: "KAELON" üstte küçük, altında ne yapılacağı. */
+.login-head { display: flex; flex-direction: column; gap: 3px; margin-bottom: 4px; }
 .login-card .login-brand {
-  display: flex; align-items: center; gap: 9px;
-  font-weight: 700; letter-spacing: -.02em; font-size: 15px;
-  margin-bottom: 4px;
+  font-weight: 600; letter-spacing: -.01em; font-size: 13px; color: var(--muted);
 }
-.login-card .login-brand i {
-  width: 9px; height: 9px; border-radius: 50%;
-  background: var(--accent); box-shadow: 0 0 0 3px var(--accent-veil);
+.login-card .login-title {
+  font-size: 21px; font-weight: 600; letter-spacing: -.026em; color: var(--ink);
 }
 
-.login-lead { margin: 0; font-size: 14px; color: var(--ink-2); }
+.login-lead { margin: 0; font-size: 14px; color: var(--muted); }
 
-.login-field { display: flex; flex-direction: column; gap: 6px; }
-.login-field span { font-size: 12px; font-weight: 600; color: var(--muted); }
+.login-fields { display: flex; flex-direction: column; gap: 10px; }
+.login-field { display: flex; flex-direction: column; gap: 5px; }
+.login-field span { font-size: 12.5px; color: var(--muted); }
 .login-field input {
-  font: inherit; font-size: 14px;
-  padding: 10px 12px; border-radius: 11px;
-  background: var(--surface-2); color: var(--ink);
+  font: inherit; font-size: 15px; height: 44px;
+  padding: 0 13px; border-radius: 10px;
+  background: var(--surface); color: var(--ink);
   border: 1px solid var(--line);
-  transition: border-color .18s var(--glide), box-shadow .18s var(--glide);
+  transition: border-color .16s var(--glide), box-shadow .16s var(--glide);
 }
+.login-field input::placeholder { color: var(--faint); }
+.login-field input:hover { border-color: color-mix(in srgb, var(--ink) 18%, var(--line)); }
 .login-field input:focus-visible {
   outline: none;
   border-color: var(--accent);
-  box-shadow: 0 0 0 3px var(--accent-veil);
+  box-shadow: 0 0 0 3.5px var(--accent-veil);
 }
 
+/* Hata, kırmızı bir kutu değil; alanın altındaki bir cümle. */
 .login-error {
-  margin: 0; font-size: 12.5px; font-weight: 600;
-  padding: 9px 11px; border-radius: 10px;
-  background: var(--crit-veil); color: var(--crit);
+  margin: -4px 0 0; font-size: 13px; color: var(--crit);
+  display: flex; align-items: baseline; gap: 6px;
 }
 
 .login-submit {
-  font: inherit; font-size: 14px; font-weight: 550;
-  padding: 12px 14px; border-radius: 12px; border: 0;
+  font: inherit; font-size: 15px; font-weight: 500; height: 44px;
+  padding: 0 14px; border-radius: 10px; border: 0;
   background: var(--accent); color: #fff; cursor: pointer;
-  box-shadow: var(--sh-accent);
-  transition: transform .22s var(--spring), opacity .18s var(--glide);
+  transition: filter .16s var(--glide), transform .1s var(--glide);
 }
-.login-submit:hover:not(:disabled) { transform: translateY(-1px); }
-.login-submit:active:not(:disabled) { transform: translateY(0) scale(.985); }
-.login-submit:disabled { opacity: .55; cursor: default; }
+.login-submit:hover:not(:disabled) { filter: brightness(1.08); }
+.login-submit:active:not(:disabled) { transform: scale(.99); }
+.login-submit:disabled { opacity: .45; cursor: default; }
 
-.login-choices { display: flex; flex-direction: column; gap: 8px; }
+/* Şirket listesi: kart içinde tek bir gruplanmış liste (macOS ayar
+   listeleri gibi), her satır arasında hairline. Ayrı ayrı kutular
+   "form elemanı" gibi duruyordu; bu bir SEÇİM listesi. */
+.login-choices {
+  display: flex; flex-direction: column;
+  border: 1px solid var(--line); border-radius: 10px; overflow: hidden;
+}
 .login-choice {
-  font: inherit; font-size: 14px; font-weight: 600; text-align: left;
-  padding: 13px 14px; border-radius: 12px;
-  background: var(--surface-2); color: var(--ink);
-  border: 1px solid var(--line); cursor: pointer;
-  transition: border-color .18s var(--glide), transform .22s var(--spring);
+  font: inherit; font-size: 15px; text-align: left;
+  display: flex; align-items: center; gap: 10px;
+  padding: 13px 14px; background: var(--surface); color: var(--ink);
+  border: 0; border-top: 1px solid var(--line-soft); cursor: pointer;
+  transition: background .14s var(--glide);
 }
-.login-choice:hover:not(:disabled) { border-color: var(--accent); transform: translateX(2px); }
-.login-choice:disabled { opacity: .55; cursor: default; }
+.login-choice:first-child { border-top: 0; }
+.login-choice::after {
+  content: ""; margin-left: auto; width: 6px; height: 6px;
+  border-right: 1.5px solid var(--faint); border-top: 1.5px solid var(--faint);
+  transform: rotate(45deg); flex: 0 0 auto;
+}
+.login-choice:hover:not(:disabled) { background: var(--surface-2); }
+.login-choice:disabled { opacity: .5; cursor: default; }
 
-.login-note { margin: 2px 0 0; font-size: 11.5px; color: var(--faint); line-height: 1.5; }
+.login-note { margin: 0; font-size: 12.5px; color: var(--faint); line-height: 1.5; text-align: center; }
 
 
 /* ── Sohbete eklenen dosya ─────────────────────────────────────────────
@@ -661,7 +702,7 @@ body.gallery { overflow: auto; height: auto; }
   <div class="grid2">
     <div class="frame h-md"><span class="cap">Adım 1 · Kimlik</span>
       <div class="login-shell"><form class="login-card">
-        <div class="login-brand"><i></i><span>KAELON</span></div>
+        <div class="login-head"><span class="login-brand">KAELON</span><span class="login-title">Giriş yapın</span></div>
         <label class="login-field"><span>E-posta</span><input type="email" value="cebrail@orthaus.com"></label>
         <label class="login-field"><span>Parola</span><input type="password" value="parolaparola"></label>
         <button class="login-submit" type="button">Giriş</button>
@@ -671,7 +712,7 @@ body.gallery { overflow: auto; height: auto; }
 
     <div class="frame h-md"><span class="cap">Hata · ayrım yapmaz</span>
       <div class="login-shell"><form class="login-card">
-        <div class="login-brand"><i></i><span>KAELON</span></div>
+        <div class="login-head"><span class="login-brand">KAELON</span><span class="login-title">Giriş yapın</span></div>
         <label class="login-field"><span>E-posta</span><input type="email" value="cebrail@orthaus.com"></label>
         <label class="login-field"><span>Parola</span><input type="password" value="yanlis"></label>
         <p class="login-error">E-posta veya parola hatalı.</p>
@@ -682,7 +723,7 @@ body.gallery { overflow: auto; height: auto; }
 
     <div class="frame h-md"><span class="cap">Adım 2 · Şirket seçimi</span>
       <div class="login-shell"><div class="login-card">
-        <div class="login-brand"><i></i><span>KAELON</span></div>
+        <div class="login-head"><span class="login-brand">KAELON</span><span class="login-title">Giriş yapın</span></div>
         <p class="login-lead">Hangi şirkete giriyorsunuz?</p>
         <div class="login-choices">
           <button type="button" class="login-choice">Orthaus Makina</button>
@@ -693,7 +734,7 @@ body.gallery { overflow: auto; height: auto; }
 
     <div class="frame h-md"><span class="cap">2FA · yalnızca gerekince</span>
       <div class="login-shell"><form class="login-card">
-        <div class="login-brand"><i></i><span>KAELON</span></div>
+        <div class="login-head"><span class="login-brand">KAELON</span><span class="login-title">Giriş yapın</span></div>
         <label class="login-field"><span>E-posta</span><input type="email" value="cebrail@orthaus.com"></label>
         <label class="login-field"><span>Parola</span><input type="password" value="parolaparola"></label>
         <label class="login-field"><span>Doğrulama kodu</span><input inputmode="numeric" maxlength="6" placeholder="000000" value="418302"></label>
@@ -716,10 +757,10 @@ body.gallery { overflow: auto; height: auto; }
 
   <div class="frame"><span class="cap">Gerçek oturum</span>
     <div class="shell" style="min-height:0"><header class="topbar">
-      <div class="brand"><i></i><span>KAELON</span></div>
+      <div class="brand">KAELON</div>
       <div class="who">Cebrail Karaarslan · <b>Patron</b></div>
       <div class="spacer"></div>
-      <span class="demo-badge">Model bağlı değil</span>
+      <span class="status"><i></i>Modelsiz</span>
       <span class="who meta" style="border:0;padding-left:0">24/26 tool · L3</span>
       <button class="icon-btn" title="Yeni konuşma"><svg viewBox="0 0 16 16" width="15" height="15"><path d="M8 3.2v9.6M3.2 8h9.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
       <button class="role" type="button">Çıkış</button>
@@ -728,11 +769,10 @@ body.gallery { overflow: auto; height: auto; }
 
   <div class="frame"><span class="cap">Geliştirme kimliği · rol seçici</span>
     <div class="shell" style="min-height:0"><header class="topbar">
-      <div class="brand"><i></i><span>KAELON</span></div>
+      <div class="brand">KAELON</div>
       <div class="who">Cebrail Karaarslan (demo) · <b>Patron</b></div>
       <div class="spacer"></div>
-      <span class="demo-badge">Demo veri</span>
-      <span class="demo-badge">Model bağlı değil</span>
+      <span class="status"><i></i>Demo</span>
       <select class="role"><option>Patron</option><option>CFO</option><option>Üretim Müdürü</option></select>
       <button class="role" type="button">Gerçek giriş</button>
     </header></div>
@@ -757,13 +797,13 @@ body.gallery { overflow: auto; height: auto; }
       </div>
       <div class="signals">
         <div class="sig2">
-          <span class="lbl">Kritik · Müdahale gerekiyor</span>
+          <span class="lbl">Kritik</span>
           <div class="t">Daimler SO-2026-0427 5 gün gecikecek.</div>
           <div class="d">3 sipariş risk altında. Toplam sözleşme cezası riski yaklaşık 156.000 TRY.</div>
           <div class="row"><button class="act">Detayı aç</button><button class="act">Planı değiştir</button></div>
         </div>
         <div class="sig2">
-          <span class="lbl">Kritik · Müdahale gerekiyor</span>
+          <span class="lbl">Kritik</span>
           <div class="t">Üretim hızı hedefin %24 altında.</div>
           <div class="d">Gerçek 29 birim/saat, hedef 38.</div>
           <div class="row"><button class="act">Detayı aç</button></div>
@@ -993,7 +1033,7 @@ body.gallery { overflow: auto; height: auto; }
   <div class="frame h-lg"><span class="cap">Çekmece açık</span>
     <div class="shell" style="position:relative">
       <header class="topbar">
-        <div class="brand"><i></i><span>KAELON</span></div>
+        <div class="brand">KAELON</div>
         <div class="who">Cebrail Karaarslan · <b>Patron</b></div>
         <div class="spacer"></div>
         <button class="icon-btn"><svg viewBox="0 0 16 16" width="15" height="15"><path d="M8 3.2v9.6M3.2 8h9.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
@@ -1036,7 +1076,7 @@ body.gallery { overflow: auto; height: auto; }
   </p>
   <div class="frame h-md"><span class="cap">Arayüz hatası</span>
     <div class="login-shell"><div class="login-card">
-      <div class="login-brand"><i></i><span>KAELON</span></div>
+      <div class="login-head"><span class="login-brand">KAELON</span><span class="login-title">Giriş yapın</span></div>
       <p class="login-lead">Bir şeyler ters gitti.</p>
       <p class="login-note" style="margin-top:0">Bu ekran açılamadı. <strong>Kaydedilmiş verileriniz yerinde duruyor</strong> — bu hata yalnızca görüntülemeyi etkiledi.</p>
       <button class="login-submit" type="button">Tekrar dene</button>
@@ -1056,8 +1096,7 @@ body.gallery { overflow: auto; height: auto; }
     <div class="risk"><b>Bilgi</b><span>Toplam 16.650 blokeli bakiye var; kullanılabilir tutara dahil değil.</span></div>
     <div class="risk"><b>Uyarı</b><span>2 siparişin sevkiyat tarihi hesaplanamadı, riski BİLİNMİYOR.</span></div>
     <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
-      <span class="demo-badge">Demo veri</span>
-      <span class="demo-badge">Model bağlı değil</span>
+      <span class="status"><i></i>Demo</span>
       <span class="call">get_bank_balance · 8ms</span>
       <span class="call live">get_shipment_risk çalışıyor…</span>
       <span class="call bad">get_payroll · permission_denied</span>

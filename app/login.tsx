@@ -83,11 +83,10 @@ export function LoginScreen({ onSuccess }: { readonly onSuccess: () => void }) {
     return (
       <div className="login-shell">
         <div className="login-card">
-          <div className="login-brand">
-            <i />
-            <span>KAELON</span>
+          <div className="login-head">
+            <span className="login-brand">KAELON</span>
+            <span className="login-title">Hangi şirket?</span>
           </div>
-          <p className="login-lead">Hangi şirkete giriyorsunuz?</p>
           <div className="login-choices">
             {choices.map((t) => (
               <button
@@ -117,48 +116,51 @@ export function LoginScreen({ onSuccess }: { readonly onSuccess: () => void }) {
           if (!busy) void attempt();
         }}
       >
-        <div className="login-brand">
-          <i />
-          <span>KAELON</span>
+        <div className="login-head">
+          <span className="login-brand">KAELON</span>
+          <span className="login-title">Giriş yapın</span>
         </div>
 
-        <label className="login-field">
-          <span>E-posta</span>
-          <input
-            type="email"
-            autoComplete="username"
-            required
-            autoFocus
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-          />
-        </label>
-
-        <label className="login-field">
-          <span>Parola</span>
-          <input
-            type="password"
-            autoComplete="current-password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </label>
-
-        {needsTotp && (
+        <div className="login-fields">
           <label className="login-field">
-            <span>Doğrulama kodu</span>
+            <span>E-posta</span>
             <input
-              ref={totpRef}
-              inputMode="numeric"
-              autoComplete="one-time-code"
-              maxLength={6}
-              placeholder="000000"
-              value={totpCode}
-              onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))}
+              type="email"
+              autoComplete="username"
+              required
+              autoFocus
+              placeholder="ad@sirket.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
             />
           </label>
-        )}
+
+          <label className="login-field">
+            <span>Parola</span>
+            <input
+              type="password"
+              autoComplete="current-password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+          </label>
+
+          {needsTotp && (
+            <label className="login-field">
+              <span>Doğrulama kodu</span>
+              <input
+                ref={totpRef}
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                placeholder="000000"
+                value={totpCode}
+                onChange={(e) => setTotpCode(e.target.value.replace(/\D/g, ""))}
+              />
+            </label>
+          )}
+        </div>
 
         {error && <p className="login-error">{error}</p>}
 
@@ -166,9 +168,7 @@ export function LoginScreen({ onSuccess }: { readonly onSuccess: () => void }) {
           {busy ? "Kontrol ediliyor…" : "Giriş"}
         </button>
 
-        <p className="login-note">
-          Hesap oluşturma ekranı yoktur. Kullanıcılar yöneticiniz tarafından tanımlanır.
-        </p>
+        <p className="login-note">Hesabınızı yöneticiniz tanımlar.</p>
       </form>
     </div>
   );

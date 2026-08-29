@@ -309,30 +309,30 @@ export default function Page() {
   return (
     <div className="shell" style={{ position: "relative" }}>
       <header className="topbar">
-        <div className="brand">
-          <i />
-          <span>KAELON</span>
-        </div>
+        <div className="brand">KAELON</div>
         <div className="who">
           {session?.displayName ?? "…"} · <b>{session?.roleLabel ?? "…"}</b>
         </div>
         <div className="spacer" />
-        {session?.dataPlane === "demo" && (
-          <span className="demo-badge" title="İşletmesel veri demo kümesinden geliyor">
-            Demo veri
+        {/* TEK SESSİZ DURUM İŞARETİ.
+            Üst çubukta iki amber hap duruyordu ve ekranı bir demo sayfasına
+            çeviriyordu. Bilgi kalmalı — ama bağırmadan. Gerçek kurulumda
+            (model bağlı + gerçek tenant) hiç görünmez. */}
+        {session && (session.dataPlane === "demo" || !session.modelConnected) && (
+          <span
+            className="status"
+            title={[
+              session.dataPlane === "demo" ? "İşletmesel veri demo kümesinden geliyor" : "",
+              !session.modelConnected ? "Model bağlı değil (ANTHROPIC_API_KEY tanımsız)" : "",
+            ]
+              .filter(Boolean)
+              .join(" · ")}
+          >
+            <i />
+            {session.dataPlane === "demo" ? "Demo" : "Modelsiz"}
           </span>
         )}
 
-        {session && !session.modelConnected && (
-          <span className="demo-badge" title="ANTHROPIC_API_KEY tanımlı değil">
-            Model bağlı değil
-          </span>
-        )}
-        {session && (
-          <span className="who meta" style={{ border: 0, paddingLeft: 0 }}>
-            {session.visibleTools.length}/{session.totalTools} tool · L{session.maxAuthority}
-          </span>
-        )}
         {/* Konuşma sürüyorsa yeni konuşma açılabilsin; sürmüyorsa buton
             gereksiz gürültüdür. */}
         {conversationId && turns.length > 0 && (
@@ -442,7 +442,7 @@ export default function Page() {
                 ) : (
                   <div className="reply">
                     <Reveal text={t.answer} />
-                    {t.risks.map((r, k) => (
+                    {visibleRisks(t.risks, t.answer).map((r, k) => (
                       <div className={`risk ${riskClass(r.severity)}`} key={k}>
                         <b>{RISK_LABEL[r.severity] ?? "Not"}</b>
                         <span>{r.message}</span>
@@ -527,17 +527,7 @@ export default function Page() {
                 </svg>
               </button>
             </div>
-            {!chatting && (
-              <p className="foot in" style={{ animationDelay: ".52s" }}>
-                {/* Rol değiştirme ipucu yalnızca rol seçicisi varken anlamlı;
-                    gerçek oturumda rol arayüzden değiştirilemez. */}
-                {briefing && briefing.signals.length === 0
-                  ? "Bugün eşiği aşan bir şey yok — ekran bilerek sessiz."
-                  : session?.identitySource === "dev-header"
-                    ? "Rolü değiştirin — görünen sinyaller ve tool sayısı gerçekten değişir."
-                    : `${session?.visibleTools.length ?? 0} tool yetkinizde.`}
-              </p>
-            )}
+
           </div>
         </div>
         <div className="tail" style={{ height: chatting ? 0 : "18vh" }} />
@@ -594,6 +584,22 @@ function riskClass(severity: string): string {
   return "";
 }
 
+/**
+ * Cevabın içinde zaten geçen uyarıyı tekrar gösterme.
+ *
+ * Model uyarıyı cümlesine katmışsa, altına aynı cümleyi bir daha koymak
+ * kullanıcıya "sistem kendini tekrarlıyor" hissi verir. Katmamışsa satır
+ * gerekli — asıl mesele uyarının BİR KEZ görünmesi, hiç görünmemesi değil.
+ */
+function visibleRisks(risks: readonly TurnRisk[], answer: string | null): readonly TurnRisk[] {
+  if (!answer) return risks;
+  const haystack = answer.toLocaleLowerCase("tr").replace(/\s+/g, " ");
+  return risks.filter((r) => {
+    const needle = r.message.toLocaleLowerCase("tr").replace(/\s+/g, " ").replace(/\.$/, "");
+    return !haystack.includes(needle);
+  });
+}
+
 /** Aynı mesaj birden çok tool'dan gelebilir; kullanıcıya bir kez gösterilir. */
 function dedupeRisks(risks: readonly TurnRisk[]): TurnRisk[] {
   const seen = new Set<string>();
@@ -622,7 +628,7 @@ function Signals({ signals, onAsk }: { signals: readonly Signal[]; onAsk: (q: st
     <div className="signals">
       {shown.map((sig, i) => (
         <div className="sig2 in" key={sig.id} style={{ animationDelay: `${0.26 + i * 0.09}s` }}>
-          <span className="lbl">Kritik · müdahale gerekiyor</span>
+          <span className="lbl">Kritik</span>
           {/* Başlık ve ölçü aynı satırda: göz önce rakama gider. Ölçü YOKSA
               uydurulmaz — bazı sinyaller sayıya indirgenmez ("kalite kapısı
               bekliyor" gibi) ve sahte bir rakam koymak yanlış aciliyet üretir. */}

@@ -36,31 +36,30 @@ export default function Error({
   return (
     <div className="login-shell">
       <div className="login-card" role="alert">
-        <div className="login-brand">
-          <i />
-          <span>KAELON</span>
+        <div className="login-head">
+          <span className="login-brand">KAELON</span>
+          <span className="login-title">Bir şeyler ters gitti</span>
         </div>
 
-        <p className="login-lead">Bir şeyler ters gitti.</p>
-
-        <p className="login-note" style={{ marginTop: 0 }}>
-          Bu ekran açılamadı. <strong>Kaydedilmiş verileriniz yerinde duruyor</strong> — bu
-          hata yalnızca görüntülemeyi etkiledi.
+        <p className="login-lead">
+          Bu ekran açılamadı. Kaydedilmiş verileriniz yerinde duruyor.
         </p>
 
         <button className="login-submit" type="button" onClick={reset}>
           Tekrar dene
         </button>
 
-        <button
-          className="login-choice"
-          type="button"
-          onClick={() => {
-            window.location.href = "/";
-          }}
-        >
-          Ana ekrana dön
-        </button>
+        <div className="login-choices">
+          <button
+            className="login-choice"
+            type="button"
+            onClick={() => {
+              window.location.href = "/";
+            }}
+          >
+            Ana ekrana dön
+          </button>
+        </div>
 
         {error.digest && (
           // Destek isteyen kullanıcının söyleyebileceği tek referans.
