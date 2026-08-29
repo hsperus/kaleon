@@ -12,6 +12,7 @@
 
 import { disconnectAll, sharedClient } from "../db/client.js";
 import { dropTenantSchema, provisionTenantSchema, tenantSchemaName } from "../db/provision.js";
+import { appliedMigrations, migrateTenant, pendingMigrations } from "../db/migrate.js";
 
 const db = sharedClient();
 
@@ -41,7 +42,56 @@ async function main(): Promise<void> {
     case "list": {
       const rows = await db.tenant.findMany({ orderBy: { createdAt: "asc" } });
       if (rows.length === 0) console.log("(tenant yok)");
-      for (const t of rows) console.log(`${t.slug}  ${t.name}  [${t.status}]  ${t.schemaName}  ${t.id}`);
+      for (const t of rows) {
+        const pending = await pendingMigrations(db, t.schemaName).catch(() => []);
+        const applied = await appliedMigrations(db, t.schemaName).catch(() => []);
+        const version = applied.at(-1)?.version ?? 0;
+        const flag = pending.length > 0 ? `  ⚠ ${pending.length} migration bekliyor` : "";
+        console.log(
+          `${t.slug}  ${t.name}  [${t.status}]  ${t.schemaName}  v${version}${flag}`,
+        );
+      }
+      break;
+    }
+
+    /**
+     * Bekleyen şema değişikliklerini uygular.
+     *
+     * TÜM TENANT'LAR TEK KOMUTLA güncellenir; tek tek uygulamak, birinin
+     * unutulması demektir ve unutulan tenant eksik tabloyla çalışır.
+     * Bir tenant patlarsa diğerleri denenmeye DEVAM EDER ve rapor sonda
+     * toplanır — ilk hatada durmak, kalanları görünmez kılardı.
+     */
+    case "migrate": {
+      const [target] = args;
+      const tenants = await db.tenant.findMany({
+        where: target && target !== "--all" ? { slug: target } : {},
+        orderBy: { createdAt: "asc" },
+      });
+      if (tenants.length === 0) {
+        console.error(target ? `Tenant yok: ${target}` : "(tenant yok)");
+        process.exitCode = 1;
+        return;
+      }
+
+      const failures: string[] = [];
+      for (const t of tenants) {
+        try {
+          const r = await migrateTenant(db, t.schemaName);
+          console.log(
+            r.applied.length === 0
+              ? `= ${t.slug}: güncel`
+              : `✓ ${t.slug}: ${r.applied.join(", ")} uygulandı`,
+          );
+        } catch (e) {
+          failures.push(t.slug);
+          console.error(`✗ ${t.slug}: ${(e as Error).message}`);
+        }
+      }
+      if (failures.length > 0) {
+        console.error(`\n${failures.length} tenant güncellenemedi: ${failures.join(", ")}`);
+        process.exitCode = 1;
+      }
       break;
     }
 
@@ -73,6 +123,7 @@ async function main(): Promise<void> {
           "Kullanım:",
           '  npm run tenant -- create <slug> "<Şirket Adı>"',
           "  npm run tenant -- list",
+          "  npm run tenant -- migrate [slug|--all]",
           "  npm run tenant -- drop <slug>",
         ].join("\n"),
       );

@@ -17,6 +17,7 @@ import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { PrismaClient as SharedClient } from "./generated/shared/index.js";
+import { migrateTenant } from "./migrate.js";
 
 const here = dirname(fileURLToPath(import.meta.url));
 
@@ -99,9 +100,39 @@ export function splitSqlStatements(sql: string): string[] {
   let buf = "";
   let inSingle = false;
   let dollarTag: string | null = null;
+  let inLineComment = false;
+  let inBlockComment = false;
 
   for (let i = 0; i < sql.length; i++) {
     const ch = sql[i]!;
+
+    // YORUM İÇİNDEKİ NOKTALI VİRGÜL İFADE SONU DEĞİLDİR.
+    // Bu ayrım olmadan `-- şema değişikliği; yeni migration yazın` gibi bir
+    // açıklama satırı ikiye bölünür ve ikinci yarısı SQL sanılıp çalıştırılır.
+    if (inLineComment) {
+      buf += ch;
+      if (ch === "\n") inLineComment = false;
+      continue;
+    }
+
+    if (inBlockComment) {
+      buf += ch;
+      if (ch === "/" && sql[i - 1] === "*") inBlockComment = false;
+      continue;
+    }
+
+    if (!dollarTag && !inSingle) {
+      if (ch === "-" && sql[i + 1] === "-") {
+        inLineComment = true;
+        buf += ch;
+        continue;
+      }
+      if (ch === "/" && sql[i + 1] === "*") {
+        inBlockComment = true;
+        buf += ch;
+        continue;
+      }
+    }
 
     if (dollarTag) {
       buf += ch;
@@ -153,11 +184,22 @@ export function splitSqlStatements(sql: string): string[] {
 export interface ProvisionResult {
   readonly schema: string;
   readonly created: boolean;
+  /** Bu koşuda uygulanan migration numaraları. */
+  readonly applied: readonly number[];
 }
 
 /**
- * Yeni tenant şeması oluşturur ve DDL'i uygular.
- * Idempotenttir: var olan şemada tekrar çalıştırılabilir.
+ * Tenant şemasını kurar veya günceller.
+ *
+ * KURULUM DA BİR MIGRATION'DIR. Yeni tenant migration 001'den başlar ve
+ * hepsini uygular; var olan tenant yalnızca eksiklerini uygular. Tek kod
+ * yolu olması önemlidir — iki ayrı yol olsaydı, "yeni kurulan" ile
+ * "güncellenmiş" tenant'ın şeması zamanla farklılaşırdı ve bu fark ancak
+ * müşteride, açıklanamayan bir hata olarak ortaya çıkardı.
+ *
+ * Migration sisteminden ÖNCE kurulmuş, defteri olmayan bir şema bulursa
+ * SESSİZCE devam etmez ve onu "güncel" diye işaretlemez — hata verir.
+ * Yanlış işaretlenmiş bir şema, eksik tabloyla çalışan bir müşteri demektir.
  */
 export async function provisionTenantSchema(
   shared: SharedClient,
@@ -167,31 +209,25 @@ export async function provisionTenantSchema(
     ? (assertSafeSchemaName(slugOrSchema), slugOrSchema)
     : tenantSchemaName(slugOrSchema);
 
-  // "Zaten kurulu mu?" sorusunun doğru cevabı şemanın varlığı değil,
-  // tabloların varlığıdır: yarım kalmış bir provisioning'de şema vardır
-  // ama tablolar yoktur ve tamamlanması gerekir.
-  const provisioned = await shared.$queryRawUnsafe<{ count: bigint }[]>(
-    `SELECT count(*)::bigint AS count FROM information_schema.tables
-      WHERE table_schema = $1 AND table_name = 'audit_entries'`,
-    schema,
-  );
-  if (Number(provisioned[0]?.count ?? 0) > 0) {
-    // NOT: var olan tenant'lara ŞEMA DEĞİŞİKLİĞİ uygulamak ayrı bir iştir
-    // (tenant migration runner, BUILD-PLAN Aşama 1). Burada DDL tekrar
-    // uygulanmaz — `CREATE TYPE` idempotent olmadığı için patlardı.
-    return { schema, created: false };
+  const hasTables = await schemaHasTables(shared, schema);
+  const hasLedger = await schemaHasLedger(shared, schema);
+
+  if (hasTables && !hasLedger) {
+    throw new Error(
+      `${schema}: migration defteri yok ama tablolar var. Bu şema migration ` +
+        `sisteminden önce kurulmuş. Hangi sürümde olduğu bilinemez; "güncel" ` +
+        `sayılırsa eksik tabloyla çalışır. Verisi yoksa şemayı silip yeniden ` +
+        `kurun, varsa elle baseline'layın (migrateTenant(..., { baselineTo })).`,
+    );
   }
 
-  // Tek transaction = tek bağlantı. `SET search_path` ancak böyle tüm
-  // ifadeler boyunca geçerli kalır; havuzdan farklı bağlantı gelirse
-  // DDL yanlış şemaya uygulanırdı.
+  const { applied } = await migrateTenant(shared, schema);
+
+  // Denetim kaydı değişmezliği şema adına bağlı olduğu için migration
+  // dosyasına konamaz; her koşuda idempotent olarak yeniden uygulanır.
   await shared.$transaction(
     async (tx) => {
-      await tx.$executeRawUnsafe(`CREATE SCHEMA IF NOT EXISTS "${schema}"`);
       await tx.$executeRawUnsafe(`SET LOCAL search_path TO "${schema}"`);
-      for (const stmt of splitSqlStatements(tenantDdl())) {
-        await tx.$executeRawUnsafe(stmt);
-      }
       for (const stmt of splitSqlStatements(AUDIT_IMMUTABILITY_SQL(schema))) {
         await tx.$executeRawUnsafe(stmt);
       }
@@ -199,7 +235,25 @@ export async function provisionTenantSchema(
     { timeout: 60_000 },
   );
 
-  return { schema, created: true };
+  return { schema, created: !hasTables, applied };
+}
+
+async function schemaHasTables(shared: SharedClient, schema: string): Promise<boolean> {
+  const rows = await shared.$queryRawUnsafe<{ count: bigint }[]>(
+    `SELECT count(*)::bigint AS count FROM information_schema.tables
+      WHERE table_schema = $1 AND table_name = 'audit_entries'`,
+    schema,
+  );
+  return Number(rows[0]?.count ?? 0) > 0;
+}
+
+async function schemaHasLedger(shared: SharedClient, schema: string): Promise<boolean> {
+  const rows = await shared.$queryRawUnsafe<{ count: bigint }[]>(
+    `SELECT count(*)::bigint AS count FROM information_schema.tables
+      WHERE table_schema = $1 AND table_name = 'schema_migrations'`,
+    schema,
+  );
+  return Number(rows[0]?.count ?? 0) > 0;
 }
 
 /** KVKK silme talebi — tenant'ın tüm işletmesel verisi tek komutla gider. */
