@@ -34,19 +34,22 @@ export function masterDataTools(db: DataSource) {
     }),
     requires: ["master-data:partner.read"],
     async execute(input, ctx): Promise<ToolOk<Resolution>> {
+      const externalRef =
+        input.externalSystem && input.externalId
+          ? { system: input.externalSystem, externalId: input.externalId }
+          : null;
+
       const { rows, freshness } = await db.partnerCandidates(ctx.tenant.tenantId, {
         name: input.name,
         taxId: input.taxId,
+        externalRef,
       });
 
       const resolution: Resolution = resolvePartner(
         {
           name: input.name,
           taxId: input.taxId,
-          externalRef:
-            input.externalSystem && input.externalId
-              ? { system: input.externalSystem, externalId: input.externalId }
-              : null,
+          externalRef,
         },
         rows,
       );

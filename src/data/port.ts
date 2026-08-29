@@ -79,8 +79,22 @@ export interface DataSource {
    */
   partnerCandidates(
     tenantId: string,
-    hint: { name: string | null; taxId: string | null },
+    hint: PartnerHint,
   ): Promise<WithFreshness<readonly PartnerCandidateRow[]>>;
+}
+
+/**
+ * Aday getirme ipucu.
+ *
+ * `externalRef` ÖNEMLİDİR: e-faturalar çoğu zaman ne düzgün bir unvanla ne
+ * de vergi numarasıyla gelir — entegratörün cari kodunu taşır. Bu kanal
+ * olmadan, yalnızca cari koduyla gelen bir belge hiçbir adaya ulaşamaz ve
+ * çözümleyici "yeni firma" der. Aynı firma her fatura için yeniden açılırdı.
+ */
+export interface PartnerHint {
+  readonly name: string | null;
+  readonly taxId: string | null;
+  readonly externalRef?: { readonly system: string; readonly externalId: string } | null;
 }
 
 /** Entity resolution için ön elemeli aday getirme. */

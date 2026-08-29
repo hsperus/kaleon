@@ -122,7 +122,7 @@ export class InMemoryDataSource implements DataSource {
 
   async partnerCandidates(
     tenantId: string,
-    _hint?: { name: string | null; taxId: string | null },
+    _hint?: import("./port.js").PartnerHint,
   ): Promise<WithFreshness<readonly import("./port.js").PartnerCandidateRow[]>> {
     if (!this.#mine(tenantId)) return fresh([], 0);
     return fresh(PARTNERS, PARTNERS.length);

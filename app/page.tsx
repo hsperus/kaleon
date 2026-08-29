@@ -47,7 +47,7 @@ interface Session {
   readonly modelConnected: boolean;
   readonly maxAuthority: number;
   readonly identitySource: "session" | "dev-header";
-  readonly dataPlane: "demo" | "empty";
+  readonly dataPlane: "demo" | "postgres";
   readonly displayName: string;
 }
 
@@ -219,11 +219,7 @@ export default function Page() {
             Demo veri
           </span>
         )}
-        {session?.dataPlane === "empty" && (
-          <span className="demo-badge" title="Bu şirket için veri kaynağı henüz bağlanmadı">
-            Veri yüklenmedi
-          </span>
-        )}
+
         {session && !session.modelConnected && (
           <span className="demo-badge" title="ANTHROPIC_API_KEY tanımlı değil">
             Model bağlı değil
@@ -360,9 +356,7 @@ export default function Page() {
                 {/* Rol değiştirme ipucu yalnızca rol seçicisi varken anlamlı;
                     gerçek oturumda rol arayüzden değiştirilemez. */}
                 {briefing && briefing.signals.length === 0
-                  ? session?.dataPlane === "empty"
-                    ? "Bu şirket için veri kaynağı henüz bağlanmadı."
-                    : "Bugün eşiği aşan bir şey yok — ekran bilerek sessiz."
+                  ? "Bugün eşiği aşan bir şey yok — ekran bilerek sessiz."
                   : session?.identitySource === "dev-header"
                     ? "Rolü değiştirin — görünen sinyaller ve tool sayısı gerçekten değişir."
                     : `${session?.visibleTools.length ?? 0} tool yetkinizde.`}

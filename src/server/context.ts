@@ -33,7 +33,13 @@ import { InMemoryLedger } from "../ai/ledger.js";
 import { SYSTEM_PROMPT } from "../ai/system-prompt.js";
 import { createWorkOrder } from "../modules/operations/work-order.js";
 import { principalFromSession } from "./auth.js";
-import { sharedClient } from "../db/client.js";
+import { sharedClient, tenantClient } from "../db/client.js";
+import { PrismaDataSource } from "../db/master-data-source.js";
+import { PrismaOperationsRepository } from "../db/operations-repository.js";
+import {
+  PrismaApprovalRepository,
+  PrismaDocumentsRepository,
+} from "../db/documents-repository.js";
 
 const DEV = process.env["NODE_ENV"] !== "production";
 
@@ -155,15 +161,41 @@ async function demoTenantContext(): Promise<TenantContext> {
  * bir "demo" dizesiyle kurmak, principal'ın gerçek tenant'ıyla uyuşmayan
  * bir bağlam üretiyordu.
  */
-let registrySingleton: ToolRegistry | null = null;
+const registryByTenant = new Map<string, ToolRegistry>();
 
-function registryFor(demoTenantId: string): ToolRegistry {
-  registrySingleton ??= buildRegistry(new InMemoryDataSource(demoTenantId), {
-    operations,
-    documents,
-    approvals,
+/**
+ * Tenant'ın registry'si.
+ *
+ * DEMO TENANT'I bellek kaynağını ve bellek depolarını kullanır — hazır veri
+ * kümesi oradadır. GERÇEK TENANT Postgres'e bağlanır; henüz adaptörü olmayan
+ * kanallar (banka, mesai, sevkiyat, WIP) boş döner, uydurma veri dönmez.
+ *
+ * Registry tenant başına önbelleklenir çünkü tool şemaları prompt önbelleğinin
+ * ön ekindedir; her istekte yeniden kurmak sırayı bozup önbelleği ıskalatırdı.
+ */
+function registryFor(tenant: TenantContext, isDemo: boolean): ToolRegistry {
+  const cached = registryByTenant.get(tenant.tenantId);
+  if (cached) return cached;
+
+  const registry = isDemo
+    ? buildRegistry(new InMemoryDataSource(tenant.tenantId), {
+        operations,
+        documents,
+        approvals,
+      })
+    : buildRegistryForTenant(tenant);
+
+  registryByTenant.set(tenant.tenantId, registry);
+  return registry;
+}
+
+function buildRegistryForTenant(tenant: TenantContext): ToolRegistry {
+  const db = tenantClient(tenant.schema);
+  return buildRegistry(new PrismaDataSource(db), {
+    operations: new PrismaOperationsRepository(db),
+    documents: new PrismaDocumentsRepository(db),
+    approvals: new PrismaApprovalRepository(db),
   });
-  return registrySingleton;
 }
 
 let completerSingleton: Completer | null = null;
@@ -189,12 +221,12 @@ export interface RequestContext {
   readonly displayName: string;
   /**
    * Verinin durumu — arayüzde AÇIKÇA gösterilir.
-   *   "demo"  → demo tenant'ının hazır veri kümesi
-   *   "empty" → gerçek tenant, ama veri düzlemi henüz bağlanmadı
+   *   "demo"     → demo tenant'ının hazır veri kümesi
+   *   "postgres" → gerçek tenant, veri kendi şemasından geliyor
    * Gerçek bir şirkete girip demo rakamları görmek yanıltıcı olurdu; bu
    * yüzden demo verisi YALNIZCA demo tenant'ına bağlıdır.
    */
-  readonly dataPlane: "demo" | "empty";
+  readonly dataPlane: "demo" | "postgres";
 }
 
 /** Oturum yok/geçersiz. Uç noktalar 401 döner. */
@@ -227,12 +259,12 @@ export async function createContext(req: Request): Promise<RequestContext> {
     const demo = await demoTenantContext().catch(() => null);
     return {
       ...base,
-      registry: registryFor(demo?.tenantId ?? tenant.tenantId),
+      registry: registryFor(tenant, demo?.tenantId === tenant.tenantId),
       tenant,
       principal: identity.principal,
       identitySource: "session",
       displayName: identity.displayName,
-      dataPlane: demo?.tenantId === tenant.tenantId ? "demo" : "empty",
+      dataPlane: demo?.tenantId === tenant.tenantId ? "demo" : "postgres",
     };
   }
 
@@ -242,7 +274,7 @@ export async function createContext(req: Request): Promise<RequestContext> {
   const tenant = await demoTenantContext();
   return {
     ...base,
-    registry: registryFor(tenant.tenantId),
+    registry: registryFor(tenant, true),
     tenant,
     identitySource: "dev-header",
     displayName: "Cebrail Karaarslan (demo)",
