@@ -30,6 +30,15 @@ const ROLES: { id: Role; label: string }[] = [
   { id: "operator", label: "Operatör" },
 ];
 
+interface Signal {
+  readonly id: string;
+  readonly level: 0 | 1 | 2;
+  readonly title: string;
+  readonly detail: string;
+  readonly impact: number | null;
+  readonly drilldown: { readonly tool: string; readonly input: unknown } | null;
+}
+
 interface Session {
   readonly roleLabel: string;
   readonly visibleTools: readonly string[];
@@ -67,14 +76,17 @@ export default function Page() {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [panels, setPanels] = useState<PanelPayload[]>([]);
+  const [briefing, setBriefing] = useState<{ level: 0 | 1 | 2; signals: Signal[] } | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
-    client(role)
-      .session.query()
-      .then((s) => setSession(s))
-      .catch(() => setSession(null));
+    const c = client(role);
+    c.session.query().then(setSession).catch(() => setSession(null));
+    c.briefing
+      .query()
+      .then((b) => setBriefing({ level: b.level, signals: [...b.signals] as Signal[] }))
+      .catch(() => setBriefing(null));
   }, [role]);
 
   useEffect(() => {
@@ -208,23 +220,8 @@ export default function Page() {
             </div>
           )}
 
-          {!chatting && (
-            <div className="signals">
-              <div className="sig1 in" style={{ animationDelay: ".26s" }}>
-                <i />
-                <div>
-                  <b>Boya hattında dün 4 saat plansız duruş.</b>{" "}
-                  <span style={{ opacity: 0.75 }}>· OEE %78 → %72</span>
-                </div>
-              </div>
-              <div className="sig1 in" style={{ animationDelay: ".34s" }}>
-                <i />
-                <div>
-                  <b>Volvo sevkiyatında 4 gün gecikme riski.</b>{" "}
-                  <span style={{ opacity: 0.75 }}>· ~156.000 TL ceza riski</span>
-                </div>
-              </div>
-            </div>
+          {!chatting && briefing && briefing.signals.length > 0 && (
+            <Signals signals={briefing.signals} onAsk={(q) => void ask(q)} />
           )}
 
           <div className="stream">
@@ -288,7 +285,9 @@ export default function Page() {
             </div>
             {!chatting && (
               <p className="foot in" style={{ animationDelay: ".52s" }}>
-                Rolü değiştirin — görünen tool sayısı ve alınan cevap gerçekten değişir.
+                {briefing && briefing.signals.length === 0
+                  ? "Bugün eşiği aşan bir şey yok — ekran bilerek sessiz."
+                  : "Rolü değiştirin — görünen sinyaller ve tool sayısı gerçekten değişir."}
               </p>
             )}
           </div>
@@ -315,6 +314,58 @@ export default function Page() {
           ))}
         </div>
       </aside>
+    </div>
+  );
+}
+
+/**
+ * Sinyal listesi.
+ *
+ * ÜRÜN KARARI: ana ekranda en fazla İKİ kritik kart açılır.
+ *
+ * Gerekçe: üç dört kırmızı kart aynı anda açıldığında hiçbiri kritik
+ * hissettirmez — Anayasa'nın "kritik olduğunda konuş" ilkesi tam olarak
+ * burada ölür. Ama fazlası GİZLENMEZ: kalanlar tek satırda sayıyla
+ * duyurulur ve tıklanabilir. Sessizlik, saklamak değildir.
+ */
+function Signals({ signals, onAsk }: { signals: readonly Signal[]; onAsk: (q: string) => void }) {
+  const [expandAll, setExpandAll] = useState(false);
+  const critical = signals.filter((s) => s.level === 2);
+  const quiet = signals.filter((s) => s.level === 1);
+  const shown = expandAll ? critical : critical.slice(0, 2);
+  const hidden = critical.length - shown.length;
+
+  return (
+    <div className="signals">
+      {shown.map((sig, i) => (
+        <div className="sig2 in" key={sig.id} style={{ animationDelay: `${0.26 + i * 0.09}s` }}>
+          <span className="lbl">Kritik · müdahale gerekiyor</span>
+          <div className="t">{sig.title}</div>
+          <div className="d">{sig.detail}</div>
+          {sig.drilldown && (
+            <div className="row">
+              <button className="act" onClick={() => onAsk(`${sig.title} Detayını göster.`)}>
+                Detayı aç
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {hidden > 0 && (
+        <button className="sig-more in" style={{ animationDelay: ".44s" }} onClick={() => setExpandAll(true)}>
+          {hidden} kritik konu daha var — göster
+        </button>
+      )}
+
+      {quiet.map((sig, i) => (
+        <div className="sig1 in" key={sig.id} style={{ animationDelay: `${0.44 + i * 0.09}s` }}>
+          <i />
+          <div>
+            <b>{sig.title}</b> <span style={{ opacity: 0.75 }}>· {sig.detail}</span>
+          </div>
+        </div>
+      ))}
     </div>
   );
 }

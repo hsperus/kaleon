@@ -259,3 +259,31 @@ select.role {
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
 }
+
+/* ─────────────── Seviye 2 · kritik müdahale kartı ─────────────── */
+.sig2 {
+  background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--crit);
+  border-radius: 16px; padding: 17px 19px; display: flex; flex-direction: column; gap: 9px;
+  box-shadow: var(--sh-m), inset 0 1px 0 var(--spec);
+}
+.sig2 .lbl { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--crit); font-weight: 700; }
+.sig2 .t { font-size: 16.5px; font-weight: 600; letter-spacing: -.018em; line-height: 1.35; }
+.sig2 .d { font-size: 13.5px; color: var(--muted); line-height: 1.55; }
+.sig2 .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+
+.act {
+  font-size: 13px; font-weight: 600; padding: 9px 15px; border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--line); color: var(--ink-2);
+  box-shadow: var(--sh-s), inset 0 1px 0 var(--spec);
+  transition: transform .34s var(--spring), box-shadow .34s var(--glide), color .2s var(--glide);
+}
+.act:hover { transform: translateY(-2px); box-shadow: var(--sh-m); color: var(--ink); }
+.act:active { transform: translateY(0) scale(.96); transition-duration: .1s; }
+
+.sig-more {
+  align-self: flex-start; font-size: 13px; font-weight: 600; color: var(--crit);
+  padding: 8px 14px; border-radius: 11px; background: var(--crit-veil);
+  transition: transform .34s var(--spring), opacity .2s var(--glide);
+}
+.sig-more:hover { transform: translateY(-1.5px); }
+.sig-more:active { transform: scale(.96); transition-duration: .1s; }
