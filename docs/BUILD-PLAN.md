@@ -30,7 +30,10 @@
 ### Aşama 1 — Kalıcılık ve kimlik ✅ TAMAM
 - Prisma şeması: `shared` (tenants, users, roles, billing) + `tenant_*` (işletmesel veri)
 - Schema-per-tenant yönlendirmesi tek yerde — bağlantı havuzu ve migration stratejisi
-- `DataSource` portunun Prisma adaptörü (bellek adaptörü testlerde kalır)
+- `DataSource` portunun Prisma adaptörü ✅ — beş kanal da bağlı: cari
+  çözümleme, banka, puantaj, sevkiyat, WIP. Bellek adaptörü testlerde ve
+  demo tenant'ında kalır. Eksik veri `null` + `caveat` olarak taşınır;
+  uydurma sayı üretilmez.
 - Kimlik ve oturum ✅ — kendi katmanımız, Better Auth'a bağımlılık yok:
   parola (scrypt, N=2^16, sabit zamanlı), TOTP (RFC 6238, kod tekrar
   kullanılamaz), oturum (token hash'lenerek saklanır), hesap kilidi,
@@ -40,7 +43,9 @@
   kendi üyeliklerinden sunulur (müşteri listesi sızmaz).
 - Audit sink'in Postgres adaptörü: append-only tablo, `UPDATE`/`DELETE` yetkisi hiçbir role verilmez
 - **Çıkış kriteri:** iki tenant'ın verisi birbirini göremediğini kanıtlayan izolasyon testi ✅
-- **Kalan:** var olan tenant'lara şema değişikliği uygulayan migration runner
+- Tenant migration runner ✅ — her şemada `schema_migrations` defteri,
+  numaralı SQL dosyaları, transaction başına migration, checksum doğrulaması.
+  `npm run tenant -- migrate [slug|--all]`
 - **Kimlik katmanının KAPSAM DIŞI bıraktıkları** (bilinçli, kimse tamam
   sanmasın): parola sıfırlama akışı, e-posta doğrulama, OAuth/SSO, cihaz
   hatırlama, dağıtık IP sınırı (Redis gerekir — süreç içi sürüm tek
