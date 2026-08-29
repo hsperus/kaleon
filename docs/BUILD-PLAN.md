@@ -27,14 +27,24 @@
 **Neden önce bu:** 240 tool'un hepsi bu primitiften türeyecek. Çekirdek yanlışsa
 240 tool yanlış olur; doğruysa gerisi mekanik iş.
 
-### Aşama 1 — Kalıcılık ve kimlik ✅ ÇEKİRDEK TAMAM
+### Aşama 1 — Kalıcılık ve kimlik ✅ TAMAM
 - Prisma şeması: `shared` (tenants, users, roles, billing) + `tenant_*` (işletmesel veri)
 - Schema-per-tenant yönlendirmesi tek yerde — bağlantı havuzu ve migration stratejisi
 - `DataSource` portunun Prisma adaptörü (bellek adaptörü testlerde kalır)
-- Better Auth + JWT, oturum yönetimi, 2FA (admin zorunlu)
+- Kimlik ve oturum ✅ — kendi katmanımız, Better Auth'a bağımlılık yok:
+  parola (scrypt, N=2^16, sabit zamanlı), TOTP (RFC 6238, kod tekrar
+  kullanılamaz), oturum (token hash'lenerek saklanır), hesap kilidi,
+  IP sınırı, kullanıcı numaralandırma koruması. Yetki HER İSTEKTE
+  üyelikten yeniden okunur; rolü alınan kullanıcının eski oturumu düşer.
+  Şirket seçimi ancak parola doğrulandıktan sonra ve yalnızca kullanıcının
+  kendi üyeliklerinden sunulur (müşteri listesi sızmaz).
 - Audit sink'in Postgres adaptörü: append-only tablo, `UPDATE`/`DELETE` yetkisi hiçbir role verilmez
 - **Çıkış kriteri:** iki tenant'ın verisi birbirini göremediğini kanıtlayan izolasyon testi ✅
-- **Kalan:** Better Auth entegrasyonu, oturum/2FA akışı, var olan tenant'lara şema değişikliği uygulayan migration runner
+- **Kalan:** var olan tenant'lara şema değişikliği uygulayan migration runner
+- **Kimlik katmanının KAPSAM DIŞI bıraktıkları** (bilinçli, kimse tamam
+  sanmasın): parola sıfırlama akışı, e-posta doğrulama, OAuth/SSO, cihaz
+  hatırlama, dağıtık IP sınırı (Redis gerekir — süreç içi sürüm tek
+  düğümde gerçek koruma sağlar, çok düğümde sınır düğüm sayısıyla çarpılır)
 
 ### Aşama 2 — Master Data + Entity Resolution ✅ MOTOR TAMAM
 - `partners`, `partner_aliases`, `partner_tax_ids`, `employees`, `items`, `locations`
