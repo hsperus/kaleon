@@ -609,3 +609,12 @@ button.role, select.role {
 @media (max-width: 900px) {
   .history { width: 84%; max-width: 300px; }
 }
+
+/* Karttaki ikincil bağlantı: "Parolamı unuttum", "Vazgeç".
+   Düğme gibi görünmemeli — birincil eylem tektir ve o mavi olandır. */
+.login-link {
+  align-self: center; font: inherit; font-size: 13px;
+  color: var(--muted); background: none; border: 0; padding: 2px 4px;
+  cursor: pointer; transition: color .16s var(--glide);
+}
+.login-link:hover { color: var(--accent); }

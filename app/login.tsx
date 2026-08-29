@@ -30,6 +30,11 @@ export function LoginScreen({ onSuccess }: { readonly onSuccess: () => void }) {
   const [totpCode, setTotpCode] = useState("");
   const [needsTotp, setNeedsTotp] = useState(false);
   const [choices, setChoices] = useState<readonly TenantChoice[] | null>(null);
+  /** Parola sıfırlama ekranı. Kod yöneticiden telefonla gelir. */
+  const [resetting, setResetting] = useState(false);
+  const [resetCode, setResetCode] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [resetDone, setResetDone] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const totpRef = useRef<HTMLInputElement>(null);
@@ -76,6 +81,108 @@ export function LoginScreen({ onSuccess }: { readonly onSuccess: () => void }) {
     } finally {
       setBusy(false);
     }
+  }
+
+  // ── Parola sıfırlama
+  if (resetting) {
+    return (
+      <div className="login-shell">
+        <form
+          className="login-card"
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (busy) return;
+            setBusy(true);
+            setError(null);
+            try {
+              const res = await fetch("/api/auth/reset", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ code: resetCode, newPassword }),
+              });
+              const body = (await res.json().catch(() => ({}))) as { error?: string };
+              if (res.ok) {
+                setResetDone(true);
+                setResetCode("");
+                setNewPassword("");
+                setPassword("");
+              } else {
+                setError(body.error ?? "Parola değiştirilemedi.");
+              }
+            } catch {
+              setError("Sunucuya ulaşılamadı.");
+            } finally {
+              setBusy(false);
+            }
+          }}
+        >
+          <div className="login-head">
+            <span className="login-brand">KAELON</span>
+            <span className="login-title">Parola sıfırla</span>
+          </div>
+
+          {resetDone ? (
+            <>
+              <p className="login-lead">Parolanız değiştirildi. Yeni parolanızla girebilirsiniz.</p>
+              <button
+                className="login-submit"
+                type="button"
+                onClick={() => {
+                  setResetting(false);
+                  setResetDone(false);
+                  setError(null);
+                }}
+              >
+                Giriş ekranına dön
+              </button>
+            </>
+          ) : (
+            <>
+              <p className="login-lead">
+                Yöneticinizden aldığınız kodu ve yeni parolanızı girin.
+              </p>
+              <div className="login-fields">
+                <label className="login-field">
+                  <span>Sıfırlama kodu</span>
+                  <input
+                    autoFocus
+                    required
+                    placeholder="ABCD-EFGH-JK"
+                    value={resetCode}
+                    onChange={(e) => setResetCode(e.target.value.toUpperCase())}
+                  />
+                </label>
+                <label className="login-field">
+                  <span>Yeni parola</span>
+                  <input
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    minLength={10}
+                    value={newPassword}
+                    onChange={(e) => setNewPassword(e.target.value)}
+                  />
+                </label>
+              </div>
+              {error && <p className="login-error">{error}</p>}
+              <button className="login-submit" type="submit" disabled={busy}>
+                {busy ? "Değiştiriliyor…" : "Parolayı değiştir"}
+              </button>
+              <button
+                className="login-link"
+                type="button"
+                onClick={() => {
+                  setResetting(false);
+                  setError(null);
+                }}
+              >
+                Vazgeç
+              </button>
+            </>
+          )}
+        </form>
+      </div>
+    );
   }
 
   // ── İkinci adım: şirket seçimi
@@ -166,6 +273,19 @@ export function LoginScreen({ onSuccess }: { readonly onSuccess: () => void }) {
 
         <button className="login-submit" type="submit" disabled={busy}>
           {busy ? "Kontrol ediliyor…" : "Giriş"}
+        </button>
+
+        {/* Parolasını unutan kullanıcı yöneticiyi arar; e-posta altyapısı
+            olmadığı için kod telefonla iletilir. */}
+        <button
+          className="login-link"
+          type="button"
+          onClick={() => {
+            setResetting(true);
+            setError(null);
+          }}
+        >
+          Parolamı unuttum
         </button>
 
         <p className="login-note">Hesabınızı yöneticiniz tanımlar.</p>

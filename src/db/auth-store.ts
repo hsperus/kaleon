@@ -23,6 +23,7 @@ import type {
   UserRecord,
 } from "../auth/session.js";
 import { LOCKOUT_MS, MAX_FAILED_ATTEMPTS } from "../auth/session.js";
+import type { PasswordResetStore, ResetRecord } from "../auth/password-reset.js";
 import { ROLE_PERMISSIONS } from "../kernel/rbac.js";
 import type { RoleId } from "../kernel/types.js";
 import type { SharedDb } from "./client.js";
@@ -33,7 +34,7 @@ function toRoles(values: readonly string[]): readonly RoleId[] {
   return values.filter((v): v is RoleId => KNOWN_ROLES.has(v));
 }
 
-export class PrismaAuthStore implements AuthStore {
+export class PrismaAuthStore implements AuthStore, PasswordResetStore {
   readonly #db: SharedDb;
 
   constructor(db: SharedDb) {
@@ -158,6 +159,78 @@ export class PrismaAuthStore implements AuthStore {
     await this.#db.user.update({
       where: { id: userId },
       data: { lastTotpStep: BigInt(step) },
+    });
+  }
+
+  // ─────────────── Parola sıfırlama ───────────────
+
+  async invalidateAll(userId: string, at: string): Promise<void> {
+    // Silmek yerine KULLANILMIŞ işaretlenir: kimin ne zaman kod istediği
+    // denetim izinin parçasıdır ve silinirse kaybolur.
+    await this.#db.passwordReset.updateMany({
+      where: { userId, usedAt: null },
+      data: { usedAt: new Date(at) },
+    });
+  }
+
+  async create(input: {
+    userId: string;
+    codeHash: string;
+    expiresAt: string;
+    issuedBy: string | null;
+  }): Promise<void> {
+    await this.#db.passwordReset.create({
+      data: {
+        userId: input.userId,
+        codeHash: input.codeHash,
+        expiresAt: new Date(input.expiresAt),
+        issuedBy: input.issuedBy,
+      },
+    });
+  }
+
+  async findByHash(codeHash: string): Promise<ResetRecord | null> {
+    const row = await this.#db.passwordReset.findUnique({ where: { codeHash } });
+    if (!row) return null;
+    return {
+      id: row.id,
+      userId: row.userId,
+      codeHash: row.codeHash,
+      expiresAt: row.expiresAt.toISOString(),
+      usedAt: row.usedAt?.toISOString() ?? null,
+    };
+  }
+
+  async markUsed(id: string, at: string): Promise<void> {
+    await this.#db.passwordReset.updateMany({
+      where: { id, usedAt: null },
+      data: { usedAt: new Date(at) },
+    });
+  }
+
+  /**
+   * Parolayı değiştirir ve TÜM OTURUMLARI DÜŞÜRÜR.
+   *
+   * Tek transaction: parola değişip oturumlar açık kalırsa, sıfırlamanın
+   * sebebi olan şüphe giderilmemiş olur.
+   */
+  async applyNewPassword(userId: string, passwordHash: string, at: string): Promise<void> {
+    await this.#db.$transaction(async (tx) => {
+      const user = await tx.user.update({
+        where: { id: userId },
+        data: { passwordHash },
+        select: { email: true },
+      });
+
+      await tx.session.updateMany({
+        where: { userId, revokedAt: null },
+        data: { revokedAt: new Date(at) },
+      });
+
+      // Kilit sayacı da sıfırlanır: parolası yeni sıfırlanmış bir hesabın
+      // hâlâ kilitli olması, kullanıcıyı yöneticiyi ikinci kez aramaya
+      // zorlar ve sıfırlamayı işe yaramaz kılar.
+      await tx.loginAttempt.deleteMany({ where: { email: user.email } });
     });
   }
 

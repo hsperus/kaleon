@@ -13,6 +13,7 @@
 
 import { hashPassword } from "../auth/password.js";
 import { generateSecret, otpauthUri } from "../auth/totp.js";
+import { issueResetCode } from "../auth/password-reset.js";
 import { PrismaAuthStore } from "../db/auth-store.js";
 import { sharedClient, disconnectAll } from "../db/client.js";
 import { ROLE_PERMISSIONS } from "../kernel/rbac.js";
@@ -79,6 +80,24 @@ async function main(): Promise<void> {
       break;
     }
 
+    case "reset": {
+      const [email] = args;
+      if (!email) fail("Kullanım: reset <e-posta>");
+      const user = await findUser(email);
+      const { code, expiresAt } = await issueResetCode(new PrismaAuthStore(db), {
+        userId: user.id,
+        issuedBy: null,
+      });
+      console.log(`✓ Sıfırlama kodu üretildi: ${user.email}`);
+      console.log("");
+      console.log(`    ${code}`);
+      console.log("");
+      console.log(`  Geçerlilik: ${new Date(expiresAt).toLocaleString("tr-TR")} (1 saat)`);
+      console.log("  Tek kullanımlık. Kullanıcı giriş ekranında 'Parolamı unuttum' ile girer.");
+      console.log("  Sıfırlandığında kullanıcının TÜM oturumları düşer.");
+      break;
+    }
+
     case "revoke": {
       const [email] = args;
       if (!email) fail("Kullanım: revoke <e-posta>");
@@ -111,6 +130,7 @@ async function main(): Promise<void> {
           '  npm run user -- create <e-posta> "<Ad Soyad>" <parola>',
           "  npm run user -- grant  <e-posta> <tenant-slug> <rol...>",
           "  npm run user -- totp   <e-posta>",
+          "  npm run user -- reset  <e-posta>              # parola sıfırlama kodu",
           "  npm run user -- revoke <e-posta>",
           "  npm run user -- list",
         ].join("\n"),
