@@ -58,6 +58,25 @@ export class PrismaAuthStore implements AuthStore {
     return { tenantId: row.tenantId, roles: toRoles(row.roles), isActive: row.isActive };
   }
 
+  async listMemberships(
+    userId: string,
+  ): Promise<readonly (MembershipRecord & { name: string })[]> {
+    const rows = await this.#db.membership.findMany({
+      where: { userId, isActive: true },
+      include: { tenant: true },
+      orderBy: { createdAt: "asc" },
+    });
+    return rows
+      // Askıya alınmış veya arşivlenmiş tenant'a giriş yapılmaz.
+      .filter((r) => r.tenant.status === "active")
+      .map((r) => ({
+        tenantId: r.tenantId,
+        roles: toRoles(r.roles),
+        isActive: r.isActive,
+        name: r.tenant.name,
+      }));
+  }
+
   async createSession(input: Omit<SessionRecord, "revokedAt">): Promise<void> {
     await this.#db.session.create({
       data: {

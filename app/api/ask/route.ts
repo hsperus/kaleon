@@ -50,7 +50,7 @@ export async function POST(req: Request): Promise<Response> {
             channel: ctx.channel,
             task: "lookup",
             display: {
-              name: "Cebrail Karaarslan",
+              name: ctx.displayName,
               roleLabel: ROLE_LABEL[ctx.principal.roles[0]!],
               companyName: "Orthaus",
             },

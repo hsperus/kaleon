@@ -76,9 +76,21 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   backdrop-filter: saturate(180%) blur(22px);
   position: relative; z-index: 20;
 }
+
+/* Dar ekranda üst çubuk taşmamalı: önce ikincil bilgiler gider, kimlik
+   ve eylemler kalır. Taşan bir çubukta kaybolan ilk şey "Çıkış" olurdu. */
+@media (max-width: 900px) {
+  .topbar { gap: 10px; padding: 12px 14px; }
+  .topbar .who.meta { display: none; }
+  .demo-badge { font-size: 11px; padding: 3px 8px; }
+}
 .brand { display: flex; align-items: center; gap: 9px; font-weight: 700; letter-spacing: -.02em; font-size: 15px; }
 .brand i { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-veil); }
-.who { font-size: 12.5px; color: var(--muted); padding-left: 16px; border-left: 1px solid var(--line); white-space: nowrap; }
+.who {
+  font-size: 12.5px; color: var(--muted);
+  padding-left: 16px; border-left: 1px solid var(--line);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
 .who b { color: var(--ink-2); font-weight: 600; }
 .spacer { flex: 1; }
 
@@ -87,7 +99,7 @@ button { font: inherit; color: inherit; background: none; border: none; cursor: 
   background: var(--warn-veil); color: var(--warn); white-space: nowrap;
 }
 
-select.role {
+button.role, select.role {
   font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 9px;
   background: var(--surface-2); color: var(--ink); border: 1px solid var(--line);
   cursor: pointer;
@@ -287,3 +299,100 @@ select.role {
 }
 .sig-more:hover { transform: translateY(-1.5px); }
 .sig-more:active { transform: scale(.96); transition-duration: .1s; }
+
+
+/* ─────────────────────── Giriş ekranı ───────────────────────
+   Ana ekranın sakinliğiyle aynı dilde: tek kart, iki alan, tek eylem.
+   Kart yay eğrisiyle bir kez oturur; her yenilemede animasyon tekrarı
+   sinir bozucu olurdu, o yüzden yalnızca giriş anında çalışır. */
+
+.shell.boot { background: var(--bg); }
+
+.login-shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(120% 90% at 50% -10%, var(--accent-veil), transparent 60%),
+    var(--bg);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px;
+  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--sh-m);
+  animation: login-in .62s var(--spring-soft) both;
+}
+
+@keyframes login-in {
+  from { opacity: 0; transform: translateY(10px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-card { animation: none; }
+}
+
+.login-card .login-brand {
+  display: flex; align-items: center; gap: 9px;
+  font-weight: 700; letter-spacing: -.02em; font-size: 15px;
+  margin-bottom: 4px;
+}
+.login-card .login-brand i {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 0 3px var(--accent-veil);
+}
+
+.login-lead { margin: 0; font-size: 14px; color: var(--ink-2); }
+
+.login-field { display: flex; flex-direction: column; gap: 6px; }
+.login-field span { font-size: 12px; font-weight: 600; color: var(--muted); }
+.login-field input {
+  font: inherit; font-size: 14px;
+  padding: 10px 12px; border-radius: 11px;
+  background: var(--surface-2); color: var(--ink);
+  border: 1px solid var(--line);
+  transition: border-color .18s var(--glide), box-shadow .18s var(--glide);
+}
+.login-field input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-veil);
+}
+
+.login-error {
+  margin: 0; font-size: 12.5px; font-weight: 600;
+  padding: 9px 11px; border-radius: 10px;
+  background: var(--crit-veil); color: var(--crit);
+}
+
+.login-submit {
+  font: inherit; font-size: 14px; font-weight: 650;
+  padding: 11px 14px; border-radius: 12px; border: 0;
+  background: var(--ink); color: var(--bg); cursor: pointer;
+  transition: transform .22s var(--spring), opacity .18s var(--glide);
+}
+.login-submit:hover:not(:disabled) { transform: translateY(-1px); }
+.login-submit:active:not(:disabled) { transform: translateY(0) scale(.985); }
+.login-submit:disabled { opacity: .55; cursor: default; }
+
+.login-choices { display: flex; flex-direction: column; gap: 8px; }
+.login-choice {
+  font: inherit; font-size: 14px; font-weight: 600; text-align: left;
+  padding: 13px 14px; border-radius: 12px;
+  background: var(--surface-2); color: var(--ink);
+  border: 1px solid var(--line); cursor: pointer;
+  transition: border-color .18s var(--glide), transform .22s var(--spring);
+}
+.login-choice:hover:not(:disabled) { border-color: var(--accent); transform: translateX(2px); }
+.login-choice:disabled { opacity: .55; cursor: default; }
+
+.login-note { margin: 2px 0 0; font-size: 11.5px; color: var(--faint); line-height: 1.5; }

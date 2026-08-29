@@ -18,7 +18,8 @@ export const dynamic = "force-dynamic";
 const Body = z.object({
   email: z.string().email().max(320),
   password: z.string().min(1).max(1024),
-  tenantId: z.string().min(1).max(64),
+  /** Kullanıcı birden çok şirketteyse ikinci adımda gelir. */
+  tenantId: z.string().min(1).max(64).optional(),
   totpCode: z.string().max(16).optional(),
 });
 
@@ -47,7 +48,7 @@ export async function POST(req: Request): Promise<Response> {
   const result = await login(authStore(), {
     email: parsed.data.email,
     password: parsed.data.password,
-    tenantId: parsed.data.tenantId,
+    ...(parsed.data.tenantId ? { tenantId: parsed.data.tenantId } : {}),
     ...(parsed.data.totpCode ? { totpCode: parsed.data.totpCode } : {}),
     ip: clientIp(req),
     ...(ua ? { userAgent: ua } : {}),
@@ -56,6 +57,10 @@ export async function POST(req: Request): Promise<Response> {
   if (!result.ok) {
     if (result.reason === "totp_required") {
       return Response.json({ error: "totp_required" }, { status: 401 });
+    }
+    if (result.reason === "tenant_choice") {
+      // Kimlik doğrulandı; yalnızca KENDİ şirketleri listeleniyor.
+      return Response.json({ error: "tenant_choice", tenants: result.tenants }, { status: 409 });
     }
     if (result.reason === "locked") {
       return Response.json(
@@ -69,7 +74,12 @@ export async function POST(req: Request): Promise<Response> {
 
   return Response.json(
     {
-      user: { id: result.principal.userId, roles: result.principal.roles },
+      user: {
+        id: result.principal.userId,
+        name: result.displayName,
+        roles: result.principal.roles,
+        tenantId: result.tenantId,
+      },
       expiresAt: result.expiresAt,
     },
     { status: 200, headers: { "Set-Cookie": sessionCookie(result.token, result.expiresAt) } },

@@ -56,27 +56,61 @@ function fresh<T>(rows: T, recordCount: number): WithFreshness<T> {
   return { rows, freshness: { syncedAt: SYNCED, recordCount } };
 }
 
+/**
+ * Demo veri kaynağı.
+ *
+ * TEK BİR TENANT'A BAĞLIDIR.
+ *
+ * Önceki hâli `tenantId` parametresini görmezden geliyordu ve hangi şirket
+ * sorarsa sorsun aynı satırları döndürüyordu. Demo verisi olduğu için zararsız
+ * görünür — değildir: gerçek bir şirketle giriş yapan kullanıcı, kendi
+ * şirketinin ekranında başka bir şirketin rakamlarını görürdü. Sistemin
+ * tamamı kiracı izolasyonu üzerine kurulu; demo katmanının bu garantiyi
+ * delmesine izin verilmez.
+ *
+ * `boundTenantId` verilmezse kaynak HİÇBİR tenant'a veri döndürmez —
+ * "yanlışlıkla herkese açık" yerine "yanlışlıkla boş" tarafta hata yapar.
+ */
 export class InMemoryDataSource implements DataSource {
-  async wipSnapshot(): Promise<WithFreshness<WipSnapshot>> {
+  readonly #tenantId: string | null;
+
+  constructor(boundTenantId: string | null = null) {
+    this.#tenantId = boundTenantId;
+  }
+
+  #mine(tenantId: string): boolean {
+    return this.#tenantId !== null && tenantId === this.#tenantId;
+  }
+
+  async wipSnapshot(tenantId: string): Promise<WithFreshness<WipSnapshot>> {
+    if (!this.#mine(tenantId)) {
+      return fresh({ ...WIP, stations: [] }, 0);
+    }
     return fresh(WIP, WIP.stations.length);
   }
 
-  async shipmentRisks(): Promise<WithFreshness<readonly ShipmentRisk[]>> {
+  async shipmentRisks(
+    tenantId: string,
+    _week?: number,
+  ): Promise<WithFreshness<readonly ShipmentRisk[]>> {
+    if (!this.#mine(tenantId)) return fresh([], 0);
     return fresh(SHIPMENTS, SHIPMENTS.length);
   }
 
   async bankBalances(
-    _tenantId: string,
+    tenantId: string,
     currency: string | null,
   ): Promise<WithFreshness<readonly BankBalance[]>> {
+    if (!this.#mine(tenantId)) return fresh([], 0);
     const rows = currency ? BANKS.filter((b) => b.currency === currency) : BANKS;
     return fresh(rows, rows.length);
   }
 
   async overtime(
-    _tenantId: string,
+    tenantId: string,
     args: { employeeQuery: string | null; department: string | null; period: string },
   ): Promise<WithFreshness<readonly OvertimeRecord[]>> {
+    if (!this.#mine(tenantId)) return fresh([], 0);
     let rows = OVERTIME;
     if (args.employeeQuery) {
       const q = args.employeeQuery.toLocaleLowerCase("tr");
@@ -86,9 +120,11 @@ export class InMemoryDataSource implements DataSource {
     return fresh(rows, rows.length);
   }
 
-  async partnerCandidates(): Promise<
-    WithFreshness<readonly import("./port.js").PartnerCandidateRow[]>
-  > {
+  async partnerCandidates(
+    tenantId: string,
+    _hint?: { name: string | null; taxId: string | null },
+  ): Promise<WithFreshness<readonly import("./port.js").PartnerCandidateRow[]>> {
+    if (!this.#mine(tenantId)) return fresh([], 0);
     return fresh(PARTNERS, PARTNERS.length);
   }
 }

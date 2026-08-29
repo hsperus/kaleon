@@ -18,6 +18,7 @@ import {
   tenantSchemaName,
 } from "../src/db/provision.js";
 import { urlForSchema } from "../src/db/client.js";
+import { InMemoryDataSource } from "../src/data/memory.js";
 import { PostgresAuditSink } from "../src/db/audit-sink.js";
 import { buildEntry } from "../src/kernel/audit.js";
 import { createPrincipal } from "../src/kernel/rbac.js";
@@ -175,5 +176,46 @@ describe("şema adı güvenliği (veritabanı gerekmez)", () => {
     expect(tenantSchemaName("Orthaus Treyler")).toBe("tenant_orthaus_treyler");
     expect(tenantSchemaName("Zerey Tekstil A.Ş.")).toBe("tenant_zerey_tekstil_a_s");
     expect(tenantSchemaName("ÇĞİÖŞÜ")).toBe("tenant_cgiosu");
+  });
+});
+
+
+/**
+ * Demo veri kaynağının kiracı sınırı.
+ *
+ * Bu test gerçek bir hatadan doğdu: `InMemoryDataSource` `tenantId`
+ * parametresini görmezden geliyor ve hangi şirket sorarsa sorsun aynı
+ * satırları döndürüyordu. Gerçek bir oturumla giren kullanıcı, kendi
+ * şirketinin ekranında başka bir şirketin rakamlarını görüyordu.
+ */
+describe("demo veri kaynağı kiracı sınırı", () => {
+  it("bağlı olduğu tenant'a veri verir", async () => {
+    const db = new InMemoryDataSource("t-benim");
+    const banks = await db.bankBalances("t-benim", null);
+    const ships = await db.shipmentRisks("t-benim", 0);
+    expect(banks.rows.length).toBeGreaterThan(0);
+    expect(ships.rows.length).toBeGreaterThan(0);
+  });
+
+  it("BAŞKA TENANT'A HİÇBİR SATIR VERMEZ", async () => {
+    const db = new InMemoryDataSource("t-benim");
+    expect((await db.bankBalances("t-baskasi", null)).rows).toEqual([]);
+    expect((await db.shipmentRisks("t-baskasi", 0)).rows).toEqual([]);
+    expect((await db.wipSnapshot("t-baskasi")).rows.stations).toEqual([]);
+    expect((await db.partnerCandidates("t-baskasi", { name: "Burçelik", taxId: null })).rows).toEqual([]);
+    expect(
+      (await db.overtime("t-baskasi", { employeeQuery: null, department: null, period: "2026-05" })).rows,
+    ).toEqual([]);
+  });
+
+  it("bağsız kaynak KİMSEYE veri vermez — hata boş tarafta yapılır", async () => {
+    const db = new InMemoryDataSource();
+    expect((await db.bankBalances("t-herhangi", null)).rows).toEqual([]);
+  });
+
+  it("kayıt sayısı da sızmaz", async () => {
+    const db = new InMemoryDataSource("t-benim");
+    // Boş satır dönüp "3 kayıt" demek, kaç müşterisi olduğunu ele verirdi.
+    expect((await db.shipmentRisks("t-baskasi", 0)).freshness.recordCount).toBe(0);
   });
 });

@@ -26,6 +26,9 @@ export const appRouter = router({
       visibleTools: catalog.names,
       totalTools: ctx.registry.size,
       modelConnected: MODEL_CONNECTED,
+      identitySource: ctx.identitySource,
+      dataPlane: ctx.dataPlane,
+      displayName: ctx.displayName,
     };
   }),
 

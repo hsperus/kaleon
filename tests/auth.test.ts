@@ -146,7 +146,7 @@ describe("TOTP", () => {
 
 class MemoryAuthStore implements AuthStore {
   users: UserRecord[] = [];
-  memberships = new Map<string, MembershipRecord>();
+  memberships = new Map<string, MembershipRecord & { name: string }>();
   sessions: SessionRecord[] = [];
   failures = new Map<string, { count: number; lockedUntil: string | null }>();
   totpSteps = new Map<string, number>();
@@ -159,6 +159,11 @@ class MemoryAuthStore implements AuthStore {
   }
   async findMembership(userId: string, tenantId: string) {
     return this.memberships.get(`${userId}:${tenantId}`) ?? null;
+  }
+  async listMemberships(userId: string) {
+    return [...this.memberships.entries()]
+      .filter(([k]) => k.startsWith(`${userId}:`))
+      .map(([, v]) => v);
   }
   async createSession(s: Omit<SessionRecord, "revokedAt">) {
     this.sessions.push({ ...s, revokedAt: null });
@@ -205,6 +210,7 @@ async function storeWith(opts: { totp?: boolean; roles?: RoleId[]; active?: bool
   });
   store.memberships.set("u-1:t-orthaus", {
     tenantId: "t-orthaus",
+    name: "Orthaus Makina",
     roles: opts.roles ?? ["patron"],
     isActive: true,
   });
@@ -340,7 +346,12 @@ describe("oturum çözümleme", () => {
     if (!r.ok) throw new Error("giriş başarısız");
 
     // Kullanıcının rolü elinden alınıyor
-    store.memberships.set("u-1:t-orthaus", { tenantId: "t-orthaus", roles: [], isActive: true });
+    store.memberships.set("u-1:t-orthaus", {
+      tenantId: "t-orthaus",
+      name: "Orthaus Makina",
+      roles: [],
+      isActive: true,
+    });
     expect(await resolveSession(store, r.token, NOW)).toMatchObject({ reason: "no_membership" });
   });
 
@@ -352,6 +363,7 @@ describe("oturum çözümleme", () => {
 
     store.memberships.set("u-1:t-orthaus", {
       tenantId: "t-orthaus",
+      name: "Orthaus Makina",
       roles: ["operator"],
       isActive: true,
     });
@@ -436,5 +448,66 @@ describe("oturum çerezi", () => {
 
   it("çerez yoksa null", () => {
     expect(readCookie(new Request("http://x/"), "kaelon_session")).toBe(null);
+  });
+});
+
+describe("şirket seçimi", () => {
+  async function twoTenants() {
+    const store = await storeWith();
+    store.memberships.set("u-1:t-zerey", {
+      tenantId: "t-zerey",
+      name: "Zerey Metal",
+      roles: ["uretim_muduru"],
+      isActive: true,
+    });
+    return store;
+  }
+
+  it("tek üyelik varsa şirket sorulmaz", async () => {
+    const store = await storeWith();
+    const r = await login(store, { email: creds.email, password: creds.password, now: NOW });
+    expect(r.ok).toBe(true);
+    if (r.ok) expect(r.tenantId).toBe("t-orthaus");
+  });
+
+  it("birden çok üyelikte seçim istenir", async () => {
+    const store = await twoTenants();
+    const r = await login(store, { email: creds.email, password: creds.password, now: NOW });
+    expect(r).toMatchObject({ ok: false, reason: "tenant_choice" });
+    if (!r.ok && r.reason === "tenant_choice") {
+      expect(r.tenants.map((t) => t.name).sort()).toEqual(["Orthaus Makina", "Zerey Metal"]);
+    }
+  });
+
+  it("ŞİRKET LİSTESİ ANCAK PAROLA DOĞRUYSA VERİLİR", async () => {
+    const store = await twoTenants();
+    const r = await login(store, { email: creds.email, password: "yanlisParola123", now: NOW });
+    expect(r).toMatchObject({ ok: false, reason: "invalid_credentials" });
+    expect(r).not.toHaveProperty("tenants");
+  });
+
+  it("seçim ekranı hesabı kilitlemez", async () => {
+    const store = await twoTenants();
+    for (let i = 0; i < MAX_FAILED_ATTEMPTS + 2; i++) {
+      await login(store, { email: creds.email, password: creds.password, now: NOW });
+    }
+    const r = await login(store, { ...creds, now: NOW });
+    expect(r.ok).toBe(true);
+  });
+
+  it("seçilen şirkette üyelik yoksa reddedilir", async () => {
+    const store = await twoTenants();
+    const r = await login(store, { ...creds, tenantId: "t-baskasi", now: NOW });
+    expect(r).toMatchObject({ ok: false, reason: "no_membership" });
+  });
+
+  it("oturum SEÇİLEN şirketin rollerini taşır", async () => {
+    const store = await twoTenants();
+    const r = await login(store, { ...creds, tenantId: "t-zerey", now: NOW });
+    expect(r.ok).toBe(true);
+    if (r.ok) {
+      expect(r.principal.roles).toEqual(["uretim_muduru"]);
+      expect(r.principal.tenantId).toBe("t-zerey");
+    }
   });
 });

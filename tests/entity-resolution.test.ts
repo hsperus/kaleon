@@ -234,7 +234,7 @@ describe("resolve_partner tool — uçtan uca", () => {
       "resolve_partner",
       { name: "Burçelik", taxId: null, externalSystem: null, externalId: null },
       {
-        registry: buildRegistry(new InMemoryDataSource()),
+        registry: buildRegistry(new InMemoryDataSource("t1")),
         audit: new InMemoryAuditSink(),
         principal: createPrincipal({ userId: "u1", tenantId: "t1", roles: ["satin_alma"] }),
         tenant: { tenantId: "t1", schema: "tenant_t1", locale: "tr-TR", baseCurrency: "TRY" },
@@ -255,7 +255,7 @@ describe("resolve_partner tool — uçtan uca", () => {
     const { buildRegistry } = await import("../src/app.js");
     const { InMemoryDataSource } = await import("../src/data/memory.js");
     const { createPrincipal } = await import("../src/kernel/rbac.js");
-    const registry = buildRegistry(new InMemoryDataSource());
+    const registry = buildRegistry(new InMemoryDataSource("t1"));
     const depo = createPrincipal({ userId: "u", tenantId: "t1", roles: ["depo_sorumlusu"] });
     expect(registry.catalogFor(depo).names).not.toContain("resolve_partner");
   });

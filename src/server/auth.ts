@@ -18,22 +18,17 @@
 
 import { PrismaAuthStore } from "../db/auth-store.js";
 import { sharedClient } from "../db/client.js";
-import { resolveSession, type AuthStore } from "../auth/session.js";
+import { resolveSession } from "../auth/session.js";
 import type { Principal } from "../kernel/types.js";
 
 export const SESSION_COOKIE = "kaelon_session";
 const IS_PROD = process.env["NODE_ENV"] === "production";
 
-let storeSingleton: AuthStore | null = null;
+let storeSingleton: PrismaAuthStore | null = null;
 
 export function authStore(): PrismaAuthStore {
   storeSingleton ??= new PrismaAuthStore(sharedClient());
-  return storeSingleton as PrismaAuthStore;
-}
-
-/** Test ve özel kurulum için store'u değiştirir. */
-export function setAuthStore(store: PrismaAuthStore): void {
-  storeSingleton = store;
+  return storeSingleton;
 }
 
 export function readCookie(req: Request, name: string): string | null {
@@ -71,6 +66,7 @@ export function clearedSessionCookie(): string {
 export interface AuthenticatedIdentity {
   readonly principal: Principal;
   readonly sessionId: string;
+  readonly displayName: string;
   readonly source: "session";
 }
 
@@ -85,7 +81,12 @@ export async function principalFromSession(req: Request): Promise<AuthenticatedI
   try {
     const result = await resolveSession(authStore(), token);
     if (!result.ok) return null;
-    return { principal: result.principal, sessionId: result.sessionId, source: "session" };
+    return {
+      principal: result.principal,
+      sessionId: result.sessionId,
+      displayName: result.displayName,
+      source: "session",
+    };
   } catch {
     return null;
   }

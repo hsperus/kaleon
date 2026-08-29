@@ -34,7 +34,7 @@ const ik = createPrincipal({ userId: "u5", tenantId: "t-orthaus", roles: ["ik_mu
 
 function ctx(principal = patron, audit = new InMemoryAuditSink()) {
   return {
-    registry: buildRegistry(new InMemoryDataSource()),
+    registry: buildRegistry(new InMemoryDataSource("t-orthaus")),
     audit,
     principal,
     tenant: TENANT,
@@ -63,7 +63,7 @@ describe("L4 sınırı", () => {
 });
 
 describe("Tool listesi filtresi — modelin görmediğini çağıramaması", () => {
-  const registry = buildRegistry(new InMemoryDataSource());
+  const registry = buildRegistry(new InMemoryDataSource("t-orthaus"));
 
   it("CFO banka tool'unu görür", () => {
     expect(registry.catalogFor(cfo).names).toContain("get_bank_balance");

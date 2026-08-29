@@ -10,6 +10,13 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+/**
+ * Geliştirme yolu demo tenant'ını kontrol düzleminden okur; o yüzden
+ * veritabanı gerektirir. Üretim yolu ise çereze bakmadan reddettiği için
+ * veritabanısız da çalışır — asıl güvenlik testi her ortamda koşar.
+ */
+const DB = Boolean(process.env["SHARED_DATABASE_URL"]);
+
 afterEach(() => {
   vi.unstubAllEnvs();
   vi.resetModules();
@@ -19,7 +26,7 @@ function reqWithRole(role: string): Request {
   return new Request("http://localhost/api/ask", { headers: { "x-kaelon-dev-role": role } });
 }
 
-describe("geliştirme kimliği", () => {
+describe.skipIf(!DB)("geliştirme kimliği — veritabanı gerektiren yol", () => {
   it("geliştirmede başlıktan rol okunur", async () => {
     vi.stubEnv("NODE_ENV", "development");
     vi.resetModules();
@@ -37,6 +44,20 @@ describe("geliştirme kimliği", () => {
     expect(ctx.principal.roles).toEqual(["patron"]); // geçerli listeye düşer
   });
 
+  it("BAĞLAMIN TENANT'I İLE PRINCIPAL'IN TENANT'I HEP AYNIDIR", async () => {
+    // Bu ikisi ayrışırsa invoker `tenant_mismatch` ile her çağrıyı reddeder.
+    // Testin sebebi gerçek bir hata: principal oturumdan gerçek tenant'ı
+    // taşırken bağlam uydurma bir "demo" dizesi taşıyordu.
+    vi.stubEnv("NODE_ENV", "development");
+    vi.resetModules();
+    const { createContext } = await import("../src/server/context.js");
+    const ctx = await createContext(reqWithRole("patron"));
+    expect(ctx.tenant.tenantId).toBe(ctx.principal.tenantId);
+    expect(ctx.tenant.schema).toMatch(/^tenant_/);
+  });
+});
+
+describe("üretim kimliği — her ortamda koşar", () => {
   it("ÜRETİMDE oturumsuz istek REDDEDİLİR — başlık ne olursa olsun", async () => {
     vi.stubEnv("NODE_ENV", "production");
     vi.resetModules();
@@ -55,7 +76,7 @@ describe("geliştirme kimliği", () => {
   });
 });
 
-describe("veri düzlemi işareti", () => {
+describe.skipIf(!DB)("veri düzlemi işareti", () => {
   it("bağlam demo veri kullandığını AÇIKÇA taşır", async () => {
     vi.stubEnv("NODE_ENV", "development");
     vi.resetModules();

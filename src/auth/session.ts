@@ -51,6 +51,12 @@ export interface MembershipRecord {
   readonly isActive: boolean;
 }
 
+/** Kullanıcıya şirket seçtirmek için gereken en az bilgi. */
+export interface TenantChoice {
+  readonly tenantId: string;
+  readonly name: string;
+}
+
 export interface SessionRecord {
   readonly id: string;
   readonly userId: string;
@@ -64,6 +70,15 @@ export interface AuthStore {
   findUserByEmail(email: string): Promise<UserRecord | null>;
   findUserById(id: string): Promise<UserRecord | null>;
   findMembership(userId: string, tenantId: string): Promise<MembershipRecord | null>;
+  /**
+   * Kullanıcının etkin üyelikleri.
+   *
+   * ŞİRKET LİSTESİ GİRİŞ EKRANINDA GÖSTERİLMEZ: tüm tenant'ları listeleyen
+   * bir açık uç nokta, müşteri listesini herkese verirdi. Seçim ancak parola
+   * (ve varsa 2FA) doğrulandıktan SONRA, yalnızca o kullanıcının kendi
+   * şirketleriyle sunulur.
+   */
+  listMemberships(userId: string): Promise<readonly (MembershipRecord & { name: string })[]>;
   createSession(input: Omit<SessionRecord, "revokedAt">): Promise<void>;
   findSessionByHash(tokenHash: string): Promise<SessionRecord | null>;
   revokeSession(id: string, at: string): Promise<void>;
@@ -90,13 +105,31 @@ export function issueToken(): string {
 }
 
 export type LoginResult =
-  | { readonly ok: true; readonly token: string; readonly expiresAt: string; readonly principal: Principal }
-  | { readonly ok: false; readonly reason: "invalid_credentials" | "locked" | "totp_required" | "totp_invalid" | "no_membership" };
+  | {
+      readonly ok: true;
+      readonly token: string;
+      readonly expiresAt: string;
+      readonly principal: Principal;
+      readonly displayName: string;
+      readonly tenantId: string;
+    }
+  /** Kimlik doğru ama kullanıcı birden çok şirkette — hangisi? */
+  | { readonly ok: false; readonly reason: "tenant_choice"; readonly tenants: readonly TenantChoice[] }
+  | {
+      readonly ok: false;
+      readonly reason:
+        | "invalid_credentials"
+        | "locked"
+        | "totp_required"
+        | "totp_invalid"
+        | "no_membership";
+    };
 
 export interface LoginInput {
   readonly email: string;
   readonly password: string;
-  readonly tenantId: string;
+  /** Verilmezse tek üyelik otomatik seçilir, birden çoksa seçim istenir. */
+  readonly tenantId?: string;
   readonly totpCode?: string;
   readonly now?: () => Date;
   readonly ip?: string;
@@ -146,10 +179,32 @@ export async function login(store: AuthStore, input: LoginInput): Promise<LoginR
   }
 
   // ── YETKİ ÜYELİKTEN GELİR, İSTEKTEN DEĞİL
-  const membership = await store.findMembership(user.id, input.tenantId);
-  if (!membership || !membership.isActive || membership.roles.length === 0) {
+  const usable = (await store.listMemberships(user.id)).filter(
+    (m) => m.isActive && m.roles.length > 0,
+  );
+  if (usable.length === 0) {
     await store.recordFailure(email, now().toISOString());
     return { ok: false, reason: "no_membership" };
+  }
+
+  let membership: (MembershipRecord & { name: string }) | undefined;
+  if (input.tenantId) {
+    membership = usable.find((m) => m.tenantId === input.tenantId);
+    // İstenen şirkette üyelik yok: kimlik doğru olsa da erişim yok.
+    if (!membership) {
+      await store.recordFailure(email, now().toISOString());
+      return { ok: false, reason: "no_membership" };
+    }
+  } else if (usable.length === 1) {
+    membership = usable[0]!;
+  } else {
+    // Parola doğrulandı; artık KENDİ şirketlerini görmesi güvenli.
+    await store.clearFailures(email);
+    return {
+      ok: false,
+      reason: "tenant_choice",
+      tenants: usable.map((m) => ({ tenantId: m.tenantId, name: m.name })),
+    };
   }
 
   await store.clearFailures(email);
@@ -159,7 +214,7 @@ export async function login(store: AuthStore, input: LoginInput): Promise<LoginR
   await store.createSession({
     id: crypto.randomUUID(),
     userId: user.id,
-    tenantId: input.tenantId,
+    tenantId: membership.tenantId,
     tokenHash: hashToken(token),
     expiresAt,
   });
@@ -168,16 +223,23 @@ export async function login(store: AuthStore, input: LoginInput): Promise<LoginR
     ok: true,
     token,
     expiresAt,
+    displayName: user.displayName,
+    tenantId: membership.tenantId,
     principal: createPrincipal({
       userId: user.id,
-      tenantId: input.tenantId,
+      tenantId: membership.tenantId,
       roles: membership.roles,
     }),
   };
 }
 
 export type SessionResolution =
-  | { readonly ok: true; readonly principal: Principal; readonly sessionId: string }
+  | {
+      readonly ok: true;
+      readonly principal: Principal;
+      readonly sessionId: string;
+      readonly displayName: string;
+    }
   | { readonly ok: false; readonly reason: "not_found" | "expired" | "revoked" | "no_membership" | "inactive" };
 
 /** Token'dan principal çözer. Her istekte çağrılır. */
@@ -204,6 +266,7 @@ export async function resolveSession(
   return {
     ok: true,
     sessionId: session.id,
+    displayName: user.displayName,
     principal: createPrincipal({
       userId: user.id,
       tenantId: session.tenantId,
