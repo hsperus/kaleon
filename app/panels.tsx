@@ -68,44 +68,54 @@ function Body({ payload }: { payload: PanelPayload }): ReactNode {
   if (payload.tool === "get_factory_wip") {
     const w = d as unknown as {
       activeWorkOrders: number;
-      staffOnShift: number;
-      staffPlanned: number;
-      machinesRunning: number;
-      machinesTotal: number;
-      actualRatePerHour: number;
-      targetRatePerHour: number;
-      stations: { station: string; utilizationPct: number; note: string }[];
+      staffOnShift: number | null;
+      staffPlanned: number | null;
+      machinesRunning: number | null;
+      machinesTotal: number | null;
+      actualRatePerHour: number | null;
+      targetRatePerHour: number | null;
+      stations: { station: string; utilizationPct: number | null; note: string }[];
     };
+    // Bilinmeyen sayı en/boy sıfır bir çubuk olarak çizilmez — boş bir
+    // ölçüm çubuğu "sıfır" diye okunur. Yerine açıkça "bilinmiyor" yazılır.
+    const pair = (a: number | null, b: number | null) =>
+      a === null || b === null ? "bilinmiyor" : `${a}/${b}`;
+    const rate = (v: number | null) => (v === null ? "bilinmiyor" : `${v} br/sa`);
+
     return (
       <>
         <p>
-          {w.activeWorkOrders} aktif iş emri · {w.staffOnShift}/{w.staffPlanned} personel ·{" "}
-          {w.machinesRunning}/{w.machinesTotal} makine
+          {w.activeWorkOrders} aktif iş emri · {pair(w.staffOnShift, w.staffPlanned)} personel ·{" "}
+          {pair(w.machinesRunning, w.machinesTotal)} makine
         </p>
         <div className="meters">
           {w.stations.map((s) => (
             <div className="st" key={s.station}>
               <div className="st-top">
                 <span className="n">{s.station}</span>
-                <span className="v">%{s.utilizationPct}</span>
+                <span className="v">{s.utilizationPct === null ? "—" : `%${s.utilizationPct}`}</span>
               </div>
-              <div className="bar">
-                <i
-                  className={s.utilizationPct >= 90 ? "r" : s.utilizationPct >= 80 ? "y" : ""}
-                  style={{ width: `${s.utilizationPct}%` }}
-                />
-              </div>
+              {s.utilizationPct === null ? (
+                <div className="st-note">Kapasite tanımlı değil — doluluk hesaplanamıyor.</div>
+              ) : (
+                <div className="bar">
+                  <i
+                    className={s.utilizationPct >= 90 ? "r" : s.utilizationPct >= 80 ? "y" : ""}
+                    style={{ width: `${s.utilizationPct}%` }}
+                  />
+                </div>
+              )}
               <div className="st-note">{s.note}</div>
             </div>
           ))}
         </div>
         <div className="kv">
           <span>Gerçek hız</span>
-          <b>{w.actualRatePerHour} br/sa</b>
+          <b>{rate(w.actualRatePerHour)}</b>
         </div>
         <div className="kv">
           <span>Hedef hız</span>
-          <b>{w.targetRatePerHour} br/sa</b>
+          <b>{rate(w.targetRatePerHour)}</b>
         </div>
       </>
     );

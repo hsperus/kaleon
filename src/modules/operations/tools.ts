@@ -24,10 +24,17 @@ export function operationsTools(db: DataSource) {
     input: z.strictObject({}),
     requires: ["operations:workorder.read"],
     async execute(_input, ctx): Promise<ToolOk<Awaited<ReturnType<DataSource["wipSnapshot"]>>["rows"]>> {
-      const { rows, freshness } = await db.wipSnapshot(ctx.tenant.tenantId);
+      const { rows, freshness, caveats } = await db.wipSnapshot(ctx.tenant.tenantId);
 
       const risks: Risk[] = [];
-      const bottleneck = [...rows.stations].sort((a, b) => b.utilizationPct - a.utilizationPct)[0];
+
+      // Doluluğu BİLİNEN istasyonlar arasından darboğaz aranır. Kapasitesi
+      // tanımsız bir istasyonu "%0 dolu" sayıp listenin sonuna atmak,
+      // gerçek darboğazı gizlerdi.
+      const known = rows.stations.filter(
+        (s): s is typeof s & { utilizationPct: number } => s.utilizationPct !== null,
+      );
+      const bottleneck = [...known].sort((a, b) => b.utilizationPct - a.utilizationPct)[0];
       if (bottleneck && bottleneck.utilizationPct >= 90) {
         risks.push({
           severity: "critical",
@@ -35,30 +42,45 @@ export function operationsTools(db: DataSource) {
           ref: bottleneck.station,
         });
       }
-      const shortfall = 1 - rows.actualRatePerHour / rows.targetRatePerHour;
-      if (shortfall >= 0.15) {
-        risks.push({
-          severity: "warning",
-          message: `Üretim hızı hedefin %${Math.round(shortfall * 100)} altında (${rows.actualRatePerHour}/${rows.targetRatePerHour} birim-saat).`,
-        });
+
+      // Hız karşılaştırması ancak İKİ SAYI DA biliniyorsa yapılır.
+      if (rows.actualRatePerHour !== null && rows.targetRatePerHour) {
+        const shortfall = 1 - rows.actualRatePerHour / rows.targetRatePerHour;
+        if (shortfall >= 0.15) {
+          risks.push({
+            severity: "warning",
+            message: `Üretim hızı hedefin %${Math.round(shortfall * 100)} altında (${rows.actualRatePerHour}/${rows.targetRatePerHour} birim-saat).`,
+          });
+        }
       }
-      const offline = rows.machinesTotal - rows.machinesRunning;
-      if (offline > 0) {
-        risks.push({
-          severity: "info",
-          message: `${offline} makine plan dışı duruşta.`,
-        });
+
+      if (rows.machinesTotal !== null && rows.machinesRunning !== null) {
+        const offline = rows.machinesTotal - rows.machinesRunning;
+        if (offline > 0) {
+          risks.push({ severity: "info", message: `${offline} makine plan dışı duruşta.` });
+        }
       }
+
+      risks.push(...caveatRisks(caveats));
+
+      const machineHealth =
+        rows.machinesTotal && rows.machinesRunning !== null
+          ? rows.machinesRunning / rows.machinesTotal
+          : null;
 
       return {
         ok: true,
         data: rows,
         sources: [
           { system: "Saha terminalleri", kind: "module", recordCount: rows.activeWorkOrders, syncedAt: freshness.syncedAt },
-          { system: "Makine telemetrisi", kind: "machine", recordCount: rows.machinesTotal, syncedAt: freshness.syncedAt },
+          { system: "Makine telemetrisi", kind: "machine", recordCount: rows.machinesTotal ?? 0, syncedAt: freshness.syncedAt },
         ],
         risks,
-        confidence: rows.machinesRunning / rows.machinesTotal >= 0.8 ? 92 : 74,
+        // Makine durumu bilinmiyorsa yüksek güven iddia edilmez.
+        confidence: confidenceWithCaveats(
+          machineHealth === null ? 74 : machineHealth >= 0.8 ? 92 : 74,
+          caveats,
+        ),
       };
     },
   });

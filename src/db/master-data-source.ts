@@ -29,6 +29,7 @@ import { normalizeName } from "../modules/master-data/normalize.js";
 import { isValidTckn, isValidVkn } from "../modules/master-data/identifiers.js";
 import { PrismaAttendanceSource } from "./attendance-source.js";
 import { PrismaShipmentSource } from "./shipment-source.js";
+import { PrismaWipSource } from "./wip-source.js";
 import type { TenantDb } from "./client.js";
 
 /** Bir sorguda belleğe alınacak en fazla aday. */
@@ -243,38 +244,29 @@ export class PrismaBankSource {
 /**
  * Bir tenant için tam veri kaynağı.
  *
- * Cari, banka, puantaj ve sevkiyat Postgres'ten geliyor; WIP için makine ve
- * vardiya master data'sı gerekiyor, henüz yok. Bu sınıf o metotta BOŞ
- * döner — uydurma veri değil, boş. Hangi kanalın bağlı olduğu
- * `connectedChannels` ile dışarıya bildirilir; arayüz "veri yok" ile
- * "bağlanmadı" arasındaki farkı gösterebilsin diye.
+ * Bütün kanallar tenant'ın kendi şemasından okur. Bir kanalın verisi eksikse
+ * uydurma değer değil, null ve gerekçesini taşıyan bir caveat döner —
+ * cevabın hangi kısmının bilinmediği kullanıcıya kadar gider.
  */
 export class PrismaDataSource implements DataSource {
   readonly #master: PrismaMasterDataSource;
   readonly #bank: PrismaBankSource;
   readonly #attendance: PrismaAttendanceSource;
   readonly #shipment: PrismaShipmentSource;
+  readonly #wip: PrismaWipSource;
 
   constructor(db: TenantDb) {
     this.#master = new PrismaMasterDataSource(db);
     this.#bank = new PrismaBankSource(db);
     this.#attendance = new PrismaAttendanceSource(db);
     this.#shipment = new PrismaShipmentSource(db);
+    this.#wip = new PrismaWipSource(db);
   }
 
-  readonly connectedChannels = ["partners", "bank", "attendance", "sales"] as const;
+  readonly connectedChannels = ["partners", "bank", "attendance", "sales", "wip"] as const;
 
   async wipSnapshot(): Promise<WithFreshness<import("../data/port.js").WipSnapshot>> {
-    return empty({
-      activeWorkOrders: 0,
-      staffOnShift: 0,
-      staffPlanned: 0,
-      machinesRunning: 0,
-      machinesTotal: 0,
-      stations: [],
-      actualRatePerHour: 0,
-      targetRatePerHour: 0,
-    });
+    return this.#wip.wipSnapshot();
   }
 
   async shipmentRisks(): Promise<WithFreshness<readonly import("../data/port.js").ShipmentRisk[]>> {
@@ -303,6 +295,3 @@ export class PrismaDataSource implements DataSource {
   }
 }
 
-function empty<T>(rows: T): WithFreshness<T> {
-  return { rows, freshness: { syncedAt: new Date().toISOString(), recordCount: 0 } };
-}

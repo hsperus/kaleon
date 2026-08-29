@@ -31,21 +31,37 @@ const RULES: readonly Rule[] = [
     render: (d) => {
       const w = d as {
         activeWorkOrders: number;
-        staffOnShift: number;
-        staffPlanned: number;
-        machinesRunning: number;
-        machinesTotal: number;
-        actualRatePerHour: number;
-        targetRatePerHour: number;
-        stations: { station: string; utilizationPct: number; note: string }[];
+        staffOnShift: number | null;
+        staffPlanned: number | null;
+        machinesRunning: number | null;
+        machinesTotal: number | null;
+        actualRatePerHour: number | null;
+        targetRatePerHour: number | null;
+        stations: { station: string; utilizationPct: number | null; note: string }[];
       };
-      const bottleneck = [...w.stations].sort((a, b) => b.utilizationPct - a.utilizationPct)[0];
-      return (
-        `Şu an ${w.activeWorkOrders} aktif iş emri var. ` +
-        `${w.staffOnShift}/${w.staffPlanned} personel vardiyada, ${w.machinesRunning}/${w.machinesTotal} makine çalışıyor.\n\n` +
-        `Darboğaz ${bottleneck?.station} — %${bottleneck?.utilizationPct} dolulukta (${bottleneck?.note}).\n\n` +
-        `Gerçek hız ${w.actualRatePerHour} birim/saat, hedef ${w.targetRatePerHour}.`
+      // Bilinmeyen sayı "bilinmiyor" diye yazılır; ekranda "null" veya "NaN"
+      // görmek kullanıcıya sistemin bozuk olduğunu düşündürür.
+      const n = (v: number | null) => (v === null ? "bilinmiyor" : String(v));
+      const pair = (a: number | null, b: number | null) =>
+        a === null || b === null ? "bilinmiyor" : `${a}/${b}`;
+
+      const measured = w.stations.filter(
+        (x): x is typeof x & { utilizationPct: number } => x.utilizationPct !== null,
       );
+      const bottleneck = [...measured].sort((a, b) => b.utilizationPct - a.utilizationPct)[0];
+
+      const lines = [
+        `Şu an ${w.activeWorkOrders} aktif iş emri var. ` +
+          `${pair(w.staffOnShift, w.staffPlanned)} personel vardiyada, ` +
+          `${pair(w.machinesRunning, w.machinesTotal)} makine çalışıyor.`,
+      ];
+      if (bottleneck) {
+        lines.push(
+          `Darboğaz ${bottleneck.station} — %${bottleneck.utilizationPct} dolulukta (${bottleneck.note}).`,
+        );
+      }
+      lines.push(`Gerçek hız ${n(w.actualRatePerHour)} birim/saat, hedef ${n(w.targetRatePerHour)}.`);
+      return lines.join("\n\n");
     },
   },
   {

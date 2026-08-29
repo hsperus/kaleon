@@ -110,18 +110,25 @@ export const SENTINELS: readonly Sentinel[] = [
     input: {},
     requires: "operations:workorder.read",
     evaluate(data, t) {
+      // Alanlar null olabilir: "bilinmiyor" ile "sıfır" ayrı şeylerdir.
+      // Bilinmeyen bir sayıyla eşik karşılaştırmak NaN üretir; NaN her
+      // karşılaştırmada false döner ve sinyal SESSİZCE kaybolur. Sessiz
+      // kayıp, Boss Mode'un tek işini yapmaması demektir.
       const w = data as {
-        actualRatePerHour: number;
-        targetRatePerHour: number;
-        machinesRunning: number;
-        machinesTotal: number;
-        stations: { station: string; utilizationPct: number; note: string }[];
+        actualRatePerHour: number | null;
+        targetRatePerHour: number | null;
+        machinesRunning: number | null;
+        machinesTotal: number | null;
+        stations: { station: string; utilizationPct: number | null; note: string }[];
       };
       if (!w?.stations) return [];
       const out: Signal[] = [];
 
-      const shortfall = 1 - w.actualRatePerHour / w.targetRatePerHour;
-      if (shortfall >= t.rateShortfallNotice) {
+      const shortfall =
+        w.actualRatePerHour !== null && w.targetRatePerHour
+          ? 1 - w.actualRatePerHour / w.targetRatePerHour
+          : null;
+      if (shortfall !== null && shortfall >= t.rateShortfallNotice) {
         out.push({
           id: "production_rate",
           level: shortfall >= t.rateShortfallCritical ? 2 : 1,
@@ -132,7 +139,10 @@ export const SENTINELS: readonly Sentinel[] = [
         });
       }
 
-      const worst = [...w.stations].sort((a, b) => b.utilizationPct - a.utilizationPct)[0];
+      const measured = w.stations.filter(
+        (s): s is typeof s & { utilizationPct: number } => s.utilizationPct !== null,
+      );
+      const worst = [...measured].sort((a, b) => b.utilizationPct - a.utilizationPct)[0];
       if (worst && worst.utilizationPct >= t.utilizationNotice) {
         out.push({
           id: "bottleneck",
@@ -144,8 +154,11 @@ export const SENTINELS: readonly Sentinel[] = [
         });
       }
 
-      const offline = w.machinesTotal - w.machinesRunning;
-      if (offline >= Math.ceil(w.machinesTotal * 0.15)) {
+      const offline =
+        w.machinesTotal !== null && w.machinesRunning !== null
+          ? w.machinesTotal - w.machinesRunning
+          : null;
+      if (offline !== null && offline >= Math.ceil(w.machinesTotal! * 0.15)) {
         out.push({
           id: "machines_offline",
           level: 1,

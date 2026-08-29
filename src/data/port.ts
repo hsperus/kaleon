@@ -31,21 +31,37 @@ export interface WithFreshness<T> {
 
 export interface StationLoad {
   readonly station: string;
-  readonly utilizationPct: number;
+  /** Kapasite tanımlı değilse null — sıfır doluluk DEĞİL. */
+  readonly utilizationPct: number | null;
   readonly activeOrders: number;
   readonly holdOrders: number;
   readonly note: string;
 }
 
+/**
+ * Fabrikanın anlık durumu.
+ *
+ * BİLİNMEYEN ALANLAR `null`, SIFIR DEĞİL.
+ *
+ * "0 makine çalışıyor" ile "makine bilgisi gelmiyor" aynı ekranda aynı
+ * görünürse, fabrika durmuş sanılır veya duruş fark edilmez. İkisi de
+ * pahalıdır. Sayıyı bilmediğimizde sayı UYDURMAYIZ; alan null kalır ve
+ * cevap bunu söyler.
+ */
 export interface WipSnapshot {
+  /** İş emri sayımı her zaman bilinir. */
   readonly activeWorkOrders: number;
-  readonly staffOnShift: number;
-  readonly staffPlanned: number;
-  readonly machinesRunning: number;
-  readonly machinesTotal: number;
+  /** Vardiya verisi bağlı değilse null. */
+  readonly staffOnShift: number | null;
+  readonly staffPlanned: number | null;
+  /** Makine kaydı yoksa null — "0 makine çalışıyor" demek değildir. */
+  readonly machinesRunning: number | null;
+  readonly machinesTotal: number | null;
   readonly stations: readonly StationLoad[];
-  readonly actualRatePerHour: number;
-  readonly targetRatePerHour: number;
+  /** Zaman damgalı üretim onayı yoksa null. */
+  readonly actualRatePerHour: number | null;
+  /** İş merkezi hedefi tanımlı değilse null. */
+  readonly targetRatePerHour: number | null;
 }
 
 export interface ShipmentRisk {

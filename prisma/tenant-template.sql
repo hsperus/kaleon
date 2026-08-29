@@ -417,6 +417,43 @@ CREATE TABLE "sales_order_lines" (
     CONSTRAINT "sales_order_lines_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "work_centers" (
+    "id" UUID NOT NULL,
+    "code" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "concurrent_capacity" INTEGER,
+    "target_rate_per_hour" DECIMAL(12,2),
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "work_centers_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "machines" (
+    "id" UUID NOT NULL,
+    "code" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "work_center_id" UUID,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "machines_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "machine_status_snapshots" (
+    "id" UUID NOT NULL,
+    "machine_id" UUID NOT NULL,
+    "as_of" TIMESTAMP(3) NOT NULL,
+    "state" TEXT NOT NULL,
+    "reason" TEXT,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "machine_status_snapshots_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "partners_code_key" ON "partners"("code");
 
@@ -570,6 +607,21 @@ CREATE INDEX "sales_order_lines_work_order_id_idx" ON "sales_order_lines"("work_
 -- CreateIndex
 CREATE UNIQUE INDEX "sales_order_lines_sales_order_id_line_no_key" ON "sales_order_lines"("sales_order_id", "line_no");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "work_centers_code_key" ON "work_centers"("code");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "machines_code_key" ON "machines"("code");
+
+-- CreateIndex
+CREATE INDEX "machines_work_center_id_idx" ON "machines"("work_center_id");
+
+-- CreateIndex
+CREATE INDEX "machine_status_snapshots_machine_id_as_of_idx" ON "machine_status_snapshots"("machine_id", "as_of" DESC);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "machine_status_snapshots_machine_id_as_of_key" ON "machine_status_snapshots"("machine_id", "as_of");
+
 -- AddForeignKey
 ALTER TABLE "partner_aliases" ADD CONSTRAINT "partner_aliases_partner_id_fkey" FOREIGN KEY ("partner_id") REFERENCES "partners"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -611,4 +663,10 @@ ALTER TABLE "sales_order_lines" ADD CONSTRAINT "sales_order_lines_sales_order_id
 
 -- AddForeignKey
 ALTER TABLE "sales_order_lines" ADD CONSTRAINT "sales_order_lines_work_order_id_fkey" FOREIGN KEY ("work_order_id") REFERENCES "work_orders"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "machines" ADD CONSTRAINT "machines_work_center_id_fkey" FOREIGN KEY ("work_center_id") REFERENCES "work_centers"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "machine_status_snapshots" ADD CONSTRAINT "machine_status_snapshots_machine_id_fkey" FOREIGN KEY ("machine_id") REFERENCES "machines"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

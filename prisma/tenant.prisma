@@ -630,3 +630,62 @@ model SalesOrderLine {
   @@index([workOrderId])
   @@map("sales_order_lines")
 }
+
+// ─────────────────── İş merkezi ve makine ───────────────────
+
+/// İş merkezi — rotadaki `work_center` değerinin master kaydı.
+///
+/// Kapasite ve hedef hız BURADA tanımlıdır ve TANIMSIZ KALABİLİR.
+/// Tanımsızsa doluluk oranı hesaplanamaz; sistem "%0 dolu" demez, "bilinmiyor"
+/// der. Sıfır doluluk boş bir tezgâh demektir ve yanlış karar verdirir.
+model WorkCenter {
+  id                String   @id @default(uuid()) @db.Uuid
+  code              String   @unique
+  name              String
+  /// Aynı anda işlenebilecek iş emri sayısı. Null = tanımlanmamış.
+  concurrentCapacity Int?    @map("concurrent_capacity")
+  /// Hedef üretim hızı (birim/saat). Null = tanımlanmamış.
+  targetRatePerHour Decimal? @map("target_rate_per_hour") @db.Decimal(12, 2)
+  isActive          Boolean  @default(true) @map("is_active")
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  machines Machine[]
+
+  @@map("work_centers")
+}
+
+model Machine {
+  id           String   @id @default(uuid()) @db.Uuid
+  code         String   @unique
+  name         String
+  workCenterId String?  @map("work_center_id") @db.Uuid
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  workCenter WorkCenter?             @relation(fields: [workCenterId], references: [id])
+  statuses   MachineStatusSnapshot[]
+
+  @@index([workCenterId])
+  @@map("machines")
+}
+
+/// Makine durumu ANLIK GÖRÜNTÜDÜR — güncellenebilir bir alan değil.
+///
+/// Banka bakiyesiyle aynı gerekçe: "şu an duruyor" ile "dün 3 saat durdu"
+/// farklı sorulardır ve tek bir `status` sütunu ikincisini kaybettirir.
+/// Duruş analizi (OEE, plansız duruş süresi) ancak geçmiş tutulursa yapılır.
+model MachineStatusSnapshot {
+  id        String   @id @default(uuid()) @db.Uuid
+  machineId String   @map("machine_id") @db.Uuid
+  asOf      DateTime @map("as_of")
+  /// running | idle | down
+  state     String
+  reason    String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  machine Machine @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  @@unique([machineId, asOf])
+  @@index([machineId, asOf(sort: Desc)])
+  @@map("machine_status_snapshots")
+}
