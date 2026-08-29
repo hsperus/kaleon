@@ -454,6 +454,29 @@ CREATE TABLE "machine_status_snapshots" (
     CONSTRAINT "machine_status_snapshots_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "conversations" (
+    "id" UUID NOT NULL,
+    "user_id" UUID NOT NULL,
+    "title" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "conversations_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "conversation_messages" (
+    "id" UUID NOT NULL,
+    "conversation_id" UUID NOT NULL,
+    "seq" INTEGER NOT NULL,
+    "role" TEXT NOT NULL,
+    "content" TEXT NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "conversation_messages_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "partners_code_key" ON "partners"("code");
 
@@ -622,6 +645,12 @@ CREATE INDEX "machine_status_snapshots_machine_id_as_of_idx" ON "machine_status_
 -- CreateIndex
 CREATE UNIQUE INDEX "machine_status_snapshots_machine_id_as_of_key" ON "machine_status_snapshots"("machine_id", "as_of");
 
+-- CreateIndex
+CREATE INDEX "conversations_user_id_updated_at_idx" ON "conversations"("user_id", "updated_at" DESC);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "conversation_messages_conversation_id_seq_key" ON "conversation_messages"("conversation_id", "seq");
+
 -- AddForeignKey
 ALTER TABLE "partner_aliases" ADD CONSTRAINT "partner_aliases_partner_id_fkey" FOREIGN KEY ("partner_id") REFERENCES "partners"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -669,4 +698,7 @@ ALTER TABLE "machines" ADD CONSTRAINT "machines_work_center_id_fkey" FOREIGN KEY
 
 -- AddForeignKey
 ALTER TABLE "machine_status_snapshots" ADD CONSTRAINT "machine_status_snapshots_machine_id_fkey" FOREIGN KEY ("machine_id") REFERENCES "machines"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "conversation_messages" ADD CONSTRAINT "conversation_messages_conversation_id_fkey" FOREIGN KEY ("conversation_id") REFERENCES "conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

@@ -36,6 +36,11 @@ import { principalFromSession } from "./auth.js";
 import { sharedClient, tenantClient } from "../db/client.js";
 import { PrismaDataSource } from "../db/master-data-source.js";
 import { PrismaOperationsRepository } from "../db/operations-repository.js";
+import { PrismaConversationRepository } from "../db/conversation-repository.js";
+import {
+  InMemoryConversationRepository,
+  type ConversationRepository,
+} from "../modules/conversation/repository.js";
 import {
   PrismaApprovalRepository,
   PrismaDocumentsRepository,
@@ -63,6 +68,7 @@ const VALID_ROLES: readonly RoleId[] = [
  * ile reddediyordu. Koruma doğruydu, bağlam yanlıştı.
  */
 export const DEMO_SLUG = "demo";
+const DEMO_COMPANY_NAME = "Demo A.Ş.";
 
 /** Demo veri kümesinin bağlı olduğu tenant — açılışta çözülür. */
 let demoTenant: TenantContext | null = null;
@@ -118,21 +124,26 @@ async function seedDemo(tenantId: string): Promise<void> {
  * Şema adı UYGULAMADAN TÜRETİLMEZ, kayıttan okunur: slug'dan şema adı
  * hesaplamak, kaydın söylediğinden farklı bir şemaya yazma riski demektir.
  */
-const tenantCache = new Map<string, TenantContext>();
+const tenantCache = new Map<string, { ctx: TenantContext; name: string }>();
 
-async function tenantContextById(tenantId: string): Promise<TenantContext | null> {
+async function tenantContextById(
+  tenantId: string,
+): Promise<{ ctx: TenantContext; name: string } | null> {
   const cached = tenantCache.get(tenantId);
   if (cached) return cached;
   const row = await sharedClient().tenant.findUnique({ where: { id: tenantId } });
   if (!row || row.status !== "active") return null;
-  const ctx: TenantContext = {
-    tenantId: row.id,
-    schema: row.schemaName,
-    locale: row.locale,
-    baseCurrency: row.baseCurrency,
+  const entry = {
+    ctx: {
+      tenantId: row.id,
+      schema: row.schemaName,
+      locale: row.locale,
+      baseCurrency: row.baseCurrency,
+    },
+    name: row.name,
   };
-  tenantCache.set(tenantId, ctx);
-  return ctx;
+  tenantCache.set(tenantId, entry);
+  return entry;
 }
 
 async function demoTenantContext(): Promise<TenantContext> {
@@ -162,6 +173,23 @@ async function demoTenantContext(): Promise<TenantContext> {
  * bir bağlam üretiyordu.
  */
 const registryByTenant = new Map<string, ToolRegistry>();
+const conversationsByTenant = new Map<string, ConversationRepository>();
+
+/**
+ * Konuşma deposu — tenant başına.
+ *
+ * Demo tenant'ı bellekte tutar (sunucu yeniden başlayınca sıfırlanır, demo
+ * için doğru davranış); gerçek tenant kendi şemasına yazar.
+ */
+function conversationsFor(tenant: TenantContext, isDemo: boolean): ConversationRepository {
+  const cached = conversationsByTenant.get(tenant.tenantId);
+  if (cached) return cached;
+  const repo: ConversationRepository = isDemo
+    ? new InMemoryConversationRepository()
+    : new PrismaConversationRepository(tenantClient(tenant.schema));
+  conversationsByTenant.set(tenant.tenantId, repo);
+  return repo;
+}
 
 /**
  * Tenant'ın registry'si.
@@ -215,10 +243,13 @@ export interface RequestContext {
   readonly audit: AuditSink;
   readonly completer: Completer;
   readonly auditSink: InMemoryAuditSink;
+  readonly conversations: ConversationRepository;
   /** Kimliğin nereden geldiği — arayüzde ve denetim kaydında görünür. */
   readonly identitySource: "session" | "dev-header";
   /** Kullanıcının görünen adı. Artık sabit yazılı değil. */
   readonly displayName: string;
+  /** Şirketin görünen adı — kimliği değil. */
+  readonly companyName: string;
   /**
    * Verinin durumu — arayüzde AÇIKÇA gösterilir.
    *   "demo"     → demo tenant'ının hazır veri kümesi
@@ -253,18 +284,22 @@ export async function createContext(req: Request): Promise<RequestContext> {
   // 1. Gerçek oturum
   const identity = await principalFromSession(req);
   if (identity) {
-    const tenant = await tenantContextById(identity.principal.tenantId);
+    const found = await tenantContextById(identity.principal.tenantId);
     // Tenant askıya alınmış veya silinmişse oturum geçerli olsa da giriş yok.
-    if (!tenant) throw new UnauthenticatedError();
+    if (!found) throw new UnauthenticatedError();
+    const tenant = found.ctx;
     const demo = await demoTenantContext().catch(() => null);
+    const isDemo = demo?.tenantId === tenant.tenantId;
     return {
       ...base,
-      registry: registryFor(tenant, demo?.tenantId === tenant.tenantId),
+      registry: registryFor(tenant, isDemo),
+      conversations: conversationsFor(tenant, isDemo),
       tenant,
       principal: identity.principal,
       identitySource: "session",
       displayName: identity.displayName,
-      dataPlane: demo?.tenantId === tenant.tenantId ? "demo" : "postgres",
+      companyName: found.name,
+      dataPlane: isDemo ? "demo" : "postgres",
     };
   }
 
@@ -275,9 +310,11 @@ export async function createContext(req: Request): Promise<RequestContext> {
   return {
     ...base,
     registry: registryFor(tenant, true),
+    conversations: conversationsFor(tenant, true),
     tenant,
     identitySource: "dev-header",
     displayName: "Cebrail Karaarslan (demo)",
+    companyName: DEMO_COMPANY_NAME,
     dataPlane: "demo",
     principal: createPrincipal({
       userId: "00000000-0000-0000-0000-0000000000de",

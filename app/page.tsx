@@ -89,10 +89,19 @@ export default function Page() {
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
+  /**
+   * Aktif konuşma. Sunucu ilk olayda kimliği söyler; sonraki sorular bunu
+   * gönderir ve model önceki turları görür. Sohbet tabanlı bir üründe
+   * "peki ya geçen ay?" sorusunun cevaplanabilmesi buna bağlı.
+   */
+  const [conversationId, setConversationId] = useState<string | null>(null);
   const [panels, setPanels] = useState<PanelPayload[]>([]);
   const [briefing, setBriefing] = useState<{ level: 0 | 1 | 2; signals: Signal[] } | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+  // `ask` closure'ı içinde güncel değeri okumak için ref; state tek başına
+  // eski değeri yakalar ve ikinci soru yanlış konuşmaya gider.
+  const conversationIdRef = useRef<string | null>(null);
 
   useEffect(() => {
     const c = client(role);
@@ -134,8 +143,15 @@ export default function Page() {
         const res = await fetch("/api/ask", {
           method: "POST",
           headers: { "Content-Type": "application/json", "x-kaelon-dev-role": role },
-          body: JSON.stringify({ question }),
+          body: JSON.stringify({
+            question,
+            ...(conversationIdRef.current ? { conversationId: conversationIdRef.current } : {}),
+          }),
         });
+        if (!res.ok) {
+          const body = (await res.json().catch(() => ({}))) as { error?: string };
+          throw new Error(body.error ?? `Sunucu ${res.status} döndü.`);
+        }
         if (!res.body) throw new Error("Akış açılamadı");
 
         const reader = res.body.getReader();
@@ -151,9 +167,15 @@ export default function Page() {
 
           for (const line of lines) {
             if (!line.trim()) continue;
-            const ev = JSON.parse(line) as RunEvent | { type: "error"; message: string };
+            const ev = JSON.parse(line) as
+              | RunEvent
+              | { type: "error"; message: string }
+              | { type: "conversation"; id: string };
 
-            if (ev.type === "tool_start") {
+            if (ev.type === "conversation") {
+              conversationIdRef.current = ev.id;
+              setConversationId(ev.id);
+            } else if (ev.type === "tool_start") {
               patch((t) => ({ ...t, running: ev.tool }));
             } else if (ev.type === "tool_end") {
               patch((t) => ({
@@ -187,6 +209,15 @@ export default function Page() {
     [busy, role],
   );
 
+  /** Yeni konuşma — geçmiş kopar, ekran temizlenir. */
+  const newConversation = useCallback(() => {
+    conversationIdRef.current = null;
+    setConversationId(null);
+    setTurns([]);
+    setPanels([]);
+    inputRef.current?.focus();
+  }, []);
+
   const chatting = turns.length > 0;
 
   if (authState === "loading") return <div className="shell boot" />;
@@ -194,6 +225,8 @@ export default function Page() {
     return (
       <LoginScreen
         onSuccess={() => {
+          conversationIdRef.current = null;
+          setConversationId(null);
           setTurns([]);
           setPanels([]);
           setAuthState("loading");
@@ -230,6 +263,13 @@ export default function Page() {
             {session.visibleTools.length}/{session.totalTools} tool · L{session.maxAuthority}
           </span>
         )}
+        {/* Konuşma sürüyorsa yeni konuşma açılabilsin; sürmüyorsa buton
+            gereksiz gürültüdür. */}
+        {conversationId && turns.length > 0 && (
+          <button className="role" type="button" onClick={newConversation} title="Yeni konuşma">
+            Yeni konuşma
+          </button>
+        )}
         {/* Rol seçici YALNIZCA geliştirme kimliğiyle görünür. Gerçek oturumda
             rol kullanıcının üyeliğinden gelir ve arayüzden değiştirilemez. */}
         {session?.identitySource === "dev-header" ? (
@@ -238,8 +278,7 @@ export default function Page() {
             value={role}
             onChange={(e) => {
               setRole(e.target.value as Role);
-              setTurns([]);
-              setPanels([]);
+              newConversation();
             }}
             aria-label="Rol (geliştirme)"
             title="Geliştirme kimliği — üretimde bu seçici yoktur"
@@ -262,8 +301,7 @@ export default function Page() {
             onClick={() => {
               void fetch("/api/auth/logout", { method: "POST" }).then(() => {
                 setSession(null);
-                setTurns([]);
-                setPanels([]);
+                newConversation();
                 setAuthState("anon");
               });
             }}

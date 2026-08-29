@@ -12,6 +12,23 @@
  *  - Modelin uydurduğu tool adı hata olarak geri döner, sessizce yutulmaz.
  *  - `pause_turn` sunucu tool'u sürerken gelir; asistan turu geri itilip devam
  *    edilir, yoksa cevap sessizce yarıda kalır.
+ *
+ * DAYANIKLILIK — bir tool'un patlaması konuşmayı öldürmez:
+ *
+ *  1. TOOL ZAMAN AŞIMI. Asılı kalan bir sorgu, isteği sonsuza kadar bekletir.
+ *     Süre dolduğunda model bir hata sonucu görür ve toparlanabilir; kullanıcı
+ *     boş ekranda beklemez.
+ *
+ *  2. BEKLENMEYEN İSTİSNA YUTULMAZ AMA ÖLDÜRMEZ. Tool'dan fırlayan hata,
+ *     modele `is_error` sonucu olarak döner. Tek istisna DENETİM YAZMA
+ *     HATASIDIR: denetim kaydı yazılamıyorsa yetkili işlem yapılamaz ve
+ *     konuşma durur. Denetimsiz iş yapmak, hiç iş yapmamaktan kötüdür.
+ *
+ *  3. TOPLAM SÜRE SINIRI. Sekiz tur × yavaş tool = dakikalarca bekleyen
+ *     kullanıcı. Süre dolduğunda döngü elindeki bilgiyle biter.
+ *
+ *  4. İPTAL EDİLEBİLİR. Kullanıcı sekmeyi kapattığında model turu ve tool'lar
+ *     boşuna çalışmaya devam etmez.
  */
 
 import type Anthropic from "@anthropic-ai/sdk";
@@ -23,6 +40,15 @@ import type { ToolRegistry } from "../kernel/registry.js";
 import type { AuditSink } from "../kernel/audit.js";
 import type { Channel, Principal, TenantContext } from "../kernel/types.js";
 import { invokeTool } from "../kernel/invoke.js";
+import { AuditWriteError } from "../kernel/errors.js";
+
+/** Tek tool çağrısı için üst sınır. */
+export const DEFAULT_TOOL_TIMEOUT_MS = 15_000;
+/** Konuşmanın tamamı için üst sınır. */
+export const DEFAULT_DEADLINE_MS = 90_000;
+
+const DEADLINE_ANSWER =
+  "Bu soru ayrılan sürede tamamlanamadı. Soruyu daraltıp tekrar sorabilirsiniz.";
 
 export interface RunRequest {
   readonly question: string;
@@ -35,6 +61,28 @@ export interface RunRequest {
   readonly now?: () => Date;
   /** İlerleme olayları. Verilmezse döngü sessiz çalışır. */
   readonly onEvent?: (event: RunEvent) => void;
+  /** Tek bir tool çağrısı için üst sınır. */
+  readonly toolTimeoutMs?: number;
+  /** Konuşmanın tamamı için üst sınır. */
+  readonly deadlineMs?: number;
+  /** Kullanıcı vazgeçtiğinde döngüyü durdurur. */
+  readonly signal?: AbortSignal;
+  /**
+   * Önceki turlar — yalnızca soru ve nihai cevap metinleri.
+   *
+   * TOOL SONUÇLARI GEÇMİŞE YAZILMAZ. İki sebep:
+   *   - Bayat veri taze gibi okunur. Dünkü banka bakiyesi bugünkü cevaba
+   *     karışırsa, sistem yanlış rakam söyler ve nereden geldiği anlaşılmaz.
+   *   - Geçmiş sınırsız büyür; her tur bir öncekinin tüm tool çıktısını
+   *     taşırsa maliyet ve gecikme katlanır.
+   * Model bilgiye yine ihtiyaç duyarsa tool'u TEKRAR çağırır ve güncelini alır.
+   */
+  readonly history?: readonly ConversationTurn[];
+}
+
+export interface ConversationTurn {
+  readonly question: string;
+  readonly answer: string;
 }
 
 export interface ToolCallRecord {
@@ -101,8 +149,15 @@ export async function runConversation(
 ): Promise<RunResult> {
   const now = req.now ?? (() => new Date());
   const catalog = deps.registry.catalogFor(req.principal);
+  const toolTimeoutMs = req.toolTimeoutMs ?? DEFAULT_TOOL_TIMEOUT_MS;
+  const deadline = Date.now() + (req.deadlineMs ?? DEFAULT_DEADLINE_MS);
 
   const messages: Anthropic.Beta.BetaMessageParam[] = [
+    // Geçmiş turlar: yalnızca metin. Tool çıktısı taşınmaz.
+    ...(req.history ?? []).flatMap((t): Anthropic.Beta.BetaMessageParam[] => [
+      { role: "user", content: t.question },
+      { role: "assistant", content: t.answer },
+    ]),
     { role: "user", content: req.question },
     {
       // Konuşma ortası sistem mesajı: önbelleklenmiş öneki bozmadan oturum
@@ -125,6 +180,30 @@ export async function runConversation(
 
   while (iterations < MAX_TOOL_ITERATIONS) {
     iterations++;
+
+    if (req.signal?.aborted) {
+      return finish({
+        answer: "İstek iptal edildi.",
+        toolCalls,
+        iterations,
+        costUsd,
+        stopReason: "aborted",
+        refused: false,
+        ...(budgetWarning ? { budgetWarning } : {}),
+      });
+    }
+
+    if (Date.now() > deadline) {
+      return finish({
+        answer: DEADLINE_ANSWER,
+        toolCalls,
+        iterations,
+        costUsd,
+        stopReason: "deadline",
+        refused: false,
+        ...(budgetWarning ? { budgetWarning } : {}),
+      });
+    }
 
     const { message, costUsd: turnCost, budgetWarning: warn } = await deps.gateway.complete({
       messages,
@@ -181,20 +260,24 @@ export async function runConversation(
     const results = await Promise.all(
       toolUses.map(async (use) => {
         req.onEvent?.({ type: "tool_start", tool: use.name });
-        const invoked = await invokeTool(use.name, use.input, {
-          registry: deps.registry,
-          audit: deps.audit,
-          principal: req.principal,
-          tenant: req.tenant,
-          correlationId: req.correlationId,
-          channel: req.channel,
-          now,
-          aiContext: {
-            model: CONVERSATION_MODEL,
-            promptVersion: PROMPT_VERSION,
-            toolUseId: use.id,
+        const invoked = await safeInvoke(
+          use,
+          {
+            registry: deps.registry,
+            audit: deps.audit,
+            principal: req.principal,
+            tenant: req.tenant,
+            correlationId: req.correlationId,
+            channel: req.channel,
+            now,
+            aiContext: {
+              model: CONVERSATION_MODEL,
+              promptVersion: PROMPT_VERSION,
+              toolUseId: use.id,
+            },
           },
-        });
+          toolTimeoutMs,
+        );
         toolCalls.push({
           tool: use.name,
           ok: invoked.outcome.ok,
@@ -242,5 +325,54 @@ export async function runConversation(
   function finish(result: RunResult): RunResult {
     req.onEvent?.({ type: "done", result });
     return result;
+  }
+}
+
+/** Tek tool çağrısı: zaman aşımı ve beklenmeyen istisnaya karşı korunmuş. */
+async function safeInvoke(
+  use: Anthropic.Beta.BetaToolUseBlock,
+  opts: Parameters<typeof invokeTool>[2],
+  timeoutMs: number,
+): Promise<Awaited<ReturnType<typeof invokeTool>>> {
+  const t0 = Date.now();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+
+  try {
+    return await Promise.race([
+      invokeTool(use.name, use.input, opts),
+      new Promise<never>((_, reject) => {
+        timer = setTimeout(() => reject(new ToolTimeoutError(use.name, timeoutMs)), timeoutMs);
+      }),
+    ]);
+  } catch (e) {
+    // DENETİM YAZILAMIYORSA KONUŞMA DURUR. Yetkili bir işlemin izi
+    // tutulamıyorsa o işlem yapılmamalıdır; hatayı yutmak, iz bırakmadan
+    // iş yapmayı mümkün kılardı.
+    if (e instanceof AuditWriteError) throw e;
+
+    const timedOut = e instanceof ToolTimeoutError;
+    return {
+      toolName: use.name,
+      durationMs: Date.now() - t0,
+      outcome: {
+        ok: false,
+        code: timedOut ? "tool_timeout" : "tool_crashed",
+        message: timedOut
+          ? `${use.name} ${timeoutMs} ms içinde yanıt vermedi.`
+          : `${use.name} beklenmeyen bir hatayla durdu: ${(e as Error).message}`,
+        // Kullanıcıya gösterilebilir: teknik ayrıntı yok, sistem içi bilgi
+        // sızdırmıyor ve modelin durumu açıklamasına izin veriyor.
+        userFacing: true,
+      },
+    };
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
+}
+
+class ToolTimeoutError extends Error {
+  constructor(tool: string, ms: number) {
+    super(`${tool} zaman aşımına uğradı (${ms} ms)`);
+    this.name = "ToolTimeoutError";
   }
 }

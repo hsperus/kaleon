@@ -689,3 +689,39 @@ model MachineStatusSnapshot {
   @@index([machineId, asOf(sort: Desc)])
   @@map("machine_status_snapshots")
 }
+
+// ─────────────────────── Konuşmalar ───────────────────────
+
+/// Sohbet oturumu.
+///
+/// SAKLANAN ŞEY YALNIZCA METİNDİR — tool çağrıları ve sonuçları değil.
+/// Bayat veri taze gibi okunmasın diye; model bilgiye yine ihtiyaç duyarsa
+/// tool'u tekrar çağırıp güncelini alır.
+model Conversation {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  title     String
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  messages ConversationMessage[]
+
+  @@index([userId, updatedAt(sort: Desc)])
+  @@map("conversations")
+}
+
+model ConversationMessage {
+  id             String   @id @default(uuid()) @db.Uuid
+  conversationId String   @map("conversation_id") @db.Uuid
+  /// Tur numarası; sıra garantisi zamana değil bu sayaca dayanır.
+  seq            Int
+  /// user | assistant
+  role           String
+  content        String
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  conversation Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, seq])
+  @@map("conversation_messages")
+}

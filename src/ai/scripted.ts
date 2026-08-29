@@ -221,8 +221,17 @@ function done(m: Anthropic.Beta.BetaMessage): CompleteResult {
   };
 }
 
+/**
+ * SON kullanıcı sorusu — ilki değil.
+ *
+ * Baştan taramak, konuşma geçmişi eklenene kadar doğru çalışıyordu çünkü ilk
+ * kullanıcı mesajı zaten güncel soruydu. Geçmiş gelince aynı kod EN ESKİ
+ * soruyu döndürmeye başladı: "peki fabrikada ne oluyor?" sorusuna bir önceki
+ * turun banka cevabı verildi. Sondan taramak bunu kapatır.
+ */
 function lastUserText(messages: readonly Anthropic.Beta.BetaMessageParam[]): string {
-  for (const m of messages) {
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]!;
     if (m.role === "user" && typeof m.content === "string") return m.content;
   }
   return "";

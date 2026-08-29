@@ -14,6 +14,9 @@ import { buildRegistry } from "../src/app.js";
 import { InMemoryDataSource } from "../src/data/memory.js";
 import { InMemoryAuditSink } from "../src/kernel/audit.js";
 import { createPrincipal } from "../src/kernel/rbac.js";
+import { ToolRegistry } from "../src/kernel/registry.js";
+import { defineTool } from "../src/kernel/tool.js";
+import { z } from "zod";
 import type { TenantContext } from "../src/kernel/types.js";
 
 const TENANT: TenantContext = {
@@ -200,5 +203,122 @@ describe("ajan döngüsü", () => {
     const res = await runConversation(deps(new ScriptedCompleter(queue)), baseReq);
     expect(res.stopReason).toBe("max_iterations");
     expect(res.iterations).toBe(8);
+  });
+});
+
+/**
+ * Dayanıklılık.
+ *
+ * Buradaki her test bir korumanın VARLIĞINI kanıtlar ve koruma kaldırılırsa
+ * KIRILIR (BUILD-PLAN değişmez #8). Bir ERP'de tek bir asılı sorgu, tüm
+ * ekranı sonsuza kadar bekletebilir; bunun testi olmayan bir koruma,
+ * ilk yeniden düzenlemede sessizce kaybolur.
+ */
+describe("ajan döngüsü dayanıklılığı", () => {
+  /**
+   * Arızayı taklit eden gerçek bir tool.
+   *
+   * Üretim koduna "testte değiştir" kancası eklemek yerine, arızalı davranışı
+   * olan gerçek bir tool kaydediyoruz. Kanca eklemek, üretimde çalışan kodda
+   * yalnızca testin kullandığı bir yol açmak demektir; o yol bir gün başka
+   * bir şey tarafından kullanılır.
+   */
+  function registryWithFaultyTool(execute: () => Promise<never>) {
+    const tool = defineTool({
+      name: "arizali_kaynak",
+      module: "operations",
+      authority: 0,
+      deferLoading: false,
+      description: { tr: "Test için arızalı kaynak.", en: "Faulty source for tests." },
+      input: z.strictObject({}),
+      requires: [],
+      execute,
+    });
+    return new ToolRegistry().register(tool as unknown as Parameters<ToolRegistry["register"]>[0]);
+  }
+
+  it("TOOL ZAMAN AŞIMI: asılı kalan tool konuşmayı kilitlemez", async () => {
+    const completer = new ScriptedCompleter([
+      msg([toolUse("tu_1", "arizali_kaynak", {})], "tool_use"),
+      msg([textBlock("Bu bilgiyi alamadım ama devam edebilirim.")], "end_turn"),
+    ]);
+    const d = {
+      gateway: completer,
+      // Asla bitmeyen tool.
+      registry: registryWithFaultyTool(() => new Promise<never>(() => {})),
+      audit: new InMemoryAuditSink(),
+    };
+
+    const res = await runConversation(d, { ...baseReq, toolTimeoutMs: 60 });
+
+    expect(res.toolCalls[0]).toMatchObject({
+      tool: "arizali_kaynak",
+      ok: false,
+      code: "tool_timeout",
+    });
+    expect(res.answer).toContain("devam edebilirim");
+  });
+
+  it("BEKLENMEYEN İSTİSNA konuşmayı öldürmez, modele hata olarak döner", async () => {
+    const completer = new ScriptedCompleter([
+      msg([toolUse("tu_1", "arizali_kaynak", {})], "tool_use"),
+      msg([textBlock("Bu kaynağa şu an ulaşılamıyor.")], "end_turn"),
+    ]);
+    const d = {
+      gateway: completer,
+      registry: registryWithFaultyTool(async () => {
+        throw new Error("veritabanı bağlantısı koptu");
+      }),
+      audit: new InMemoryAuditSink(),
+    };
+
+    const res = await runConversation(d, baseReq);
+    expect(res.toolCalls[0]).toMatchObject({ ok: false });
+    expect(res.answer).toContain("ulaşılamıyor");
+  });
+
+  it("İPTAL: kullanıcı vazgeçtiğinde döngü model çağırmaz", async () => {
+    const completer = new ScriptedCompleter([msg([textBlock("olmamalı")], "end_turn")]);
+    const controller = new AbortController();
+    controller.abort();
+
+    const res = await runConversation(deps(completer), { ...baseReq, signal: controller.signal });
+    expect(res.stopReason).toBe("aborted");
+    expect(completer.seen).toHaveLength(0);
+  });
+
+  it("SÜRE SINIRI: uzun konuşma elindeki bilgiyle biter", async () => {
+    const completer = new ScriptedCompleter([msg([textBlock("olmamalı")], "end_turn")]);
+    const res = await runConversation(deps(completer), { ...baseReq, deadlineMs: -1 });
+    expect(res.stopReason).toBe("deadline");
+    expect(res.answer).toContain("daraltıp");
+  });
+
+  it("GEÇMİŞ TURLAR modele metin olarak taşınır", async () => {
+    const completer = new ScriptedCompleter([msg([textBlock("Geçen aya göre arttı.")], "end_turn")]);
+    const res = await runConversation(deps(completer), {
+      ...baseReq,
+      question: "Peki ya geçen ay?",
+      history: [{ question: "Bu ay mesai ne kadar?", answer: "42 saat." }],
+    });
+
+    const sent = completer.seen[0]!.messages;
+    expect(sent[0]).toMatchObject({ role: "user", content: "Bu ay mesai ne kadar?" });
+    expect(sent[1]).toMatchObject({ role: "assistant", content: "42 saat." });
+    expect(sent[2]).toMatchObject({ role: "user", content: "Peki ya geçen ay?" });
+    expect(res.answer).toContain("Geçen aya göre");
+  });
+
+  it("GEÇMİŞE TOOL SONUCU YAZILMAZ — bayat veri taze gibi okunmaz", async () => {
+    const completer = new ScriptedCompleter([msg([textBlock("Tamam.")], "end_turn")]);
+    await runConversation(deps(completer), {
+      ...baseReq,
+      history: [{ question: "Bakiye ne?", answer: "12.400.000 TL." }],
+    });
+
+    const sent = completer.seen[0]!.messages;
+    const serialized = JSON.stringify(sent);
+    expect(serialized).not.toContain("tool_result");
+    expect(serialized).not.toContain("tool_use");
   });
 });
