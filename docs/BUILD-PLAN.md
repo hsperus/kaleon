@@ -99,8 +99,11 @@
 - **Tamam (devam):** Raw Data Layer, senkron boru hattı (ham veri kanonik
   dönüşümden ÖNCE saklanır), idempotency, hata sınıflandırması (network/auth/
   data), üstel geri çekilme, Uyumsoft e-Fatura adaptörü (UBL-TR)
-- **Kalan:** banka ve PDKS adaptörleri, BullMQ kuyrukları ve zamanlama,
-  Prisma store adaptörü, gece belge hattı (Haiku + Batch API)
+- **Tamam (devam):** Prisma store adaptörü (gerçek Postgres'e karşı doğrulandı —
+  dönüşüm patladığında ham veri veritabanında kalıyor), zamanlayıcı portu +
+  süreç içi adaptör (çakışma önleme, üstel geri çekilme)
+- **Kalan:** banka ve PDKS adaptörleri, BullMQ adaptörü (Redis gerektirir),
+  gece belge hattı (Haiku + Batch API)
 
 ### Aşama 6 — Approval Workspace 🟡 DURUM MAKİNESİ TAMAM
 - Sekiz durumlu state machine, çoklu onay seviyeleri
@@ -151,6 +154,9 @@
 7. `tsc --noEmit` ve testler yeşil olmadan commit yok.
 8. Bir koruma yazıldıysa, korumayı KALDIRINCA kırılan bir test de yazılır.
    Yanlış sebepten geçen test, testsizlikten beterdir.
+9. Test edilemeyen altyapıya bağlı kod yazılmaz; port tanımlanır, adaptör
+   altyapı geldiğinde eklenir. Yazılıp koşturulmamış kod, yazılmamış koddan
+   tehlikelidir — çünkü çalıştığı sanılır.
 
 ## Ölçüm
 
