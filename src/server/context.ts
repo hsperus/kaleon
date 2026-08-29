@@ -38,7 +38,7 @@ import { PrismaDataSource } from "../db/master-data-source.js";
 import { PrismaOperationsRepository } from "../db/operations-repository.js";
 import { PrismaConversationRepository } from "../db/conversation-repository.js";
 import { PartnerImporter } from "../db/partner-import.js";
-import { InMemoryUploadStore } from "../modules/import/uploads.js";
+import { PrismaUploadStore } from "../db/upload-store.js";
 import {
   InMemoryConversationRepository,
   type ConversationRepository,
@@ -177,10 +177,15 @@ async function demoTenantContext(): Promise<TenantContext> {
 const registryByTenant = new Map<string, ToolRegistry>();
 
 /**
- * Yüklenen dosyalar — süreç ömrü boyunca, tenant sınırlı, süreli.
- * Tek bir depo yeterli: tenant kontrolü deponun içinde yapılıyor.
+ * Yüklenen dosya deposu — tenant'ın kendi şemasında.
+ *
+ * Süreç belleğinde tutulamaz: yüklemeyi alan sunucu ile soruyu alan sunucu
+ * aynı olmak zorunda kalırdı. Bu varsayım çok örnekli üretimde ve hatta
+ * geliştirmede modül yeniden yüklendiğinde kırılıyor.
  */
-export const uploads = new InMemoryUploadStore();
+export function uploadStoreFor(tenant: TenantContext): PrismaUploadStore {
+  return new PrismaUploadStore(tenantClient(tenant.schema));
+}
 const conversationsByTenant = new Map<string, ConversationRepository>();
 
 /**
@@ -240,7 +245,7 @@ function buildRegistryForTenant(tenant: TenantContext): ToolRegistry {
     documents: new PrismaDocumentsRepository(db),
     approvals: new PrismaApprovalRepository(db),
     imports: {
-      uploads,
+      uploads: new PrismaUploadStore(db),
       // Yazıcı, isteğin tenant'ına bağlı client ile kurulur; tool içinden
       // gelen tenantId bağlamla aynıdır (invoker bunu doğrular).
       importerFor: () => new PartnerImporter(db),

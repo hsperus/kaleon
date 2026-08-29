@@ -477,6 +477,19 @@ CREATE TABLE "conversation_messages" (
     CONSTRAINT "conversation_messages_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "file_uploads" (
+    "id" UUID NOT NULL,
+    "user_id" UUID NOT NULL,
+    "filename" TEXT NOT NULL,
+    "content" TEXT NOT NULL,
+    "byte_size" INTEGER NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "expires_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "file_uploads_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "partners_code_key" ON "partners"("code");
 
@@ -650,6 +663,9 @@ CREATE INDEX "conversations_user_id_updated_at_idx" ON "conversations"("user_id"
 
 -- CreateIndex
 CREATE UNIQUE INDEX "conversation_messages_conversation_id_seq_key" ON "conversation_messages"("conversation_id", "seq");
+
+-- CreateIndex
+CREATE INDEX "file_uploads_expires_at_idx" ON "file_uploads"("expires_at");
 
 -- AddForeignKey
 ALTER TABLE "partner_aliases" ADD CONSTRAINT "partner_aliases_partner_id_fkey" FOREIGN KEY ("partner_id") REFERENCES "partners"("id") ON DELETE CASCADE ON UPDATE CASCADE;

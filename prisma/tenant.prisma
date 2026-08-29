@@ -725,3 +725,21 @@ model ConversationMessage {
   @@unique([conversationId, seq])
   @@map("conversation_messages")
 }
+
+/// Yüklenen dosya — SÜRELİ, kalıcı değil.
+///
+/// Tenant şemasında durur: dosya o tenant'ın verisidir ve şema sınırı
+/// izolasyonu zaten sağlar. Süreç belleğinde tutulması bozuktu — yüklemeyi
+/// alan sunucu ile soruyu alan sunucunun aynı olacağını varsayıyordu.
+model FileUpload {
+  id        String   @id @default(uuid()) @db.Uuid
+  userId    String   @map("user_id") @db.Uuid
+  filename  String
+  content   String
+  byteSize  Int      @map("byte_size")
+  createdAt DateTime @default(now()) @map("created_at")
+  expiresAt DateTime @map("expires_at")
+
+  @@index([expiresAt])
+  @@map("file_uploads")
+}

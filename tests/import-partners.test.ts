@@ -420,3 +420,96 @@ describe("içe aktarma yetkileri", () => {
     expect(committed).toEqual([]);
   });
 });
+
+/**
+ * Yükleme deposu — Postgres.
+ *
+ * Bellek deposu bozuktu ve bozukluğu ancak tarayıcıda görüldü: yükleme
+ * "başarılı" dedi, önizleme "dosya bulunamadı" dedi. Sebep, yüklemeyi alan
+ * süreç ile soruyu alan sürecin farklı modül örneği kullanmasıydı.
+ */
+describe.skipIf(!enabled)("yükleme deposu — Postgres", () => {
+  let shared: SharedPrisma;
+  let db: TenantPrisma;
+  const SCHEMA_U = "tenant_it_upl";
+
+  beforeAll(async () => {
+    shared = new SharedPrisma();
+    await dropTenantSchema(shared, SCHEMA_U);
+    await provisionTenantSchema(shared, SCHEMA_U);
+    db = new TenantPrisma({ datasources: { db: { url: urlForSchema(TENANT_URL!, SCHEMA_U) } } });
+  }, 60_000);
+
+  afterAll(async () => {
+    await db?.$disconnect();
+    if (shared) {
+      await dropTenantSchema(shared, SCHEMA_U);
+      await shared.$disconnect();
+    }
+  });
+
+  beforeEach(async () => {
+    await db.fileUpload.deleteMany();
+  });
+
+  const USER = "11111111-1111-1111-1111-111111111111";
+
+  it("FARKLI DEPO ÖRNEĞİ AYNI DOSYAYI OKUR", async () => {
+    // Asıl kırılan buydu: yükleyen örnek ile okuyan örnek farklıydı.
+    const { PrismaUploadStore } = await import("../src/db/upload-store.js");
+    const writer = new PrismaUploadStore(db);
+    const reader = new PrismaUploadStore(db);
+    const id = await writer.put({ filename: "cari.csv", content: "Unvan\nX", userId: USER });
+    expect(await reader.get(id, "T")).toEqual({ filename: "cari.csv", content: "Unvan\nX" });
+  });
+
+  it("SÜRESİ DOLAN DOSYA OKUNMAZ", async () => {
+    const { PrismaUploadStore } = await import("../src/db/upload-store.js");
+    const { UPLOAD_TTL_MS } = await import("../src/modules/import/uploads.js");
+    let now = new Date("2026-05-16T08:00:00Z");
+    const store = new PrismaUploadStore(db, () => now);
+    const id = await store.put({ filename: "c.csv", content: "Unvan\nX", userId: USER });
+    now = new Date(now.getTime() + UPLOAD_TTL_MS + 1000);
+    expect(await store.get(id, "T")).toBe(null);
+  });
+
+  it("süresi dolanlar TEMİZLENİR — sonsuza kadar birikmez", async () => {
+    const { PrismaUploadStore } = await import("../src/db/upload-store.js");
+    const { UPLOAD_TTL_MS } = await import("../src/modules/import/uploads.js");
+    let now = new Date("2026-05-16T08:00:00Z");
+    const store = new PrismaUploadStore(db, () => now);
+    await store.put({ filename: "eski.csv", content: "Unvan\nX", userId: USER });
+    now = new Date(now.getTime() + UPLOAD_TTL_MS + 1000);
+    await store.put({ filename: "yeni.csv", content: "Unvan\nY", userId: USER });
+    const rows = await db.fileUpload.findMany();
+    expect(rows.map((r) => r.filename)).toEqual(["yeni.csv"]);
+  });
+
+  it("bilinmeyen kimlik null döner", async () => {
+    const { PrismaUploadStore } = await import("../src/db/upload-store.js");
+    const store = new PrismaUploadStore(db);
+    expect(await store.get("00000000-0000-0000-0000-000000000000", "T")).toBe(null);
+  });
+
+  it("BAŞKA TENANT'IN ŞEMASINDA GÖRÜNMEZ", async () => {
+    // İzolasyon bağlantıda: her tenant kendi şemasına yazar.
+    const { PrismaUploadStore } = await import("../src/db/upload-store.js");
+    const other = "tenant_it_upl2";
+    await dropTenantSchema(shared, other);
+    await provisionTenantSchema(shared, other);
+    const otherDb = new TenantPrisma({
+      datasources: { db: { url: urlForSchema(TENANT_URL!, other) } },
+    });
+    try {
+      const id = await new PrismaUploadStore(db).put({
+        filename: "gizli.csv",
+        content: "Unvan\nX",
+        userId: USER,
+      });
+      expect(await new PrismaUploadStore(otherDb).get(id, "T")).toBe(null);
+    } finally {
+      await otherDb.$disconnect();
+      await dropTenantSchema(shared, other);
+    }
+  }, 60_000);
+});

@@ -16,10 +16,16 @@ import type { CompleteRequest, CompleteResult, Completer } from "./gateway.js";
 interface Rule {
   readonly match: readonly string[];
   readonly tool: string;
+  /** Sabit girdi; `inputFrom` verilmişse o kazanır. */
   readonly input: Record<string, unknown>;
+  /** Girdi sorudan türetiliyorsa (örn. eklenen dosyanın kimliği). */
+  readonly inputFrom?: (question: string) => Record<string, unknown> | null;
   /** Tool sonucundan cevabı kuran şablon. */
   readonly render: (data: unknown) => string;
 }
+
+/** Sunucunun soruya iliştirdiği dosya kimliğini bulur. */
+const UPLOAD_ID_RE = /uploadid:\s*([0-9a-f-]{36})/i;
 
 const tl = (n: unknown): string => Number(n ?? 0).toLocaleString("tr-TR");
 
@@ -142,6 +148,42 @@ const RULES: readonly Rule[] = [
       return "Bu ada karşılık tek anlamlı bir firma bulunamadı; hangisini kastettiğinizi belirtir misiniz?";
     },
   },
+  {
+    // Dosya ekliyse içe aktarma önizlemesi. Demo modunda bile çalışır ki
+    // kullanıcı akışı model bağlanmadan görebilsin.
+    match: ["dosya", "aktar", "içe al", "yükledi", "csv", "listeyi"],
+    tool: "preview_partner_import",
+    input: {},
+    inputFrom: (q) => {
+      const m = UPLOAD_ID_RE.exec(q);
+      return m ? { uploadId: m[1], externalSystem: null } : null;
+    },
+    render: (d) => {
+      const p = d as {
+        filename: string;
+        totalRows: number;
+        validCount: number;
+        errorCount: number;
+        newCount: number;
+        updateCount: number;
+        sampleErrors: { line: number; message: string }[];
+      };
+      const lines = [
+        `${p.filename} okundu: ${p.totalRows} satır.`,
+        "",
+        `• ${p.newCount} yeni cari kartı açılacak`,
+        `• ${p.updateCount} mevcut kart güncellenecek`,
+      ];
+      if (p.errorCount > 0) {
+        lines.push(`• ${p.errorCount} satır aktarılamayacak:`);
+        for (const e of p.sampleErrors.slice(0, 3)) {
+          lines.push(`   ${e.line}. satır — ${e.message}`);
+        }
+      }
+      lines.push("", "Henüz hiçbir şey yazılmadı. Onaylıyor musunuz?");
+      return lines.join("\n");
+    },
+  },
 ];
 
 function textBlock(text: string): Anthropic.Beta.BetaContentBlock {
@@ -175,8 +217,14 @@ const NO_MATCH =
 
 export class ScriptedCompleter implements Completer {
   async complete(req: CompleteRequest): Promise<CompleteResult> {
-    const question = lastUserText(req.messages).toLocaleLowerCase("tr");
-    const rule = RULES.find((r) => r.match.some((m) => question.includes(m)));
+    const rawQuestion = lastUserText(req.messages);
+    const question = rawQuestion.toLocaleLowerCase("tr");
+    // Dosya ekliyse önce içe aktarma kuralına bak: "bu dosyadaki carileri al"
+    // cümlesi "cari" kelimesi yüzünden çözümleme kuralına takılıyordu.
+    const rules = UPLOAD_ID_RE.test(rawQuestion)
+      ? [...RULES].sort((a, b) => (a.inputFrom ? -1 : 0) - (b.inputFrom ? -1 : 0))
+      : RULES;
+    const rule = rules.find((r) => r.match.some((m) => question.includes(m)));
     const available = new Set(req.tools.map((t) => t.name));
 
     // Zaten bir tool sonucu geldiyse: cevabı kur.
@@ -209,7 +257,20 @@ export class ScriptedCompleter implements Completer {
       );
     }
 
-    return done(message([toolUse(rule.tool, rule.input)], "tool_use"));
+    const input = rule.inputFrom?.(rawQuestion) ?? rule.input;
+    if (rule.inputFrom && !rule.inputFrom(rawQuestion)) {
+      return done(
+        message(
+          [
+            textBlock(
+              "Hangi dosyayı kastettiğinizi göremiyorum. Ataç düğmesiyle bir CSV ekleyip tekrar sorun.",
+            ),
+          ],
+          "end_turn",
+        ),
+      );
+    }
+    return done(message([toolUse(rule.tool, input)], "tool_use"));
   }
 }
 

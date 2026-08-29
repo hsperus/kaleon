@@ -13,7 +13,7 @@
  *   3. KİMLİK — oturum zorunlu; yükleme yükleyenin tenant'ına bağlanır.
  */
 
-import { createContext, UnauthenticatedError, uploads } from "../../../src/server/context.js";
+import { createContext, UnauthenticatedError, uploadStoreFor } from "../../../src/server/context.js";
 import { MAX_UPLOAD_BYTES } from "../../../src/modules/import/uploads.js";
 import { parseCsv } from "../../../src/modules/import/csv.js";
 import { askThrottle } from "../../../src/server/throttle.js";
@@ -78,10 +78,9 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "Dosyada başlık satırı bulunamadı." }, { status: 422 });
   }
 
-  const uploadId = uploads.put({
+  const uploadId = await uploadStoreFor(ctx.tenant).put({
     filename: file.name,
     content,
-    tenantId: ctx.principal.tenantId,
     userId: ctx.principal.userId,
   });
 
