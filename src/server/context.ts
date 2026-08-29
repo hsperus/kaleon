@@ -1,12 +1,17 @@
 /**
  * İstek bağlamı — principal, tenant ve bağımlılıklar.
  *
- * GELİŞTİRME KİMLİĞİ HAKKINDA AÇIK UYARI:
- * Aşama 1'de Better Auth henüz bağlanmadı. Bu dosya, geliştirme sırasında rol
- * değiştirebilmek için istek başlığından rol okur. Bu davranış `NODE_ENV`
- * production olduğunda KAPALIDIR ve açılamaz — aksi hâlde herkes kendini
- * patron ilan edebilirdi. Üretimde principal yalnızca doğrulanmış oturumdan
- * gelir; o kod yolu Aşama 1'in kalan işidir.
+ * KİMLİK SIRASI:
+ *   1. Çerezdeki oturum (gerçek kimlik, `src/server/auth.ts`).
+ *   2. Yalnızca GELİŞTİRMEDE: `x-kaelon-dev-role` başlığı, demo verisiyle rol
+ *      davranışını göstermek için.
+ * Üretimde 2. yol yoktur ve açan bir bayrak da yoktur. Oturum çözülemezse
+ * `UnauthenticatedError` fırlar; uç noktalar bunu 401'e çevirir.
+ *
+ * VERİ DÜZLEMİ UYARISI:
+ * Kimlik gerçek, veri düzlemi bu derlemede hâlâ demo (`InMemoryDataSource`).
+ * Bu ayrım `dataPlane` alanıyla AÇIKÇA taşınır ve arayüzde gösterilir —
+ * çünkü gerçek bir oturumla girip demo veri görmek, uyarılmadıkça yanıltıcıdır.
  */
 
 import { createPrincipal } from "../kernel/rbac.js";
@@ -27,6 +32,7 @@ import { ScriptedCompleter } from "../ai/scripted.js";
 import { InMemoryLedger } from "../ai/ledger.js";
 import { SYSTEM_PROMPT } from "../ai/system-prompt.js";
 import { createWorkOrder } from "../modules/operations/work-order.js";
+import { principalFromSession } from "./auth.js";
 
 const DEV = process.env["NODE_ENV"] !== "production";
 
@@ -107,29 +113,53 @@ export interface RequestContext {
   readonly audit: AuditSink;
   readonly completer: Completer;
   readonly auditSink: InMemoryAuditSink;
+  /** Kimliğin nereden geldiği — arayüzde ve denetim kaydında görünür. */
+  readonly identitySource: "session" | "dev-header";
+  /** Verinin nereden geldiği. "demo" iken arayüz bunu açıkça yazar. */
+  readonly dataPlane: "demo" | "postgres";
 }
 
-function roleFromRequest(req: Request): RoleId {
-  if (!DEV) return "operator"; // üretimde başlıktan rol okunmaz
+/** Oturum yok/geçersiz. Uç noktalar 401 döner. */
+export class UnauthenticatedError extends Error {
+  constructor() {
+    super("Oturum bulunamadı veya süresi dolmuş.");
+    this.name = "UnauthenticatedError";
+  }
+}
+
+function devRole(req: Request): RoleId {
   const raw = req.headers.get("x-kaelon-dev-role");
-  const found = VALID_ROLES.find((r) => r === raw);
-  return found ?? "patron";
+  return VALID_ROLES.find((r) => r === raw) ?? "patron";
 }
 
-export function createContext(req: Request): RequestContext {
-  const role = roleFromRequest(req);
-  return {
-    principal: createPrincipal({
-      userId: "00000000-0000-0000-0000-0000000000de",
-      tenantId: DEMO_TENANT.tenantId,
-      roles: [role],
-      approvalLimit: { amount: 1_000_000, currency: "TRY" },
-    }),
+export async function createContext(req: Request): Promise<RequestContext> {
+  const shared = {
     tenant: DEMO_TENANT,
-    channel: "chat",
+    channel: "chat" as Channel,
     registry,
     audit,
     completer: getCompleter(),
     auditSink: audit as InMemoryAuditSink,
+    dataPlane: "demo" as const,
+  };
+
+  // 1. Gerçek oturum
+  const identity = await principalFromSession(req);
+  if (identity) {
+    return { ...shared, principal: identity.principal, identitySource: "session" };
+  }
+
+  // 2. Geliştirme rolü — üretimde bu satıra gelinmez.
+  if (!DEV) throw new UnauthenticatedError();
+
+  return {
+    ...shared,
+    identitySource: "dev-header",
+    principal: createPrincipal({
+      userId: "00000000-0000-0000-0000-0000000000de",
+      tenantId: DEMO_TENANT.tenantId,
+      roles: [devRole(req)],
+      approvalLimit: { amount: 1_000_000, currency: "TRY" },
+    }),
   };
 }
