@@ -13,6 +13,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
 import type { AppRouter } from "../src/server/router.js";
+import { PANEL_TOOLS, Panel, type PanelPayload } from "./panels.js";
+import type { RunEvent } from "../src/ai/runner.js";
 
 type Role =
   | "patron" | "cfo" | "ik_muduru" | "uretim_muduru"
@@ -42,6 +44,8 @@ interface Turn {
   readonly question: string;
   readonly answer: string | null;
   readonly toolCalls: readonly ToolCall[];
+  /** Şu an çalışan tool — kullanıcı boş ekrana bakmasın. */
+  readonly running: string | null;
 }
 
 function client(role: Role) {
@@ -62,6 +66,7 @@ export default function Page() {
   const [turns, setTurns] = useState<Turn[]>([]);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
+  const [panels, setPanels] = useState<PanelPayload[]>([]);
   const stageRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
@@ -81,29 +86,64 @@ export default function Page() {
       if (!question.trim() || busy) return;
       setBusy(true);
       setValue("");
-      setTurns((t) => [...t, { question, answer: null, toolCalls: [] }]);
+      setTurns((t) => [...t, { question, answer: null, toolCalls: [], running: null }]);
+
+      const patch = (fn: (t: Turn) => Turn) =>
+        setTurns((list) => {
+          const next = [...list];
+          next[next.length - 1] = fn(next[next.length - 1]!);
+          return next;
+        });
 
       try {
-        const res = await client(role).ask.mutate({ question });
-        setTurns((t) => {
-          const next = [...t];
-          const last = next[next.length - 1]!;
-          next[next.length - 1] = {
-            ...last,
-            answer: res.answer,
-            toolCalls: [...res.toolCalls],
-          };
-          return next;
+        const res = await fetch("/api/ask", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "x-kaelon-dev-role": role },
+          body: JSON.stringify({ question }),
         });
+        if (!res.body) throw new Error("Akış açılamadı");
+
+        const reader = res.body.getReader();
+        const decoder = new TextDecoder();
+        let buffer = "";
+
+        for (;;) {
+          const { done, value: chunk } = await reader.read();
+          if (done) break;
+          buffer += decoder.decode(chunk, { stream: true });
+          const lines = buffer.split("\n");
+          buffer = lines.pop() ?? "";
+
+          for (const line of lines) {
+            if (!line.trim()) continue;
+            const ev = JSON.parse(line) as RunEvent | { type: "error"; message: string };
+
+            if (ev.type === "tool_start") {
+              patch((t) => ({ ...t, running: ev.tool }));
+            } else if (ev.type === "tool_end") {
+              patch((t) => ({
+                ...t,
+                running: null,
+                toolCalls: [
+                  ...t.toolCalls,
+                  { tool: ev.tool, ok: ev.ok, durationMs: ev.durationMs, ...(ev.code ? { code: ev.code } : {}) },
+                ],
+              }));
+              if (ev.ok && PANEL_TOOLS.has(ev.tool) && ev.data !== undefined) {
+                setPanels((p) => [
+                  { tool: ev.tool, data: ev.data, sources: ev.sources ?? [] },
+                  ...p.filter((x) => x.tool !== ev.tool),
+                ]);
+              }
+            } else if (ev.type === "text") {
+              patch((t) => ({ ...t, answer: ev.text, running: null }));
+            } else if (ev.type === "error") {
+              patch((t) => ({ ...t, answer: `İstek tamamlanamadı: ${ev.message}`, running: null }));
+            }
+          }
+        }
       } catch (e) {
-        setTurns((t) => {
-          const next = [...t];
-          next[next.length - 1] = {
-            ...next[next.length - 1]!,
-            answer: `İstek tamamlanamadı: ${(e as Error).message}`,
-          };
-          return next;
-        });
+        patch((t) => ({ ...t, answer: `İstek tamamlanamadı: ${(e as Error).message}`, running: null }));
       } finally {
         setBusy(false);
         inputRef.current?.focus();
@@ -115,7 +155,7 @@ export default function Page() {
   const chatting = turns.length > 0;
 
   return (
-    <div className="shell">
+    <div className="shell" style={{ position: "relative" }}>
       <header className="topbar">
         <div className="brand">
           <i />
@@ -141,6 +181,7 @@ export default function Page() {
           onChange={(e) => {
             setRole(e.target.value as Role);
             setTurns([]);
+            setPanels([]);
           }}
           aria-label="Rol"
         >
@@ -152,7 +193,7 @@ export default function Page() {
         </select>
       </header>
 
-      <div className="stage" ref={stageRef}>
+      <div className={`stage${panels.length ? " shifted" : ""}`} ref={stageRef}>
         <div className="col">
           {!chatting && (
             <div className="hero">
@@ -190,6 +231,17 @@ export default function Page() {
             {turns.map((t, i) => (
               <div className="turn" key={i}>
                 <div className="ask">{t.question}</div>
+                {(t.toolCalls.length > 0 || t.running) && (
+                  <div className="calls">
+                    {t.toolCalls.map((c, k) => (
+                      <span className={`call${c.ok ? "" : " bad"}`} key={k}>
+                        {c.tool}
+                        {c.ok ? ` · ${c.durationMs}ms` : ` · ${c.code}`}
+                      </span>
+                    ))}
+                    {t.running && <span className="call live">{t.running} çalışıyor…</span>}
+                  </div>
+                )}
                 {t.answer === null ? (
                   <div className="think">
                     <i />
@@ -197,17 +249,7 @@ export default function Page() {
                   </div>
                 ) : (
                   <div className="reply">
-                    {t.toolCalls.length > 0 && (
-                      <div className="calls">
-                        {t.toolCalls.map((c, k) => (
-                          <span className={`call${c.ok ? "" : " bad"}`} key={k}>
-                            {c.tool}
-                            {c.ok ? ` · ${c.durationMs}ms` : ` · ${c.code}`}
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                    <div className="txt">{t.answer}</div>
+                    <Reveal text={t.answer} />
                   </div>
                 )}
               </div>
@@ -253,6 +295,51 @@ export default function Page() {
         </div>
         <div className="tail" style={{ height: chatting ? 0 : "18vh" }} />
       </div>
+
+      <aside className={`drawer${panels.length ? " open" : ""}`} aria-label="Paneller">
+        <div className="drawer-head">
+          <span className="t">Paneller</span>
+          <button className="panel-x" onClick={() => setPanels([])} aria-label="Tümünü kapat">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4" strokeLinecap="round">
+              <path d="M18 6L6 18M6 6l12 12" />
+            </svg>
+          </button>
+        </div>
+        <div className="drawer-body">
+          {panels.map((p) => (
+            <Panel
+              key={p.tool}
+              payload={p}
+              onClose={() => setPanels((list) => list.filter((x) => x.tool !== p.tool))}
+            />
+          ))}
+        </div>
+      </aside>
+    </div>
+  );
+}
+
+/**
+ * Kelime kelime beliriş.
+ *
+ * DÜRÜSTLÜK NOTU: bu bir sunum efektidir, akış değildir. Metin sunucudan tek
+ * parça gelir; buradaki kademeli beliriş okumayı kolaylaştırmak içindir.
+ * Gerçek model bağlandığında metin parça parça akacak ve aynı bileşen onu
+ * geldiği hızda gösterecek.
+ */
+function Reveal({ text }: { text: string }) {
+  const parts = text.split(/(\s+)/);
+  return (
+    <div className="txt">
+      {parts.map((p, i) =>
+        /^\s+$/.test(p) ? (
+          p
+        ) : (
+          <span className="w" key={i} style={{ animationDelay: `${Math.min(i * 0.014, 1.2)}s` }}>
+            {p}
+          </span>
+        ),
+      )}
     </div>
   );
 }
