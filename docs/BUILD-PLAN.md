@@ -86,7 +86,7 @@
 - **Kalan:** Boss Mode detay ekranları (Gerçek Kârlılık, İnsan ve Adalet),
   saha dokunmatik katmanı, gerçek oturum (Better Auth), gerçek model akışı
 
-### Aşama 5 — Entegrasyon katmanı (3-4 hafta)
+### Aşama 5 — Entegrasyon katmanı 🟡 BORU HATTI + İLK ADAPTÖR
 - Adapter deseni: `connect / sync / send / validate / normalize`
 - E-Fatura (tek standart entegratör), banka, PDKS, bordro
 - Raw Data Layer → Canonical Layer dönüşümü, `source_reference` bağı
@@ -96,8 +96,11 @@
 - **Tamam:** üç yönlü eşleştirme motoru (fiyat/miktar/mal kabul/mükerrer/para birimi),
   çift eşikli tolerans, bulgular parasal etkiye göre sıralı, Prisma kalıcılığı;
   mükerrer fatura VERİTABANI kısıtıyla korunuyor (eşzamanlı kayıt testi mevcut)
-- **Kalan:** entegratör adaptörleri (e-fatura, banka, PDKS), BullMQ kuyrukları,
-  gece belge hattı (Haiku + Batch API)
+- **Tamam (devam):** Raw Data Layer, senkron boru hattı (ham veri kanonik
+  dönüşümden ÖNCE saklanır), idempotency, hata sınıflandırması (network/auth/
+  data), üstel geri çekilme, Uyumsoft e-Fatura adaptörü (UBL-TR)
+- **Kalan:** banka ve PDKS adaptörleri, BullMQ kuyrukları ve zamanlama,
+  Prisma store adaptörü, gece belge hattı (Haiku + Batch API)
 
 ### Aşama 6 — Approval Workspace 🟡 DURUM MAKİNESİ TAMAM
 - Sekiz durumlu state machine, çoklu onay seviyeleri
