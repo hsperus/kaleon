@@ -11,6 +11,7 @@ import { procedure, router } from "./trpc.js";
 import { runConversation } from "../ai/runner.js";
 import { MODEL_CONNECTED, ROLE_LABEL } from "./context.js";
 import { GOLDEN_QUESTIONS } from "../eval/golden.js";
+import { buildBriefing } from "../modules/briefing/engine.js";
 
 export const appRouter = router({
   /** Oturum bilgisi: kim, hangi rolde, hangi tool'ları görebiliyor. */
@@ -50,6 +51,31 @@ export const appRouter = router({
       );
       return result;
     }),
+
+  /**
+   * Boss Mode brifingi.
+   *
+   * Ekranın doluluğu buradan gelir — sabit metin değil, eşik hesabı.
+   * Nöbetçiler kullanıcının kendi yetkisiyle koşar; rol değişince hem
+   * koşan nöbetçiler hem çıkan sinyaller değişir.
+   */
+  briefing: procedure.query(async ({ ctx }) => {
+    const b = await buildBriefing(
+      { registry: ctx.registry, audit: ctx.audit },
+      {
+        principal: ctx.principal,
+        tenant: ctx.tenant,
+        correlationId: crypto.randomUUID(),
+        channel: "job",
+      },
+    );
+    return {
+      level: b.level,
+      signals: b.signals,
+      ran: b.ran,
+      skipped: b.skippedByPermission,
+    };
+  }),
 
   /** Son audit kayıtları — "her tool çağrısı iz bırakır" iddiasının kanıtı. */
   auditTrail: procedure.query(({ ctx }) =>

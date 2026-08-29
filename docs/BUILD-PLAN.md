@@ -80,8 +80,11 @@
 - **Tamam (devam):** NDJSON akış uç noktası, ajan döngüsünden canlı ilerleme
   olayları (tool_start/tool_end/text/done), panel çekmecesi (5 tool için
   yapılandırılmış görünüm), kelime kelime beliriş
-- **Kalan:** Boss Mode ekranları, saha dokunmatik katmanı, gerçek oturum
-  (Better Auth), gerçek model akışı (API anahtarı gerektirir)
+- **Tamam (devam):** Boss Mode brifing motoru — nöbetçiler eşik hesabıyla
+  seviye üretiyor, ana ekranın doluluğu sabit metin değil bu hesabın çıktısı;
+  proaktiflik ROLE bağlı (izni olmayan role nöbetçi hiç koşmuyor)
+- **Kalan:** Boss Mode detay ekranları (Gerçek Kârlılık, İnsan ve Adalet),
+  saha dokunmatik katmanı, gerçek oturum (Better Auth), gerçek model akışı
 
 ### Aşama 5 — Entegrasyon katmanı (3-4 hafta)
 - Adapter deseni: `connect / sync / send / validate / normalize`
