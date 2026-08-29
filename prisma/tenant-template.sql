@@ -229,6 +229,7 @@ CREATE TABLE "invoices" (
     "match_status" TEXT NOT NULL DEFAULT 'pending',
     "total_variance" DECIMAL(18,4),
     "matched_at" TIMESTAMP(3),
+    "raw_payload_id" UUID,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "invoices_pkey" PRIMARY KEY ("id")
@@ -296,6 +297,51 @@ CREATE TABLE "approval_events" (
     "seq" INTEGER NOT NULL,
 
     CONSTRAINT "approval_events_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "raw_payloads" (
+    "id" UUID NOT NULL,
+    "source" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "external_id" TEXT NOT NULL,
+    "received_at" TIMESTAMP(3) NOT NULL,
+    "payload" JSONB NOT NULL,
+    "checksum" TEXT NOT NULL,
+    "status" TEXT NOT NULL DEFAULT 'pending',
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "raw_payloads_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "sync_runs" (
+    "id" UUID NOT NULL,
+    "source" TEXT NOT NULL,
+    "kind" TEXT NOT NULL,
+    "started_at" TIMESTAMP(3) NOT NULL,
+    "finished_at" TIMESTAMP(3),
+    "status" TEXT NOT NULL,
+    "fetched" INTEGER NOT NULL DEFAULT 0,
+    "created" INTEGER NOT NULL DEFAULT 0,
+    "skipped" INTEGER NOT NULL DEFAULT 0,
+    "failed" INTEGER NOT NULL DEFAULT 0,
+    "error" TEXT,
+
+    CONSTRAINT "sync_runs_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "integration_errors" (
+    "id" UUID NOT NULL,
+    "raw_payload_id" UUID NOT NULL,
+    "stage" TEXT NOT NULL,
+    "code" TEXT NOT NULL,
+    "message" TEXT NOT NULL,
+    "at" TIMESTAMP(3) NOT NULL,
+    "resolved_at" TIMESTAMP(3),
+
+    CONSTRAINT "integration_errors_pkey" PRIMARY KEY ("id")
 );
 
 -- CreateIndex
@@ -403,6 +449,21 @@ CREATE INDEX "approval_events_workspace_id_idx" ON "approval_events"("workspace_
 -- CreateIndex
 CREATE UNIQUE INDEX "approval_events_workspace_id_seq_key" ON "approval_events"("workspace_id", "seq");
 
+-- CreateIndex
+CREATE INDEX "raw_payloads_kind_status_idx" ON "raw_payloads"("kind", "status");
+
+-- CreateIndex
+CREATE INDEX "raw_payloads_received_at_idx" ON "raw_payloads"("received_at");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "raw_payloads_source_external_id_key" ON "raw_payloads"("source", "external_id");
+
+-- CreateIndex
+CREATE INDEX "sync_runs_source_started_at_idx" ON "sync_runs"("source", "started_at");
+
+-- CreateIndex
+CREATE INDEX "integration_errors_resolved_at_idx" ON "integration_errors"("resolved_at");
+
 -- AddForeignKey
 ALTER TABLE "partner_aliases" ADD CONSTRAINT "partner_aliases_partner_id_fkey" FOREIGN KEY ("partner_id") REFERENCES "partners"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -426,4 +487,7 @@ ALTER TABLE "invoice_findings" ADD CONSTRAINT "invoice_findings_invoice_id_fkey"
 
 -- AddForeignKey
 ALTER TABLE "approval_events" ADD CONSTRAINT "approval_events_workspace_id_fkey" FOREIGN KEY ("workspace_id") REFERENCES "approval_workspaces"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "integration_errors" ADD CONSTRAINT "integration_errors_raw_payload_id_fkey" FOREIGN KEY ("raw_payload_id") REFERENCES "raw_payloads"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

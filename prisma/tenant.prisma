@@ -320,6 +320,9 @@ model Invoice {
   matchStatus   String   @default("pending") @map("match_status")
   totalVariance Decimal? @map("total_variance") @db.Decimal(18, 4)
   matchedAt     DateTime? @map("matched_at")
+  /// KAYNAK İZLENEBİLİRLİĞİ: bu kanonik kayıt hangi ham belgeden türedi.
+  /// "Bu rakam nereden geldi?" sorusunun zincirdeki son halkası.
+  rawPayloadId  String?  @map("raw_payload_id") @db.Uuid
   createdAt     DateTime @default(now()) @map("created_at")
 
   lines    InvoiceLine[]
@@ -411,4 +414,70 @@ model ApprovalEvent {
   @@unique([workspaceId, seq])
   @@index([workspaceId])
   @@map("approval_events")
+}
+
+// ─────────────────────────── Integration Layer ───────────────────────────
+
+/**
+ * Ham veri katmanı (Raw Data Layer).
+ *
+ * Entegratörden gelen veri OLDUĞU GİBİ saklanır — hiçbir dönüşüm yapılmadan.
+ * Amaç kaynak kanıtını korumaktır: vergi denetiminde, müşteri itirazında veya
+ * hukuki uyuşmazlıkta orijinal belge gerekir. Kanonik kayıt bozulsa bile
+ * ham veriden yeniden üretilebilir.
+ */
+model RawPayload {
+  id         String   @id @default(uuid()) @db.Uuid
+  source     String
+  kind       String
+  /// Entegratördeki belge kimliği — idempotency anahtarı.
+  externalId String   @map("external_id")
+  receivedAt DateTime @map("received_at")
+  payload    Json
+  /// İçeriğin parmak izi; aynı belge değişmiş mi anlamak için.
+  checksum   String
+  /// Kanonik dönüşüm durumu: pending | transformed | failed
+  status     String   @default("pending")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  errors IntegrationError[]
+
+  @@unique([source, externalId])
+  @@index([kind, status])
+  @@index([receivedAt])
+  @@map("raw_payloads")
+}
+
+/// Senkronizasyon koşusu — ne zaman, ne kadar, ne oldu.
+model SyncRun {
+  id         String    @id @default(uuid()) @db.Uuid
+  source     String
+  kind       String
+  startedAt  DateTime  @map("started_at")
+  finishedAt DateTime? @map("finished_at")
+  status     String
+  fetched    Int       @default(0)
+  created    Int       @default(0)
+  skipped    Int       @default(0)
+  failed     Int       @default(0)
+  error      String?
+
+  @@index([source, startedAt])
+  @@map("sync_runs")
+}
+
+/// Dönüşüm hatası — ham veri durur, kanonik kayıt oluşmaz, insan inceler.
+model IntegrationError {
+  id           String   @id @default(uuid()) @db.Uuid
+  rawPayloadId String   @map("raw_payload_id") @db.Uuid
+  stage        String
+  code         String
+  message      String
+  at           DateTime
+  resolvedAt   DateTime? @map("resolved_at")
+
+  rawPayload RawPayload @relation(fields: [rawPayloadId], references: [id], onDelete: Cascade)
+
+  @@index([resolvedAt])
+  @@map("integration_errors")
 }
