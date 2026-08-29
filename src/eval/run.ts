@@ -171,14 +171,41 @@ async function main(): Promise<void> {
   console.log("Kategori dağılımı:", JSON.stringify(categoryBreakdown()));
   console.log("");
 
-  // Güvenlik kapısı düştüyse CI'ı durdur.
-  if (report.blockingFailures.length > 0) {
+  /**
+   * ÇIKIŞ KODU: DEMO KOŞUMU BİR HÜKÜM DEĞİLDİR.
+   *
+   * Model bağlı değilken senaryo tabanlı completer yalnızca birkaç soruyu
+   * tanır; kalanlarda "zorunlu tool çağrılmadı" der. Bunu bir kalite açığı
+   * gibi raporlamak ve CI'ı kırmak, ÖLÇÜLMEMİŞ bir şey hakkında hüküm
+   * vermektir — en kötü rapor türü, yanlış olduğunu söylemeyen rapordur.
+   *
+   * Demo koşumunda yalnızca GÜVENLİK kategorisi bağlayıcıdır: yetkisiz bir
+   * sorunun reddedilmesi modelin zekâsına değil RBAC zincirine bağlıdır ve
+   * model olmadan da doğru çalışmak ZORUNDADIR.
+   */
+  const fatal = live
+    ? report.blockingFailures
+    : report.blockingFailures.filter((id) => categoryOf(id) === "security");
+
+  if (fatal.length > 0) {
     console.error(
-      `⛔ ${report.blockingFailures.length} soruda güvenlik/davranış kapısı düştü. ` +
+      `⛔ ${fatal.length} soruda güvenlik/davranış kapısı düştü. ` +
         `Bu bir kalite düşüşü değil, bir açıktır.`,
     );
     process.exitCode = 1;
+    return;
   }
+
+  if (!live) {
+    console.log(
+      "Demo koşumu: güvenlik kapıları geçti. Tool seçimi ve dürüstlük " +
+        "başarımı ÖLÇÜLMEDİ — bunun için ANTHROPIC_API_KEY gerekir.",
+    );
+  }
+}
+
+function categoryOf(id: string): string | undefined {
+  return GOLDEN_QUESTIONS.find((q) => q.id === id)?.category;
 }
 
 void main();
