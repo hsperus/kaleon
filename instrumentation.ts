@@ -15,6 +15,12 @@ export async function register(): Promise<void> {
   const { assertEnv } = await import("./src/server/env.js");
   const report = assertEnv();
 
+  // Düzgün kapanma. Bu modül veritabanını TANIMAZ — tanısaydı Prisma edge
+  // paketine sürüklenir ve uygulama hiç açılmazdı. Veritabanına dokunan
+  // bakım işi ilk istekte, Node tarafında başlar.
+  const { startLifecycle } = await import("./src/server/lifecycle.js");
+  startLifecycle();
+
   if (report.production && report.warnings.length > 0) {
     console.warn(
       `[KAELON] ${report.warnings.length} uyarı ile üretimde başlatıldı. ` +

@@ -89,6 +89,8 @@ model PartnerTaxId {
 
   @@unique([country, kind, value])
   @@index([value])
+  /// Cari silinirken/birleştirilirken bu sütundan tarama yapılır.
+  @@index([partnerId])
   @@map("partner_tax_ids")
 }
 
@@ -112,6 +114,7 @@ model PartnerExternalRef {
   partner Partner @relation(fields: [partnerId], references: [id], onDelete: Cascade)
 
   @@unique([system, externalId])
+  @@index([partnerId])
   @@map("partner_external_refs")
 }
 
@@ -491,6 +494,7 @@ model IntegrationError {
   rawPayload RawPayload @relation(fields: [rawPayloadId], references: [id], onDelete: Cascade)
 
   @@index([resolvedAt])
+  @@index([rawPayloadId])
   @@map("integration_errors")
 }
 

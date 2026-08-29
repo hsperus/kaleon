@@ -22,6 +22,9 @@
  */
 
 import type { ShipmentRisk, WithFreshness } from "../data/port.js";
+import { toMoney } from "./decimal.js";
+import { limitCaveat } from "./query-limits.js";
+import { MAX_ROWS } from "./query-limits.js";
 import type { TenantDb } from "./client.js";
 
 /** Tarihi bilinemeyen sipariş — sessizce "risksiz" sayılmaz. */
@@ -67,7 +70,9 @@ export class PrismaShipmentSource {
     this.#db = db;
   }
 
-  async analyze(): Promise<ShipmentAnalysis & { freshness: { syncedAt: string } }> {
+  async analyze(): Promise<
+    ShipmentAnalysis & { freshness: { syncedAt: string }; scanned: number }
+  > {
     const orders = await this.#db.salesOrder.findMany({
       where: { status: "open" },
       include: {
@@ -79,6 +84,7 @@ export class PrismaShipmentSource {
         },
       },
       orderBy: { committedDate: "asc" },
+      take: MAX_ROWS,
     });
 
     const risks: ShipmentRisk[] = [];
@@ -126,8 +132,8 @@ export class PrismaShipmentSource {
         slipDays: days,
         penaltyRiskTry: penaltyFor(
           days,
-          order.penaltyPerDay === null ? null : Number(order.penaltyPerDay),
-          order.penaltyCap === null ? null : Number(order.penaltyCap),
+          toMoney(order.penaltyPerDay),
+          toMoney(order.penaltyCap),
         ),
       });
     }
@@ -138,17 +144,22 @@ export class PrismaShipmentSource {
     return {
       risks,
       unknown,
+      scanned: orders.length,
       freshness: { syncedAt: (newest ?? new Date()).toISOString() },
     };
   }
 
   async shipmentRisks(): Promise<WithFreshness<readonly ShipmentRisk[]>> {
-    const { risks, unknown, freshness } = await this.analyze();
+    const { risks, unknown, freshness, scanned } = await this.analyze();
     return {
       rows: risks,
       freshness: { ...freshness, recordCount: risks.length },
       // Tarihi bilinemeyen siparişler cevabın parçasıdır, dipnotu değil.
-      caveats: unknown.length === 0 ? [] : [describeUnknown(unknown)],
+      caveats: [
+        ...(unknown.length === 0 ? [] : [describeUnknown(unknown)]),
+        // Sınıra dayanıldıysa cevabın eksik olabileceği SÖYLENİR.
+        ...(limitCaveat(scanned, "Açık siparişler") ? [limitCaveat(scanned, "Açık siparişler")!] : []),
+      ],
     };
   }
 }

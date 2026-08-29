@@ -509,7 +509,13 @@ CREATE UNIQUE INDEX "partner_aliases_partner_id_normalized_key" ON "partner_alia
 CREATE INDEX "partner_tax_ids_value_idx" ON "partner_tax_ids"("value");
 
 -- CreateIndex
+CREATE INDEX "partner_tax_ids_partner_id_idx" ON "partner_tax_ids"("partner_id");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "partner_tax_ids_country_kind_value_key" ON "partner_tax_ids"("country", "kind", "value");
+
+-- CreateIndex
+CREATE INDEX "partner_external_refs_partner_id_idx" ON "partner_external_refs"("partner_id");
 
 -- CreateIndex
 CREATE UNIQUE INDEX "partner_external_refs_system_external_id_key" ON "partner_external_refs"("system", "external_id");
@@ -609,6 +615,9 @@ CREATE INDEX "sync_runs_source_started_at_idx" ON "sync_runs"("source", "started
 
 -- CreateIndex
 CREATE INDEX "integration_errors_resolved_at_idx" ON "integration_errors"("resolved_at");
+
+-- CreateIndex
+CREATE INDEX "integration_errors_raw_payload_id_idx" ON "integration_errors"("raw_payload_id");
 
 -- CreateIndex
 CREATE INDEX "bank_accounts_currency_idx" ON "bank_accounts"("currency");

@@ -22,6 +22,8 @@
 
 import type { OvertimeRecord, WithFreshness } from "../data/port.js";
 import { fold } from "../modules/master-data/normalize.js";
+import { toMoney } from "./decimal.js";
+import { MAX_ROWS, limitCaveat } from "./query-limits.js";
 import type { TenantDb } from "./client.js";
 
 export interface OvertimeQuery {
@@ -74,6 +76,7 @@ export class PrismaAttendanceSource {
         },
       },
       orderBy: { workDate: "asc" },
+      take: MAX_ROWS,
     });
 
     // Ad araması veritabanında değil burada: normalize edilmiş sütun
@@ -98,7 +101,7 @@ export class PrismaAttendanceSource {
           weekdayMinutes: 0,
           weekendMinutes: 0,
           pendingApprovalMinutes: 0,
-          grossSalaryTry: emp.grossSalary === null ? 0 : Number(emp.grossSalary),
+          grossSalaryTry: toMoney(emp.grossSalary) ?? 0,
         };
 
       // Hafta sonu/tatilde çalışılan sürenin TAMAMI fazla mesaidir;
@@ -134,12 +137,15 @@ export class PrismaAttendanceSource {
       null,
     );
 
+    const limited = limitCaveat(days.length, "Puantaj kayıtları");
+
     return {
       rows,
       freshness: {
         syncedAt: (latest ?? to).toISOString(),
         recordCount: rows.length,
       },
+      ...(limited ? { caveats: [limited] } : {}),
     };
   }
 }

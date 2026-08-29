@@ -23,6 +23,7 @@
  */
 
 import type { StationLoad, WipSnapshot, WithFreshness } from "../data/port.js";
+import { MAX_ROWS, limitCaveat } from "./query-limits.js";
 import type { TenantDb } from "./client.js";
 
 /** İş emri operasyonunun "şu an tezgâhta" sayıldığı durumlar. */
@@ -50,6 +51,7 @@ export class PrismaWipSource {
           workOrder: { status: { in: ACTIVE_WORK_ORDER_STATES } },
         },
         select: { workCenter: true, state: true },
+        take: MAX_ROWS,
       }),
       this.#db.workCenter.findMany({ where: { isActive: true } }),
       this.#db.machine.findMany({
@@ -92,6 +94,9 @@ export class PrismaWipSource {
         };
       })
       .sort((a, b) => b.activeOrders - a.activeOrders);
+
+    const limited = limitCaveat(operations.length, "Aktif operasyonlar");
+    if (limited) caveats.push(limited);
 
     if (uncapacitated.length > 0) {
       caveats.push(

@@ -81,19 +81,17 @@ export const appRouter = router({
   }),
 
   /** Son audit kayıtları — "her tool çağrısı iz bırakır" iddiasının kanıtı. */
-  auditTrail: procedure.query(({ ctx }) =>
-    ctx.auditSink.entries
-      .slice(-25)
-      .reverse()
-      .map((e) => ({
-        at: e.at,
-        toolName: e.toolName,
-        outcome: e.outcome,
-        roles: e.roles,
-        durationMs: e.durationMs,
-        errorCode: e.errorCode ?? null,
-      })),
-  ),
+  auditTrail: procedure.query(async ({ ctx }) => {
+    const entries = await ctx.recentAudit(25);
+    return entries.map((e) => ({
+      at: e.at,
+      toolName: e.toolName,
+      outcome: e.outcome,
+      roles: e.roles,
+      durationMs: e.durationMs,
+      errorCode: e.errorCode ?? null,
+    }));
+  }),
 
   /** Golden question seti — arayüzde deneme soruları olarak da kullanılır. */
   goldenQuestions: procedure.query(() =>

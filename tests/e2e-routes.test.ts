@@ -176,3 +176,66 @@ describe.skipIf(!enabled)("uçtan uca yollar", () => {
     expect(res.status).toBe(400);
   }, 30_000);
 });
+
+/**
+ * DENETİM KAYDI VERİTABANINA YAZILIYOR MU?
+ *
+ * Bu testin sebebi gerçek bir kusur: `PostgresAuditSink` yazılmış, tablosu
+ * tetikleyicilerle değiştirilemez hâle getirilmiş, testleri yazılmıştı —
+ * ama uygulama onu HİÇ ÇAĞIRMIYORDU. Bütün izler bellekteki bir diziye
+ * gidiyor, sunucu yeniden başlayınca yok oluyordu.
+ *
+ * Değişmezlik tiyatrosu, hiç kayıt tutmamaktan tehlikelidir: kimse kaydın
+ * olmadığını fark etmez. Bu test, bellek adaptörüne geri dönülürse KIRILIR.
+ */
+describe.skipIf(!enabled)("denetim kaydı kalıcılığı", () => {
+  it("her tool çağrısı TENANT ŞEMASINA yazılır", async () => {
+    const { tenantClient } = await import("../src/db/client.js");
+    const db = sharedClient();
+    const demo = await db.tenant.findFirstOrThrow({ where: { slug: "demo" } });
+    const tdb = tenantClient(demo.schemaName);
+
+    const before = await tdb.auditEntry.count();
+
+    const l = await login(
+      req("/api/auth/login", {
+        method: "POST",
+        body: JSON.stringify({ email: EMAIL, password: PASSWORD }),
+      }),
+    );
+    const cookie = cookieFrom(l);
+    const res = await ask(
+      req("/api/ask", {
+        method: "POST",
+        cookie,
+        body: JSON.stringify({ question: "Bankada ne kadar param var?" }),
+      }),
+    );
+    await res.text();
+
+    const after = await tdb.auditEntry.count();
+    expect(after, "denetim kaydı veritabanına yazılmadı").toBeGreaterThan(before);
+
+    const last = await tdb.auditEntry.findFirst({ orderBy: { at: "desc" } });
+    expect(last?.toolName).toBeTruthy();
+    expect(last?.correlationId).toBeTruthy();
+    // Kim, hangi rolle, hangi yetki seviyesinde — üçü de kayıtta olmalı.
+    expect(last?.userId).toBeTruthy();
+    expect(last?.roles.length).toBeGreaterThan(0);
+    expect(typeof last?.authority).toBe("number");
+  }, 30_000);
+
+  it("DENETİM KAYDI DEĞİŞTİRİLEMEZ — veritabanı reddeder", async () => {
+    const { tenantClient } = await import("../src/db/client.js");
+    const db = sharedClient();
+    const demo = await db.tenant.findFirstOrThrow({ where: { slug: "demo" } });
+    const tdb = tenantClient(demo.schemaName);
+    const row = await tdb.auditEntry.findFirst({ orderBy: { at: "desc" } });
+    if (!row) return;
+
+    await expect(
+      tdb.auditEntry.update({ where: { id: row.id }, data: { outcome: "degistirildi" } }),
+    ).rejects.toThrow();
+    await expect(tdb.auditEntry.delete({ where: { id: row.id } })).rejects.toThrow();
+  }, 30_000);
+});

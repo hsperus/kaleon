@@ -16,7 +16,8 @@
 
 import { createPrincipal } from "../kernel/rbac.js";
 import type { Channel, Principal, RoleId, TenantContext } from "../kernel/types.js";
-import { InMemoryAuditSink, type AuditSink } from "../kernel/audit.js";
+import { InMemoryAuditSink, type AuditEntry, type AuditSink } from "../kernel/audit.js";
+import { PostgresAuditSink } from "../db/audit-sink.js";
 import { InMemoryDataSource } from "../data/memory.js";
 import { InMemoryOperationsRepository } from "../modules/operations/repository.js";
 import {
@@ -33,6 +34,7 @@ import { InMemoryLedger } from "../ai/ledger.js";
 import { SYSTEM_PROMPT } from "../ai/system-prompt.js";
 import { createWorkOrder } from "../modules/operations/work-order.js";
 import { principalFromSession } from "./auth.js";
+import { startMaintenance } from "./maintenance.js";
 import { sharedClient, tenantClient } from "../db/client.js";
 import { PrismaDataSource } from "../db/master-data-source.js";
 import { PrismaOperationsRepository } from "../db/operations-repository.js";
@@ -94,7 +96,28 @@ export const MODEL_CONNECTED = Boolean(process.env["ANTHROPIC_API_KEY"]);
 const operations = new InMemoryOperationsRepository({ bomRevisions: { "FR-22": "R3" } });
 const documents = new InMemoryDocumentsRepository();
 const approvals = new InMemoryApprovalRepository();
-const audit: AuditSink = new InMemoryAuditSink();
+/**
+ * DENETİM KAYDI VERİTABANINA YAZILIR.
+ *
+ * Burada uzun süre `InMemoryAuditSink` duruyordu ve bu projenin en ciddi
+ * kusuruydu: `PostgresAuditSink` yazılmış, tablosu tetikleyicilerle
+ * değiştirilemez hâle getirilmiş, testleri yazılmıştı — ama uygulama onu
+ * HİÇ ÇAĞIRMIYORDU. Her tool çağrısının izi bellekteki bir diziye gidiyor,
+ * sunucu yeniden başlayınca yok oluyordu.
+ *
+ * "İz bırakmayan eylem yok" iddiası, izin kalıcı olmasına bağlıdır.
+ * Değişmezlik tiyatrosu, hiç kayıt tutmamaktan daha tehlikelidir: kimse
+ * kaydın olmadığını fark etmez.
+ */
+const auditByTenant = new Map<string, PostgresAuditSink>();
+
+function auditFor(tenant: TenantContext): PostgresAuditSink {
+  const cached = auditByTenant.get(tenant.tenantId);
+  if (cached) return cached;
+  const sink = new PostgresAuditSink(tenantClient(tenant.schema));
+  auditByTenant.set(tenant.tenantId, sink);
+  return sink;
+}
 const ledger = new InMemoryLedger();
 
 async function seedDemo(tenantId: string): Promise<void> {
@@ -269,7 +292,8 @@ export interface RequestContext {
   readonly registry: ToolRegistry;
   readonly audit: AuditSink;
   readonly completer: Completer;
-  readonly auditSink: InMemoryAuditSink;
+  /** Son kayıtları okumak için — arayüzdeki denetim izi paneli. */
+  readonly recentAudit: (limit?: number) => Promise<readonly AuditEntry[]>;
   readonly conversations: ConversationRepository;
   /** Kimliğin nereden geldiği — arayüzde ve denetim kaydında görünür. */
   readonly identitySource: "session" | "dev-header";
@@ -301,11 +325,13 @@ function devRole(req: Request): RoleId {
 }
 
 export async function createContext(req: Request): Promise<RequestContext> {
+  // Bakım işi ilk istekte başlar. `instrumentation.ts` içinden başlatmak,
+  // Prisma'yı edge paketine sürükleyip uygulamayı açılmaz hâle getiriyordu.
+  startMaintenance();
+
   const base = {
     channel: "chat" as Channel,
-    audit,
     completer: getCompleter(),
-    auditSink: audit as InMemoryAuditSink,
   };
 
   // 1. Gerçek oturum
@@ -321,6 +347,8 @@ export async function createContext(req: Request): Promise<RequestContext> {
       ...base,
       registry: registryFor(tenant, isDemo),
       conversations: conversationsFor(tenant, isDemo),
+      audit: auditFor(tenant),
+      recentAudit: (limit) => auditFor(tenant).recent(tenant.tenantId, limit),
       tenant,
       principal: identity.principal,
       identitySource: "session",
@@ -338,6 +366,8 @@ export async function createContext(req: Request): Promise<RequestContext> {
     ...base,
     registry: registryFor(tenant, true),
     conversations: conversationsFor(tenant, true),
+    audit: auditFor(tenant),
+    recentAudit: (limit) => auditFor(tenant).recent(tenant.tenantId, limit),
     tenant,
     identitySource: "dev-header",
     displayName: "Cebrail Karaarslan (demo)",

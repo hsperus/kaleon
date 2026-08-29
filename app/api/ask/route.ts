@@ -20,6 +20,7 @@ import { runConversation, type RunEvent } from "../../../src/ai/runner.js";
 import { createContext, ROLE_LABEL, UnauthenticatedError } from "../../../src/server/context.js";
 import { recentTurns, titleFrom } from "../../../src/modules/conversation/repository.js";
 import { askThrottle } from "../../../src/server/throttle.js";
+import { log } from "../../../src/server/log.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -88,6 +89,8 @@ export async function POST(req: Request): Promise<Response> {
 
   const encoder = new TextEncoder();
   const activeConversationId = conversationId;
+  const correlationId = crypto.randomUUID();
+  const startedAt = Date.now();
 
   const stream = new ReadableStream<Uint8Array>({
     async start(controller) {
@@ -115,7 +118,7 @@ export async function POST(req: Request): Promise<Response> {
             question: questionWithFile,
             principal: ctx.principal,
             tenant: ctx.tenant,
-            correlationId: crypto.randomUUID(),
+            correlationId,
             channel: ctx.channel,
             task: "lookup",
             display: {
@@ -129,6 +132,17 @@ export async function POST(req: Request): Promise<Response> {
           },
         );
 
+        log.info("soru tamamlandı", {
+          correlationId,
+          tenantId: ctx.principal.tenantId,
+          userId: ctx.principal.userId,
+          route: "/api/ask",
+          durationMs: Date.now() - startedAt,
+          toolCount: result.toolCalls.length,
+          stopReason: result.stopReason,
+          costUsd: result.costUsd,
+        });
+
         // Turu ancak GERÇEKTEN cevap üretildiyse kaydet. Boş veya iptal
         // edilmiş bir turu geçmişe yazmak, sonraki soruları bozar.
         if (result.answer.trim() && result.stopReason !== "aborted") {
@@ -137,7 +151,19 @@ export async function POST(req: Request): Promise<Response> {
             .catch(() => undefined);
         }
       } catch (e) {
-        send({ type: "error", message: (e as Error).message });
+        // Kullanıcıya teknik ayrıntı değil, logdaki satırı bulmaya yarayan
+        // bir referans gider.
+        const ref = log.fail("soru işlenemedi", e, {
+          correlationId,
+          tenantId: ctx.principal.tenantId,
+          userId: ctx.principal.userId,
+          route: "/api/ask",
+          durationMs: Date.now() - startedAt,
+        });
+        send({
+          type: "error",
+          message: `İstek tamamlanamadı. Destek kodu: ${ref}`,
+        });
       } finally {
         closed = true;
         try {

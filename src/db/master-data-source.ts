@@ -30,6 +30,7 @@ import { isValidTckn, isValidVkn } from "../modules/master-data/identifiers.js";
 import { PrismaAttendanceSource } from "./attendance-source.js";
 import { PrismaShipmentSource } from "./shipment-source.js";
 import { PrismaWipSource } from "./wip-source.js";
+import { toMoneyRequired } from "./decimal.js";
 import type { TenantDb } from "./client.js";
 
 /** Bir sorguda belleğe alınacak en fazla aday. */
@@ -225,8 +226,9 @@ export class PrismaBankSource {
       rows.push({
         bank: acc.bank,
         currency: acc.currency,
-        available: Number(snap.available),
-        blocked: Number(snap.blocked),
+        // Sessiz hassasiyet kaybı yerine gürültülü hata: bkz. decimal.ts
+        available: toMoneyRequired(snap.available, "bakiye"),
+        blocked: toMoneyRequired(snap.blocked, "blokeli tutar"),
       });
       if (!oldest || snap.asOf < oldest) oldest = snap.asOf;
     }
