@@ -1,0 +1,1041 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>KAELON · Arayüz Kiti</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+/* ═══════════════════════════════════════════════════════════════════
+   AŞAĞIDAKİ CSS, KAELON'un app/globals.css DOSYASININ BİREBİR KOPYASIDIR.
+   Değiştirdiğiniz her şey doğrudan uygulamaya taşınabilir.
+   Galeriye özel stiller en sonda, ayrı bir blokta.
+   ═══════════════════════════════════════════════════════════════════ */
+/* KAELON hareket dili — yay fiziği. Prototipteki eğrilerin aynısı. */
+:root {
+  --spring-soft: linear(0, .0118 2.17%, .043 4.35%, .0877 6.52%, .1415 8.7%, .2008 10.87%, .2629 13.04%, .3257 15.22%, .3875 17.39%, .4472 19.57%, .5041 21.74%, .5575 23.91%, .6071 26.09%, .6529 28.26%, .6947 30.43%, .7326 32.61%, .7668 34.78%, .7975 36.96%, .8248 39.13%, .8491 41.3%, .8705 43.48%, .8894 45.65%, .9058 47.83%, .9202 50%, .9327 52.17%, .9435 54.35%, .9527 56.52%, .9607 58.7%, .9675 60.87%, .9733 63.04%, .9782 65.22%, .9823 67.39%, .9858 69.57%, .9887 71.74%, .9911 73.91%, .9931 76.09%, .9947 78.26%, .996 80.43%, .9971 82.61%, .998 84.78%, .9987 86.96%, .9992 89.13%, .9996 91.3%, .9999 93.48%, 1.0002 95.65%, 1.0004 97.83%, 1);
+  --spring: linear(0, .0191 2.17%, .0687 4.35%, .1391 6.52%, .2222 8.7%, .3118 10.87%, .4028 13.04%, .4917 15.22%, .5756 17.39%, .653 19.57%, .7226 21.74%, .7841 23.91%, .8372 26.09%, .8824 28.26%, .9199 30.43%, .9506 32.61%, .9749 34.78%, .9938 36.96%, 1.008 39.13%, 1.0182 41.3%, 1.025 43.48%, 1.0292 45.65%, 1.0312 47.83%, 1.0315 50%, 1.0306 52.17%, 1.0288 54.35%, 1.0265 56.52%, 1.0238 58.7%, 1.021 60.87%, 1.0181 63.04%, 1.0153 65.22%, 1.0127 67.39%, 1.0103 69.57%, 1.0082 71.74%, 1.0063 73.91%, 1.0047 76.09%, 1.0034 78.26%, 1.0022 80.43%, 1.0013 82.61%, 1.0006 84.78%, 1.0001 86.96%, .9997 89.13%, .9994 91.3%, .9992 93.48%, .9991 95.65%, .999 97.83%, 1);
+  --glide: cubic-bezier(.32, .72, 0, 1);
+
+  --bg: #f6f7f9;
+  --surface: #fff;
+  --surface-2: #eff1f5;
+  --spec: rgba(255, 255, 255, .9);
+  --ink: #0b111a;
+  --ink-2: #39424f;
+  --muted: #6a7481;
+  --faint: #98a1ad;
+  --line: #e1e5eb;
+  --line-soft: #eceff3;
+  --accent: #0a7c8c;
+  --accent-veil: rgba(10, 124, 140, .09);
+  --crit: #b23a2e;
+  --crit-veil: rgba(178, 58, 46, .09);
+  --warn: #96620a;
+  --warn-veil: rgba(150, 98, 10, .1);
+  --ok: #22684c;
+  --sh-s: 0 1px 2px rgba(11, 17, 26, .05), 0 2px 8px -4px rgba(11, 17, 26, .1);
+  --sh-m: 0 2px 6px rgba(11, 17, 26, .05), 0 20px 44px -24px rgba(11, 17, 26, .3);
+  --sh-l: 0 4px 14px rgba(11, 17, 26, .07), 0 44px 96px -44px rgba(11, 17, 26, .42);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #070a0f;
+    --surface: #131a24;
+    --surface-2: #1a2230;
+    --spec: rgba(255, 255, 255, .07);
+    --ink: #ecf1f7;
+    --ink-2: #c2cbd7;
+    --muted: #8a94a3;
+    --faint: #626d7b;
+    --line: #222a37;
+    --line-soft: #19212c;
+    --accent: #45cbdd;
+    --accent-veil: rgba(69, 203, 221, .12);
+    --crit: #e8776a;
+    --crit-veil: rgba(232, 119, 106, .12);
+    --warn: #dfa94a;
+    --warn-veil: rgba(223, 169, 74, .13);
+    --ok: #5bbf93;
+    --sh-s: 0 1px 2px rgba(0, 0, 0, .5), 0 2px 8px -4px rgba(0, 0, 0, .5);
+    --sh-m: 0 2px 6px rgba(0, 0, 0, .5), 0 20px 44px -24px rgba(0, 0, 0, .75);
+    --sh-l: 0 4px 14px rgba(0, 0, 0, .5), 0 44px 96px -44px rgba(0, 0, 0, .9);
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-size: 15.5px;
+  line-height: 1.65;
+  -webkit-font-smoothing: antialiased;
+  overflow: hidden;
+}
+
+button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; border-radius: 10px; }
+
+.shell { height: 100dvh; display: flex; flex-direction: column; overflow: hidden; }
+
+.topbar {
+  flex: 0 0 auto; display: flex; align-items: center; gap: 16px;
+  padding: 14px 22px; border-bottom: 1px solid var(--line-soft);
+  background: color-mix(in srgb, var(--bg) 72%, transparent);
+  backdrop-filter: saturate(180%) blur(22px);
+  position: relative; z-index: 20;
+}
+
+/* Dar ekranda üst çubuk taşmamalı: önce ikincil bilgiler gider, kimlik
+   ve eylemler kalır. Taşan bir çubukta kaybolan ilk şey "Çıkış" olurdu. */
+@media (max-width: 900px) {
+  .topbar { gap: 10px; padding: 12px 14px; }
+  .topbar .who.meta { display: none; }
+  .demo-badge { font-size: 11px; padding: 3px 8px; }
+}
+.brand { display: flex; align-items: center; gap: 9px; font-weight: 700; letter-spacing: -.02em; font-size: 15px; }
+.brand i { width: 9px; height: 9px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px var(--accent-veil); }
+.who {
+  font-size: 12.5px; color: var(--muted);
+  padding-left: 16px; border-left: 1px solid var(--line);
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0;
+}
+.who b { color: var(--ink-2); font-weight: 600; }
+.spacer { flex: 1; }
+
+.demo-badge {
+  font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 8px;
+  background: var(--warn-veil); color: var(--warn); white-space: nowrap;
+}
+
+/* Üst çubuktaki eylemler asla iki satıra kırılmaz; kırılırsa çubuk büyür
+   ve sayfa zıplar. */
+button.role, select.role { white-space: nowrap; }
+
+/* Sık kullanılan eylem için kompakt ikon. Metin etiket dar ekranda çubuğu
+   taşırıyordu; ikon aynı işi yerin onda birinde yapıyor. */
+.icon-btn {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 30px; height: 30px; flex: 0 0 auto;
+  border-radius: 9px; border: 1px solid var(--line);
+  background: var(--surface-2); color: var(--ink-2); cursor: pointer;
+  transition: transform .22s var(--spring), border-color .18s var(--glide), color .18s var(--glide);
+}
+.icon-btn:hover { border-color: var(--accent); color: var(--accent); transform: translateY(-1px); }
+.icon-btn:active { transform: translateY(0) scale(.94); }
+.icon-btn:focus-visible { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-veil); }
+
+button.role, select.role {
+  font-size: 12px; font-weight: 600; padding: 6px 10px; border-radius: 9px;
+  background: var(--surface-2); color: var(--ink); border: 1px solid var(--line);
+  cursor: pointer;
+}
+
+.stage {
+  flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
+  display: flex; flex-direction: column; justify-content: flex-end;
+  padding: 0 24px 24px; scroll-behavior: smooth;
+}
+.col { width: 100%; max-width: 700px; margin: 0 auto; display: flex; flex-direction: column; }
+.tail { flex: 0 0 auto; }
+
+.hero { display: flex; flex-direction: column; align-items: center; gap: 5px; padding-bottom: 26px; overflow: hidden; }
+.kicker { font-size: 12px; letter-spacing: .15em; text-transform: uppercase; color: var(--faint); font-weight: 600; }
+.greet { font-size: clamp(28px, 5vw, 40px); font-weight: 600; letter-spacing: -.036em; line-height: 1.12; margin: 3px 0 0; text-align: center; }
+.greet em { font-style: normal; color: var(--muted); }
+
+.in { animation: blurIn .78s var(--spring-soft) both; }
+@keyframes blurIn { from { opacity: 0; transform: translateY(16px) scale(.985); filter: blur(7px); } to { opacity: 1; transform: none; filter: blur(0); } }
+
+.signals { display: flex; flex-direction: column; gap: 11px; padding-bottom: 20px; }
+.sig1 { display: flex; align-items: flex-start; gap: 11px; font-size: 14px; color: var(--muted); }
+.sig1 i { width: 5px; height: 5px; border-radius: 50%; background: var(--faint); flex: 0 0 auto; margin-top: 9px; }
+.sig1 b { color: var(--ink-2); font-weight: 600; }
+
+.stream { display: flex; flex-direction: column; gap: 26px; padding-bottom: 20px; }
+.turn { display: flex; flex-direction: column; gap: 14px; }
+.ask {
+  align-self: flex-end; max-width: 82%; background: var(--surface-2);
+  border-radius: 19px 19px 6px 19px; padding: 11px 16px; font-size: 15px;
+  box-shadow: inset 0 1px 0 var(--spec);
+  animation: askIn .7s var(--spring) both;
+}
+@keyframes askIn { from { opacity: 0; transform: translateY(14px) scale(.94); filter: blur(5px); } to { opacity: 1; transform: none; filter: blur(0); } }
+
+.reply { display: flex; flex-direction: column; gap: 12px; animation: blurIn .6s var(--spring-soft) both; }
+.reply .txt { font-size: 15.5px; line-height: 1.68; white-space: pre-wrap; }
+
+.think { display: flex; flex-direction: column; gap: 9px; }
+.think i {
+  display: block; height: 11px; border-radius: 6px;
+  background: linear-gradient(100deg, var(--surface-2) 12%, var(--line) 34%, var(--surface-2) 58%);
+  background-size: 250% 100%; animation: sweep 1.5s linear infinite;
+}
+.think i:nth-child(1) { width: 88%; }
+.think i:nth-child(2) { width: 62%; animation-delay: .16s; }
+@keyframes sweep { from { background-position: 180% 0; } to { background-position: -80% 0; } }
+
+.calls { display: flex; flex-wrap: wrap; gap: 6px; }
+.call {
+  font-family: ui-monospace, "SF Mono", monospace; font-size: 11px;
+  padding: 3px 9px; border-radius: 7px; background: var(--accent-veil); color: var(--accent);
+  animation: blurIn .5s var(--glide) both;
+}
+.call.bad { background: var(--crit-veil); color: var(--crit); }
+
+.source { display: flex; flex-wrap: wrap; gap: 6px 12px; font-size: 11.5px; color: var(--faint); padding-top: 10px; border-top: 1px solid var(--line-soft); font-family: ui-monospace, "SF Mono", monospace; }
+
+.risk { display: flex; gap: 9px; align-items: flex-start; font-size: 13.5px; line-height: 1.5; padding: 10px 13px; border-radius: 11px; background: var(--warn-veil); color: var(--ink-2); }
+.risk.crit { background: var(--crit-veil); }
+.risk b { flex: 0 0 auto; color: var(--warn); font-weight: 700; font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase; margin-top: 2px; }
+.risk.crit b { color: var(--crit); }
+
+.dock { position: relative; z-index: 5; }
+.composer {
+  display: flex; align-items: flex-end; gap: 10px;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 22px;
+  padding: 10px 10px 10px 19px; box-shadow: var(--sh-m), inset 0 1px 0 var(--spec);
+  transition: box-shadow .62s var(--glide), border-color .34s var(--glide);
+}
+.composer:focus-within { border-color: color-mix(in srgb, var(--accent) 42%, var(--line)); box-shadow: var(--sh-l), inset 0 1px 0 var(--spec), 0 0 0 4px var(--accent-veil); }
+.composer textarea { flex: 1; background: none; border: none; resize: none; outline: none; font: inherit; font-size: 15.5px; line-height: 1.5; color: var(--ink); max-height: 150px; padding: 6px 0; }
+.composer textarea::placeholder { color: var(--faint); }
+
+.send {
+  flex: 0 0 auto; width: 37px; height: 37px; border-radius: 13px; display: grid; place-items: center;
+  background: var(--ink); color: var(--bg); opacity: .24; pointer-events: none; transform: scale(.86);
+  transition: opacity .34s var(--glide), transform .62s var(--spring);
+}
+.send.on { opacity: 1; pointer-events: auto; transform: scale(1); }
+.send:active { transform: scale(.9); transition-duration: .1s; }
+.send svg { width: 16px; height: 16px; }
+
+.foot { text-align: center; font-size: 11.5px; color: var(--faint); padding-top: 12px; }
+.foot code { font-family: ui-monospace, monospace; }
+
+/* ─────────────── canlı tool ilerlemesi ─────────────── */
+.call.live {
+  background: var(--warn-veil); color: var(--warn);
+  animation: pulse 1.4s var(--glide) infinite;
+}
+@keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: .55; } }
+
+/* kelime kelime beliriş — sunum efekti, akış değil */
+.w {
+  display: inline-block; opacity: 0; filter: blur(6px); transform: translateY(6px);
+  animation: wordIn .62s var(--spring-soft) both;
+}
+@keyframes wordIn { to { opacity: 1; filter: blur(0); transform: none; } }
+
+/* ─────────────── panel çekmecesi ─────────────── */
+.stage { transition: padding-right .86s var(--spring-soft); }
+.stage.shifted { padding-right: 452px; }
+
+.drawer {
+  position: absolute; top: 63px; right: 0; bottom: 0; width: 428px;
+  background: color-mix(in srgb, var(--bg) 68%, transparent);
+  backdrop-filter: saturate(180%) blur(26px);
+  border-left: 1px solid var(--line);
+  transform: translate3d(100%, 0, 0);
+  transition: transform .86s var(--spring-soft);
+  display: flex; flex-direction: column; z-index: 30;
+}
+.drawer.open { transform: none; }
+.drawer-head { flex: 0 0 auto; display: flex; align-items: center; padding: 15px 18px; border-bottom: 1px solid var(--line-soft); }
+.drawer-head .t { font-size: 11.5px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--muted); flex: 1; }
+.drawer-body { flex: 1; overflow-y: auto; padding: 16px 18px 28px; display: flex; flex-direction: column; gap: 14px; }
+
+.panel {
+  background: var(--surface); border: 1px solid var(--line); border-radius: 18px;
+  box-shadow: var(--sh-s), inset 0 1px 0 var(--spec); overflow: hidden;
+  animation: panelIn .82s var(--spring) both;
+}
+@keyframes panelIn { from { opacity: 0; transform: translateX(26px) scale(.94); filter: blur(6px); } to { opacity: 1; transform: none; filter: blur(0); } }
+.panel-head { display: flex; align-items: center; gap: 10px; padding: 15px 16px 13px; border-bottom: 1px solid var(--line-soft); }
+.panel-head h3 { margin: 0; font-size: 14.5px; font-weight: 600; letter-spacing: -.018em; flex: 1; }
+.panel-x { width: 25px; height: 25px; border-radius: 8px; display: grid; place-items: center; color: var(--faint); transition: background .2s, color .2s; }
+.panel-x:hover { background: var(--surface-2); color: var(--ink); }
+.panel-x svg { width: 13px; height: 13px; }
+.panel-body { padding: 15px 16px 17px; display: flex; flex-direction: column; gap: 12px; }
+.panel-body p { margin: 0; font-size: 13.5px; color: var(--ink-2); }
+.panel-src { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 11px; color: var(--faint); font-family: ui-monospace, monospace; padding-top: 8px; border-top: 1px solid var(--line-soft); }
+
+.meters { display: flex; flex-direction: column; gap: 13px; }
+.st { display: flex; flex-direction: column; gap: 6px; }
+.st-top { display: flex; align-items: baseline; gap: 8px; font-size: 13px; }
+.st-top .n { font-weight: 600; flex: 1; }
+.st-top .v { font-variant-numeric: tabular-nums; color: var(--muted); font-size: 12px; }
+.bar { height: 6px; border-radius: 6px; background: var(--surface-2); overflow: hidden; }
+.bar i { display: block; height: 100%; border-radius: 6px; background: var(--accent); transition: width 1.1s var(--spring-soft); }
+.bar i.r { background: var(--crit); } .bar i.y { background: var(--warn); }
+.st-note { font-size: 11.5px; color: var(--faint); }
+
+.kv { display: flex; justify-content: space-between; gap: 14px; font-size: 13.5px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
+.kv:last-of-type { border-bottom: none; }
+.kv span { color: var(--muted); }
+.kv b { font-weight: 600; font-variant-numeric: tabular-nums; }
+
+.rrow { display: flex; align-items: center; gap: 11px; padding: 9px 0; border-bottom: 1px solid var(--line-soft); }
+.rrow:last-child { border-bottom: none; }
+.rdot { width: 8px; height: 8px; border-radius: 50%; flex: 0 0 auto; }
+.rdot.r { background: var(--crit); box-shadow: 0 0 0 3px var(--crit-veil); }
+.rdot.y { background: var(--warn); box-shadow: 0 0 0 3px var(--warn-veil); }
+.rmain { flex: 1; min-width: 0; }
+.rmain .n { font-size: 13.5px; font-weight: 600; }
+.rmain .s { font-size: 12px; color: var(--muted); font-variant-numeric: tabular-nums; }
+.rval { font-size: 12.5px; font-weight: 600; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.rval.r { color: var(--crit); } .rval.y { color: var(--warn); }
+
+.raw { font-family: ui-monospace, monospace; font-size: 11.5px; color: var(--muted); overflow-x: auto; margin: 0; }
+
+@media (max-width: 900px) {
+  .stage.shifted { padding-right: 24px; }
+  .drawer { width: 100%; left: 0; top: auto; height: 78dvh; border-left: none; border-top: 1px solid var(--line); border-radius: 22px 22px 0 0; transform: translate3d(0, 100%, 0); }
+  .drawer.open { transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; }
+}
+
+/* ─────────────── Seviye 2 · kritik müdahale kartı ─────────────── */
+.sig2 {
+  background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--crit);
+  border-radius: 16px; padding: 17px 19px; display: flex; flex-direction: column; gap: 9px;
+  box-shadow: var(--sh-m), inset 0 1px 0 var(--spec);
+}
+.sig2 .lbl { font-size: 10.5px; letter-spacing: .14em; text-transform: uppercase; color: var(--crit); font-weight: 700; }
+.sig2 .t { font-size: 16.5px; font-weight: 600; letter-spacing: -.018em; line-height: 1.35; }
+.sig2 .d { font-size: 13.5px; color: var(--muted); line-height: 1.55; }
+.sig2 .row { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 4px; }
+
+.act {
+  font-size: 13px; font-weight: 600; padding: 9px 15px; border-radius: 12px;
+  background: var(--surface); border: 1px solid var(--line); color: var(--ink-2);
+  box-shadow: var(--sh-s), inset 0 1px 0 var(--spec);
+  transition: transform .34s var(--spring), box-shadow .34s var(--glide), color .2s var(--glide);
+}
+.act:hover { transform: translateY(-2px); box-shadow: var(--sh-m); color: var(--ink); }
+.act:active { transform: translateY(0) scale(.96); transition-duration: .1s; }
+
+.sig-more {
+  align-self: flex-start; font-size: 13px; font-weight: 600; color: var(--crit);
+  padding: 8px 14px; border-radius: 11px; background: var(--crit-veil);
+  transition: transform .34s var(--spring), opacity .2s var(--glide);
+}
+.sig-more:hover { transform: translateY(-1.5px); }
+.sig-more:active { transform: scale(.96); transition-duration: .1s; }
+
+
+/* ─────────────────────── Giriş ekranı ───────────────────────
+   Ana ekranın sakinliğiyle aynı dilde: tek kart, iki alan, tek eylem.
+   Kart yay eğrisiyle bir kez oturur; her yenilemede animasyon tekrarı
+   sinir bozucu olurdu, o yüzden yalnızca giriş anında çalışır. */
+
+.shell.boot { background: var(--bg); }
+
+.login-shell {
+  min-height: 100dvh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background:
+    radial-gradient(120% 90% at 50% -10%, var(--accent-veil), transparent 60%),
+    var(--bg);
+}
+
+.login-card {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 28px;
+  border-radius: 20px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--sh-m);
+  animation: login-in .62s var(--spring-soft) both;
+}
+
+@keyframes login-in {
+  from { opacity: 0; transform: translateY(10px) scale(.985); }
+  to { opacity: 1; transform: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .login-card { animation: none; }
+}
+
+.login-card .login-brand {
+  display: flex; align-items: center; gap: 9px;
+  font-weight: 700; letter-spacing: -.02em; font-size: 15px;
+  margin-bottom: 4px;
+}
+.login-card .login-brand i {
+  width: 9px; height: 9px; border-radius: 50%;
+  background: var(--accent); box-shadow: 0 0 0 3px var(--accent-veil);
+}
+
+.login-lead { margin: 0; font-size: 14px; color: var(--ink-2); }
+
+.login-field { display: flex; flex-direction: column; gap: 6px; }
+.login-field span { font-size: 12px; font-weight: 600; color: var(--muted); }
+.login-field input {
+  font: inherit; font-size: 14px;
+  padding: 10px 12px; border-radius: 11px;
+  background: var(--surface-2); color: var(--ink);
+  border: 1px solid var(--line);
+  transition: border-color .18s var(--glide), box-shadow .18s var(--glide);
+}
+.login-field input:focus-visible {
+  outline: none;
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px var(--accent-veil);
+}
+
+.login-error {
+  margin: 0; font-size: 12.5px; font-weight: 600;
+  padding: 9px 11px; border-radius: 10px;
+  background: var(--crit-veil); color: var(--crit);
+}
+
+.login-submit {
+  font: inherit; font-size: 14px; font-weight: 650;
+  padding: 11px 14px; border-radius: 12px; border: 0;
+  background: var(--ink); color: var(--bg); cursor: pointer;
+  transition: transform .22s var(--spring), opacity .18s var(--glide);
+}
+.login-submit:hover:not(:disabled) { transform: translateY(-1px); }
+.login-submit:active:not(:disabled) { transform: translateY(0) scale(.985); }
+.login-submit:disabled { opacity: .55; cursor: default; }
+
+.login-choices { display: flex; flex-direction: column; gap: 8px; }
+.login-choice {
+  font: inherit; font-size: 14px; font-weight: 600; text-align: left;
+  padding: 13px 14px; border-radius: 12px;
+  background: var(--surface-2); color: var(--ink);
+  border: 1px solid var(--line); cursor: pointer;
+  transition: border-color .18s var(--glide), transform .22s var(--spring);
+}
+.login-choice:hover:not(:disabled) { border-color: var(--accent); transform: translateX(2px); }
+.login-choice:disabled { opacity: .55; cursor: default; }
+
+.login-note { margin: 2px 0 0; font-size: 11.5px; color: var(--faint); line-height: 1.5; }
+
+
+/* ── Sohbete eklenen dosya ─────────────────────────────────────────────
+   Dosya kutusu composer'ın ÜSTÜNDE durur: kullanıcı soruyu yazarken hangi
+   dosyayla konuştuğunu görmeli. Kutuyu composer'ın içine koymak, uzun
+   dosya adlarında yazı alanını daraltırdı. */
+
+.attach {
+  display: flex; align-items: center; gap: 10px;
+  margin-bottom: 8px; padding: 8px 10px 8px 14px;
+  border-radius: 12px; border: 1px solid var(--line);
+  background: var(--surface-2); max-width: 100%;
+}
+.attach-name {
+  font-size: 13px; font-weight: 600; color: var(--ink);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0;
+}
+.attach-meta { font-size: 12px; color: var(--muted); white-space: nowrap; }
+.attach-x {
+  margin-left: auto; flex: 0 0 auto;
+  width: 22px; height: 22px; border-radius: 7px; border: 0;
+  background: transparent; color: var(--muted); cursor: pointer;
+  font-size: 17px; line-height: 1;
+  transition: background .16s var(--glide), color .16s var(--glide);
+}
+.attach-x:hover { background: var(--crit-veil); color: var(--crit); }
+
+.clip {
+  flex: 0 0 auto; width: 32px; height: 32px; align-self: flex-end;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 10px; border: 0; background: transparent;
+  color: var(--muted); cursor: pointer;
+  transition: color .18s var(--glide), background .18s var(--glide);
+}
+.clip svg { width: 17px; height: 17px; }
+.clip:hover:not(:disabled) { color: var(--accent); background: var(--accent-veil); }
+.clip:disabled { opacity: .4; cursor: default; }
+.clip:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--accent-veil); }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+   GALERİ KABUĞU — yalnızca bu dosyaya ait.
+   Uygulamada `body { overflow:hidden }` ve `.shell { height:100dvh }`
+   vardır; galeride her ekranı yan yana göstermek için bunları çerçeve
+   içine alıyoruz. Bileşen stillerine DOKUNULMAZ.
+   ═══════════════════════════════════════════════════════════════════ */
+body.gallery { overflow: auto; height: auto; }
+.wrap { max-width: 1180px; margin: 0 auto; padding: 56px 24px 120px; }
+
+.doc-head { margin-bottom: 56px; }
+.doc-head h1 { font-size: 34px; font-weight: 700; letter-spacing: -.035em; margin: 0 0 10px; }
+.doc-head p { margin: 0; color: var(--muted); font-size: 15px; max-width: 62ch; line-height: 1.7; }
+.doc-head .meta { margin-top: 18px; display: flex; flex-wrap: wrap; gap: 8px; }
+.tag { font-size: 11.5px; font-weight: 600; padding: 4px 10px; border-radius: 8px;
+       background: var(--surface-2); color: var(--muted); border: 1px solid var(--line); }
+
+.sec { margin: 0 0 52px; }
+.sec > h2 { font-size: 12px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase;
+            color: var(--faint); margin: 0 0 6px; }
+.sec > .why { margin: 0 0 18px; font-size: 13.5px; color: var(--muted); max-width: 70ch; line-height: 1.65; }
+
+.frame {
+  position: relative; border: 1px solid var(--line); border-radius: 20px;
+  overflow: hidden; background: var(--bg); margin-bottom: 16px;
+}
+.frame > .cap {
+  position: absolute; top: 10px; left: 12px; z-index: 60;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase;
+  color: var(--faint); background: color-mix(in srgb, var(--bg) 82%, transparent);
+  padding: 4px 9px; border-radius: 7px; backdrop-filter: blur(8px); pointer-events: none;
+}
+.frame .shell, .frame .login-shell { height: auto; min-height: 0; }
+.frame .stage { justify-content: flex-end; }
+
+/* Çerçeve içinde ekranın nefes alması için sabit yükseklikler */
+.h-sm .shell, .h-sm .login-shell { min-height: 430px; }
+.h-md .shell, .h-md .login-shell { min-height: 560px; }
+.h-lg .shell, .h-lg .login-shell { min-height: 680px; }
+
+.grid2 { display: grid; grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 16px; }
+
+/* Token vitrini */
+.swatches { display: grid; grid-template-columns: repeat(auto-fill, minmax(148px, 1fr)); gap: 12px; }
+.sw { border: 1px solid var(--line); border-radius: 13px; overflow: hidden; background: var(--surface); }
+.sw .chip { height: 54px; }
+.sw .lab { padding: 9px 11px; font-size: 11px; font-family: ui-monospace, monospace; color: var(--muted); }
+.sw .lab b { display: block; color: var(--ink-2); font-family: inherit; font-size: 12px;
+             font-weight: 600; margin-bottom: 2px; }
+
+.type-row { display: flex; align-items: baseline; gap: 16px; padding: 11px 0;
+            border-bottom: 1px solid var(--line-soft); }
+.type-row .k { font-size: 11px; font-family: ui-monospace, monospace; color: var(--faint);
+               width: 190px; flex: 0 0 auto; }
+
+.note { border-left: 3px solid var(--accent); background: var(--accent-veil);
+        padding: 13px 16px; border-radius: 0 12px 12px 0; font-size: 13.5px;
+        color: var(--ink-2); line-height: 1.65; margin: 0 0 18px; }
+.note b { color: var(--ink); }
+.note.warn { border-left-color: var(--warn); background: var(--warn-veil); }
+
+/* Panelleri çekmece dışında, tek başına göstermek için */
+.panel-solo { max-width: 428px; }
+
+</style>
+</head>
+<body class="gallery">
+
+<div class="wrap">
+
+<header class="doc-head">
+  <div class="brand" style="margin-bottom:16px"><i></i><span>KAELON</span></div>
+  <h1>Arayüz Kiti</h1>
+  <p>
+    KAELON'un <strong>gerçek</strong> arayüzü — bu dosyadaki CSS, uygulamanın
+    <code>app/globals.css</code> dosyasının birebir kopyasıdır; markup da üretimdeki
+    bileşenlerden alınmıştır. Uydurma ekran yok. Her ekranın altında, o tasarımın
+    <em>neden</em> öyle olduğu yazıyor — güzelleştirirken bu kısıtların korunması gerekiyor.
+  </p>
+  <div class="meta">
+    <span class="tag">Sohbet öncelikli ERP</span>
+    <span class="tag">Türkçe birincil</span>
+    <span class="tag">Açık + koyu tema</span>
+    <span class="tag">Yoğunluk: orta</span>
+    <span class="tag">Hareket: yay fiziği</span>
+  </div>
+</header>
+
+<!-- ═══════════════ TASARIM JETONLARI ═══════════════ -->
+<section class="sec">
+  <h2>1 · Tasarım jetonları</h2>
+  <p class="why">
+    Tüm renkler CSS değişkeni. Koyu tema <code>prefers-color-scheme</code> ile geliyor.
+    Değişken adlarını koruyun; kod bunlara bağlı.
+  </p>
+  <div class="swatches">
+    <div class="sw"><div class="chip" style="background:var(--bg)"></div><div class="lab"><b>Zemin</b>--bg</div></div>
+    <div class="sw"><div class="chip" style="background:var(--surface)"></div><div class="lab"><b>Yüzey</b>--surface</div></div>
+    <div class="sw"><div class="chip" style="background:var(--surface-2)"></div><div class="lab"><b>Yüzey 2</b>--surface-2</div></div>
+    <div class="sw"><div class="chip" style="background:var(--ink)"></div><div class="lab"><b>Metin</b>--ink</div></div>
+    <div class="sw"><div class="chip" style="background:var(--muted)"></div><div class="lab"><b>Soluk</b>--muted</div></div>
+    <div class="sw"><div class="chip" style="background:var(--accent)"></div><div class="lab"><b>Vurgu</b>--accent</div></div>
+    <div class="sw"><div class="chip" style="background:var(--crit)"></div><div class="lab"><b>Kritik</b>--crit</div></div>
+    <div class="sw"><div class="chip" style="background:var(--warn)"></div><div class="lab"><b>Uyarı</b>--warn</div></div>
+    <div class="sw"><div class="chip" style="background:var(--ok)"></div><div class="lab"><b>Olumlu</b>--ok</div></div>
+    <div class="sw"><div class="chip" style="background:var(--line)"></div><div class="lab"><b>Çizgi</b>--line</div></div>
+  </div>
+
+  <div style="margin-top:26px">
+    <div class="type-row"><span class="k">.greet · clamp(28-40px)/600</span><span class="greet" style="font-size:30px">Günaydın Cebrail Bey.</span></div>
+    <div class="type-row"><span class="k">gövde · 15.5px/1.65</span><span>3 sipariş gecikme riskinde; toplam ceza 156.000 TL.</span></div>
+    <div class="type-row"><span class="k">.sig2 .t · 16.5px/600</span><span style="font-size:16.5px;font-weight:600;letter-spacing:-.018em">Daimler SO-2026-0427 5 gün gecikecek.</span></div>
+    <div class="type-row"><span class="k">.kicker · 12px/.15em</span><span class="kicker">29 AĞUSTOS</span></div>
+    <div class="type-row"><span class="k">.call · mono 11px</span><span class="call">get_bank_balance · 8ms</span></div>
+  </div>
+
+  <p class="note warn" style="margin-top:22px">
+    <b>Tespit:</b> CSS <code>"Plus Jakarta Sans"</code> istiyor ama uygulama bu fontu
+    hiç yüklemiyor — şu an sistem fontuna düşüyor. Bu dosyada fontu bilerek yükledim ki
+    tasarlanan hâli görün. Yazı tipini değiştirirseniz uygulamaya da eklememiz gerekecek.
+  </p>
+</section>
+
+<!-- ═══════════════ GİRİŞ ═══════════════ -->
+<section class="sec">
+  <h2>2 · Giriş</h2>
+  <p class="why">
+    İki alan, tek eylem. <strong>Şirket alanı yok</strong>: giriş ekranında tüm şirketleri
+    listeleyen bir alan, müşteri listesini herkese verirdi. Kullanıcı birden çok şirkette
+    çalışıyorsa seçim, parola doğrulandıktan <em>sonra</em> ve yalnızca kendi şirketlerinden
+    sunuluyor. 2FA kutusu da aynı mantıkla, yalnızca sunucu isteyince beliriyor.
+  </p>
+
+  <div class="grid2">
+    <div class="frame h-md"><span class="cap">Adım 1 · Kimlik</span>
+      <div class="login-shell"><form class="login-card">
+        <div class="login-brand"><i></i><span>KAELON</span></div>
+        <label class="login-field"><span>E-posta</span><input type="email" value="cebrail@orthaus.com"></label>
+        <label class="login-field"><span>Parola</span><input type="password" value="parolaparola"></label>
+        <button class="login-submit" type="button">Giriş</button>
+        <p class="login-note">Hesap oluşturma ekranı yoktur. Kullanıcılar yöneticiniz tarafından tanımlanır.</p>
+      </form></div>
+    </div>
+
+    <div class="frame h-md"><span class="cap">Hata · ayrım yapmaz</span>
+      <div class="login-shell"><form class="login-card">
+        <div class="login-brand"><i></i><span>KAELON</span></div>
+        <label class="login-field"><span>E-posta</span><input type="email" value="cebrail@orthaus.com"></label>
+        <label class="login-field"><span>Parola</span><input type="password" value="yanlis"></label>
+        <p class="login-error">E-posta veya parola hatalı.</p>
+        <button class="login-submit" type="button">Giriş</button>
+        <p class="login-note">Hesap oluşturma ekranı yoktur. Kullanıcılar yöneticiniz tarafından tanımlanır.</p>
+      </form></div>
+    </div>
+
+    <div class="frame h-md"><span class="cap">Adım 2 · Şirket seçimi</span>
+      <div class="login-shell"><div class="login-card">
+        <div class="login-brand"><i></i><span>KAELON</span></div>
+        <p class="login-lead">Hangi şirkete giriyorsunuz?</p>
+        <div class="login-choices">
+          <button type="button" class="login-choice">Orthaus Makina</button>
+          <button type="button" class="login-choice">Zerey Metal</button>
+        </div>
+      </div></div>
+    </div>
+
+    <div class="frame h-md"><span class="cap">2FA · yalnızca gerekince</span>
+      <div class="login-shell"><form class="login-card">
+        <div class="login-brand"><i></i><span>KAELON</span></div>
+        <label class="login-field"><span>E-posta</span><input type="email" value="cebrail@orthaus.com"></label>
+        <label class="login-field"><span>Parola</span><input type="password" value="parolaparola"></label>
+        <label class="login-field"><span>Doğrulama kodu</span><input inputmode="numeric" maxlength="6" placeholder="000000" value="418302"></label>
+        <button class="login-submit" type="button">Giriş</button>
+        <p class="login-note">Hesap oluşturma ekranı yoktur. Kullanıcılar yöneticiniz tarafından tanımlanır.</p>
+      </form></div>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ ÜST ÇUBUK ═══════════════ -->
+<section class="sec">
+  <h2>3 · Üst çubuk ve durum rozetleri</h2>
+  <p class="why">
+    Rozetler süs değil, <strong>dürüstlük işareti</strong>. "Demo veri" ve "Model bağlı değil",
+    kullanıcının ekrandaki rakamlara ne kadar güvenebileceğini söyler; kaldırılmamalı.
+    Rol seçici yalnızca geliştirme kimliğinde görünür — gerçek oturumda rol üyelikten gelir
+    ve arayüzden değiştirilemez.
+  </p>
+
+  <div class="frame"><span class="cap">Gerçek oturum</span>
+    <div class="shell" style="min-height:0"><header class="topbar">
+      <div class="brand"><i></i><span>KAELON</span></div>
+      <div class="who">Cebrail Karaarslan · <b>Patron</b></div>
+      <div class="spacer"></div>
+      <span class="demo-badge">Model bağlı değil</span>
+      <span class="who meta" style="border:0;padding-left:0">24/26 tool · L3</span>
+      <button class="icon-btn" title="Yeni konuşma"><svg viewBox="0 0 16 16" width="15" height="15"><path d="M8 3.2v9.6M3.2 8h9.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+      <button class="role" type="button">Çıkış</button>
+    </header></div>
+  </div>
+
+  <div class="frame"><span class="cap">Geliştirme kimliği · rol seçici</span>
+    <div class="shell" style="min-height:0"><header class="topbar">
+      <div class="brand"><i></i><span>KAELON</span></div>
+      <div class="who">Cebrail Karaarslan (demo) · <b>Patron</b></div>
+      <div class="spacer"></div>
+      <span class="demo-badge">Demo veri</span>
+      <span class="demo-badge">Model bağlı değil</span>
+      <select class="role"><option>Patron</option><option>CFO</option><option>Üretim Müdürü</option></select>
+      <button class="role" type="button">Gerçek giriş</button>
+    </header></div>
+  </div>
+</section>
+
+<!-- ═══════════════ BOSS MODE ═══════════════ -->
+<section class="sec">
+  <h2>4 · Boss Mode · açılış bildirimleri</h2>
+  <p class="why">
+    Ekranın doluluğu tasarlanmaz, <strong>hesaplanır</strong>: eşiği aşan sinyal yoksa ekran
+    bilerek sessiz kalır. Sinyaller role göre süzülür — CFO'nun gördüğüyle üretim müdürünün
+    gördüğü aynı değil. Seviye 2 (kritik) kart olur, seviye 1 tek satır olur; bu hiyerarşi
+    kullanıcının nereye bakacağını belirler.
+  </p>
+
+  <div class="frame h-lg"><span class="cap">Sinyalli açılış</span>
+    <div class="shell"><div class="stage"><div class="col">
+      <div class="hero">
+        <div class="kicker">29 AĞUSTOS</div>
+        <h1 class="greet">Günaydın Cebrail Bey.<br><em>Ne öğrenmek istersiniz?</em></h1>
+      </div>
+      <div class="signals">
+        <div class="sig2">
+          <span class="lbl">Kritik · Müdahale gerekiyor</span>
+          <div class="t">Daimler SO-2026-0427 5 gün gecikecek.</div>
+          <div class="d">3 sipariş risk altında. Toplam sözleşme cezası riski yaklaşık 156.000 TRY.</div>
+          <div class="row"><button class="act">Detayı aç</button><button class="act">Planı değiştir</button></div>
+        </div>
+        <div class="sig2">
+          <span class="lbl">Kritik · Müdahale gerekiyor</span>
+          <div class="t">Üretim hızı hedefin %24 altında.</div>
+          <div class="d">Gerçek 29 birim/saat, hedef 38.</div>
+          <div class="row"><button class="act">Detayı aç</button></div>
+        </div>
+        <button class="sig-more">1 kritik konu daha var — göster</button>
+        <div class="sig1"><i></i><span><b>7 makine plan dışı duruşta.</b> · 31/38 makine çalışıyor.</span></div>
+        <div class="sig1"><i></i><span><b>6 saat mesai yönetici onayı bekliyor.</b> · Onaylanmadan bordroya girmez; tutarlar kesinleşmemiştir.</span></div>
+      </div>
+      <div class="dock">
+        <div class="composer">
+          <button class="clip" aria-label="Dosya ekle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.67 3.67 0 0 1 5.19 5.19l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.59l8.49-8.48"/></svg></button>
+          <textarea rows="1" placeholder="Şirketinize bir şey sorun…"></textarea>
+          <button class="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+        </div>
+        <p class="foot">24 tool yetkinizde.</p>
+      </div>
+    </div></div></div>
+  </div>
+
+  <div class="frame h-md"><span class="cap">Sessiz açılış · eşiği aşan yok</span>
+    <div class="shell"><div class="stage"><div class="col">
+      <div class="hero">
+        <div class="kicker">29 AĞUSTOS</div>
+        <h1 class="greet">Günaydın Cebrail Bey.<br><em>Ne öğrenmek istersiniz?</em></h1>
+      </div>
+      <div class="dock">
+        <div class="composer">
+          <button class="clip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.67 3.67 0 0 1 5.19 5.19l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.59l8.49-8.48"/></svg></button>
+          <textarea rows="1" placeholder="Şirketinize bir şey sorun…"></textarea>
+          <button class="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+        </div>
+        <p class="foot">Bugün eşiği aşan bir şey yok — ekran bilerek sessiz.</p>
+      </div>
+    </div></div></div>
+  </div>
+</section>
+
+<!-- ═══════════════ SOHBET ═══════════════ -->
+<section class="sec">
+  <h2>5 · Sohbet akışı</h2>
+  <p class="why">
+    Tool çipleri <strong>gerçek adımlardır</strong>, süs değil: hangi kaynağın kaç
+    milisaniyede cevap verdiğini gösterirler. Kaynak satırı ve "son senkronizasyon" bilgisi
+    cevabın zorunlu parçasıdır — kaldırılamaz, çünkü kullanıcının rakama güvenip
+    güvenmeyeceğini belirler.
+  </p>
+
+  <div class="frame h-lg"><span class="cap">Tam tur · soru → tool → cevap → kaynak</span>
+    <div class="shell"><div class="stage"><div class="col"><div class="stream">
+      <div class="turn">
+        <div class="ask">Bankada ne kadar param var?</div>
+        <div class="calls"><span class="call">get_bank_balance · 8ms</span></div>
+        <div class="reply">
+          <div class="txt">Banka pozisyonu:
+
+• 25.200.000 TRY
+• 411.200 EUR
+
+6 hesap üzerinden toplandı.</div>
+          <div class="risk"><b>Bilgi</b><span>Toplam 16.650 EUR blokeli bakiye var; kullanılabilir tutara dahil değil.</span></div>
+          <div class="source"><span>Banka entegratörü · 6 kayıt</span><span>son senkronizasyon 16.05.2026 10:38</span></div>
+        </div>
+      </div>
+
+      <div class="turn">
+        <div class="ask">Peki fabrikada ne oluyor?</div>
+        <div class="calls"><span class="call">get_factory_wip · 12ms</span><span class="call live">get_shipment_risk çalışıyor…</span></div>
+        <div class="think"><i></i><i></i></div>
+      </div>
+    </div></div></div></div>
+  </div>
+
+  <div class="frame h-md"><span class="cap">Uyarı ve hata durumları</span>
+    <div class="shell"><div class="stage"><div class="col"><div class="stream">
+      <div class="turn">
+        <div class="ask">Hangi siparişler gecikecek?</div>
+        <div class="calls"><span class="call">get_shipment_risk · 14ms</span></div>
+        <div class="reply">
+          <div class="txt">3 sipariş gecikme riskinde. En kritiği Daimler SO-2026-0427 — 5 gün.</div>
+          <div class="risk crit"><b>Kritik</b><span>Toplam gecikme cezası riski yaklaşık 156.000 TL.</span></div>
+          <div class="risk"><b>Uyarı</b><span>2 siparişin sevkiyat tarihi hesaplanamadı, riski BİLİNMİYOR: SO-2026-0455, SO-2026-0461 (iş emri bağlanmamış).</span></div>
+          <div class="source"><span>İş emri + kapasite planı · 3 kayıt</span><span>güven %68</span></div>
+        </div>
+      </div>
+
+      <div class="turn">
+        <div class="ask">Maaş bordrosunu göster</div>
+        <div class="calls"><span class="call bad">get_payroll · permission_denied</span></div>
+        <div class="reply"><div class="txt">Bu bilgi için yetkiniz yok. Yöneticinizden erişim talep edebilirsiniz.</div></div>
+      </div>
+    </div></div></div></div>
+  </div>
+</section>
+
+<!-- ═══════════════ COMPOSER ═══════════════ -->
+<section class="sec">
+  <h2>6 · Yazma alanı ve dosya eki</h2>
+  <p class="why">
+    Dosya kutusu yazma alanının <em>üstünde</em> durur: kullanıcı soruyu yazarken hangi
+    dosyayla konuştuğunu görmeli. İçeriği değil kimliği taşınır — 4000 satırlık CSV modele
+    gönderilmez.
+  </p>
+  <div class="grid2">
+    <div class="frame"><span class="cap">Boş</span><div class="shell" style="min-height:0"><div style="padding:20px 24px"><div class="dock"><div class="composer">
+      <button class="clip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.67 3.67 0 0 1 5.19 5.19l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.59l8.49-8.48"/></svg></button>
+      <textarea rows="1" placeholder="Şirketinize bir şey sorun…"></textarea>
+      <button class="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+    </div></div></div></div></div>
+
+    <div class="frame"><span class="cap">Yazılıyor · gönder aktif</span><div class="shell" style="min-height:0"><div style="padding:20px 24px"><div class="dock"><div class="composer">
+      <button class="clip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.67 3.67 0 0 1 5.19 5.19l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.59l8.49-8.48"/></svg></button>
+      <textarea rows="1">Kaynak istasyonunda kaç iş emri bekliyor?</textarea>
+      <button class="send on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+    </div></div></div></div></div>
+
+    <div class="frame"><span class="cap">Dosya ekli</span><div class="shell" style="min-height:0"><div style="padding:20px 24px"><div class="dock">
+      <div class="attach">
+        <span class="attach-name">cari-listesi-2026.csv</span>
+        <span class="attach-meta">1.284 satır · 6 sütun</span>
+        <button class="attach-x" aria-label="Dosyayı kaldır">×</button>
+      </div>
+      <div class="composer">
+        <button class="clip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.67 3.67 0 0 1 5.19 5.19l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.59l8.49-8.48"/></svg></button>
+        <textarea rows="1" placeholder="Bu dosyayla ne yapayım?"></textarea>
+        <button class="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+      </div>
+    </div></div></div></div>
+  </div>
+</section>
+
+<!-- ═══════════════ PANELLER ═══════════════ -->
+<section class="sec">
+  <h2>7 · Paneller (çekmece içeriği)</h2>
+  <p class="why">
+    Sağdan açılan çekmecede durur. Sayısal veri sohbet metninde değil burada yaşar; metin
+    yorumu, panel kanıtı taşır. Her panelin altında kaynak satırı zorunludur.
+    <strong>"—" işareti sıfır değil, bilinmiyor demektir</strong> ve öyle görünmelidir.
+  </p>
+
+  <div class="grid2">
+    <div class="frame"><span class="cap">Banka pozisyonu</span><div style="padding:20px"><article class="panel panel-solo">
+      <div class="panel-head"><h3>Banka Pozisyonu</h3><button class="panel-x"><svg viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.6"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
+      <div class="panel-body">
+        <div class="kv"><span>Garanti BBVA · TRY</span><b>12.400.000</b></div>
+        <div class="kv"><span>İş Bankası · TRY</span><b>8.600.000</b></div>
+        <div class="kv"><span>Yapı Kredi · TRY</span><b>4.200.000</b></div>
+        <div class="kv"><span>Garanti BBVA · EUR</span><b>198.400</b></div>
+        <div class="kv"><span>İş Bankası · EUR</span><b>126.050 <span style="color:var(--warn)">(+16.650 blokeli)</span></b></div>
+        <div class="panel-src"><span>Banka entegratörü</span><span>6 kayıt</span></div>
+      </div>
+    </article></div></div>
+
+    <div class="frame"><span class="cap">Fabrika canlı</span><div style="padding:20px"><article class="panel panel-solo">
+      <div class="panel-head"><h3>Fabrika Canlı</h3><button class="panel-x"><svg viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.6"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
+      <div class="panel-body">
+        <p>142 aktif iş emri · 87/94 personel · 31/38 makine</p>
+        <div class="meters">
+          <div class="st"><div class="st-top"><span class="n">Kesim</span><span class="v">%89</span></div><div class="bar"><i class="y" style="width:89%"></i></div><div class="st-note">Kapasitenin sınırına yakın</div></div>
+          <div class="st"><div class="st-top"><span class="n">Kaynak</span><span class="v">%64</span></div><div class="bar"><i style="width:64%"></i></div><div class="st-note">4 iş emri kalite hold'da</div></div>
+          <div class="st"><div class="st-top"><span class="n">Boya</span><span class="v">%96</span></div><div class="bar"><i class="r" style="width:96%"></i></div><div class="st-note">Darboğaz — 6 iş emri sırada</div></div>
+          <div class="st"><div class="st-top"><span class="n">Montaj</span><span class="v">%41</span></div><div class="bar"><i style="width:41%"></i></div><div class="st-note">Boya çıkışı bekleniyor</div></div>
+        </div>
+        <div class="kv"><span>Gerçek hız</span><b>29 br/sa</b></div>
+        <div class="kv"><span>Hedef hız</span><b>38 br/sa</b></div>
+        <div class="panel-src"><span>Saha terminalleri · 142 kayıt</span><span>Makine telemetrisi · 38 kayıt</span></div>
+      </div>
+    </article></div></div>
+
+    <div class="frame"><span class="cap">Bilinmiyor durumu · SIFIR DEĞİL</span><div style="padding:20px"><article class="panel panel-solo">
+      <div class="panel-head"><h3>Fabrika Canlı</h3><button class="panel-x"><svg viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.6"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
+      <div class="panel-body">
+        <p>0 aktif iş emri · Vardiyadaki personel sayısı bilinmiyor · makine durumu bilinmiyor</p>
+        <div class="meters">
+          <div class="st"><div class="st-top"><span class="n">Kaynak</span><span class="v">—</span></div><div class="st-note">Kapasite tanımlı değil — doluluk hesaplanamıyor.</div><div class="st-note">1 operasyon işlemde.</div></div>
+        </div>
+        <div class="kv"><span>Gerçek hız</span><b>bilinmiyor</b></div>
+        <div class="kv"><span>Hedef hız</span><b>bilinmiyor</b></div>
+        <div class="panel-src"><span>Saha terminalleri · 0 kayıt</span></div>
+      </div>
+    </article></div></div>
+
+    <div class="frame"><span class="cap">Sevkiyat riski</span><div style="padding:20px"><article class="panel panel-solo">
+      <div class="panel-head"><h3>Sevkiyat Riski</h3><button class="panel-x"><svg viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.6"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
+      <div class="panel-body">
+        <div class="rrow"><span class="rdot r"></span><div class="rmain"><div class="n">Daimler · SO-2026-0427</div><div class="s">13.05 taahhüt → 18.05 tahmin</div></div><span class="rval r">5 gün · 52.000 ₺</span></div>
+        <div class="rrow"><span class="rdot r"></span><div class="rmain"><div class="n">Volvo · SO-2026-0418</div><div class="s">12.05 taahhüt → 16.05 tahmin</div></div><span class="rval r">4 gün · 78.000 ₺</span></div>
+        <div class="rrow"><span class="rdot y"></span><div class="rmain"><div class="n">MAN · SO-2026-0431</div><div class="s">14.05 taahhüt → 17.05 tahmin</div></div><span class="rval y">3 gün · 26.000 ₺</span></div>
+        <div class="kv"><span>Toplam ceza riski</span><b>156.000 ₺</b></div>
+        <div class="panel-src"><span>İş emri + kapasite planı · 3 kayıt</span></div>
+      </div>
+    </article></div></div>
+
+    <div class="frame"><span class="cap">Mesai · maaş maskeli</span><div style="padding:20px"><article class="panel panel-solo">
+      <div class="panel-head"><h3>Fazla Mesai</h3><button class="panel-x"><svg viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.6"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
+      <div class="panel-body">
+        <div class="rrow"><div class="rmain"><div class="n">Hasan Turan</div><div class="s">Kaynak · 14s 15dk hafta içi · 4s 30dk hafta sonu</div></div><span class="rval y">6s onay bekliyor</span></div>
+        <div class="rrow"><div class="rmain"><div class="n">Ayşe Demir</div><div class="s">Montaj · 7s hafta içi</div></div><span class="rval">onaylı</span></div>
+        <div class="kv"><span>Brüt maaş</span><b style="color:var(--faint)">•••••• (yetki yok)</b></div>
+        <div class="panel-src"><span>PDKS · 2 kayıt</span><span>Vardiya planı</span></div>
+      </div>
+    </article></div></div>
+
+    <div class="frame"><span class="cap">İçe aktarma önizlemesi</span><div style="padding:20px"><article class="panel panel-solo">
+      <div class="panel-head"><h3>Cari İçe Aktarma · Önizleme</h3><button class="panel-x"><svg viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.6"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
+      <div class="panel-body">
+        <p>cari-listesi-2026.csv okundu: 1.284 satır.</p>
+        <div class="kv"><span>Yeni kart açılacak</span><b style="color:var(--ok)">1.142</b></div>
+        <div class="kv"><span>Mevcut kart güncellenecek</span><b>138</b></div>
+        <div class="kv"><span>Aktarılamayacak</span><b style="color:var(--crit)">4</b></div>
+        <div class="rrow"><span class="rdot r"></span><div class="rmain"><div class="n">217. satır</div><div class="s">"9999999999" geçerli bir VKN değil (kontrol hanesi tutmuyor).</div></div></div>
+        <div class="rrow"><span class="rdot r"></span><div class="rmain"><div class="n">884. satır</div><div class="s">Unvan boş.</div></div></div>
+        <div class="risk"><b>Uyarı</b><span>Henüz hiçbir şey yazılmadı. Onayınızla yazılacak.</span></div>
+        <div class="row" style="display:flex;gap:8px"><button class="act">Onayla ve yaz</button><button class="act">Vazgeç</button></div>
+        <div class="panel-src"><span>Yüklenen dosya: cari-listesi-2026.csv</span></div>
+      </div>
+    </article></div></div>
+  </div>
+</section>
+
+<!-- ═══════════════ ÇEKMECE ═══════════════ -->
+<section class="sec">
+  <h2>8 · Çekmece açıkken bütün ekran</h2>
+  <p class="why">
+    Panel açıldığında sohbet sola kayar, kapanmaz. Kullanıcı konuşmaya devam ederken
+    kanıta bakabilmeli. Dar ekranda çekmece alttan yükselen bir yaprağa dönüşür.
+  </p>
+  <div class="frame h-lg"><span class="cap">Çekmece açık</span>
+    <div class="shell" style="position:relative">
+      <header class="topbar">
+        <div class="brand"><i></i><span>KAELON</span></div>
+        <div class="who">Cebrail Karaarslan · <b>Patron</b></div>
+        <div class="spacer"></div>
+        <button class="icon-btn"><svg viewBox="0 0 16 16" width="15" height="15"><path d="M8 3.2v9.6M3.2 8h9.6" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"/></svg></button>
+        <button class="role" type="button">Çıkış</button>
+      </header>
+      <div class="stage shifted"><div class="col"><div class="stream"><div class="turn">
+        <div class="ask">Bankada ne kadar param var?</div>
+        <div class="calls"><span class="call">get_bank_balance · 8ms</span></div>
+        <div class="reply"><div class="txt">Banka pozisyonu: 25.200.000 TRY ve 411.200 EUR. 6 hesap üzerinden toplandı.</div>
+        <div class="source"><span>Banka entegratörü · 6 kayıt</span></div></div>
+      </div></div>
+      <div class="dock"><div class="composer">
+        <button class="clip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.67 3.67 0 0 1 5.19 5.19l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.59l8.49-8.48"/></svg></button>
+        <textarea rows="1" placeholder="Şirketinize bir şey sorun…"></textarea>
+        <button class="send"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+      </div></div></div></div>
+      <aside class="drawer open" style="position:absolute">
+        <div class="drawer-head"><span class="t">Paneller</span><button class="panel-x"><svg viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.6"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
+        <div class="drawer-body"><article class="panel">
+          <div class="panel-head"><h3>Banka Pozisyonu</h3><button class="panel-x"><svg viewBox="0 0 14 14" stroke="currentColor" stroke-width="1.6"><path d="M2 2l10 10M12 2L2 12"/></svg></button></div>
+          <div class="panel-body">
+            <div class="kv"><span>Garanti BBVA · TRY</span><b>12.400.000</b></div>
+            <div class="kv"><span>İş Bankası · TRY</span><b>8.600.000</b></div>
+            <div class="kv"><span>Yapı Kredi · TRY</span><b>4.200.000</b></div>
+            <div class="panel-src"><span>Banka entegratörü · 6 kayıt</span></div>
+          </div>
+        </article></div>
+      </aside>
+    </div>
+  </div>
+</section>
+
+<!-- ═══════════════ HATA ═══════════════ -->
+<section class="sec">
+  <h2>9 · Hata ekranı</h2>
+  <p class="why">
+    Bir hata ekranının söylemesi gereken en önemli cümle, <strong>verinin yerinde
+    durduğudur</strong>. Yığın izi gösterilmez; destek kodu gösterilir ki logdaki kayıt
+    bulunabilsin.
+  </p>
+  <div class="frame h-md"><span class="cap">Arayüz hatası</span>
+    <div class="login-shell"><div class="login-card">
+      <div class="login-brand"><i></i><span>KAELON</span></div>
+      <p class="login-lead">Bir şeyler ters gitti.</p>
+      <p class="login-note" style="margin-top:0">Bu ekran açılamadı. <strong>Kaydedilmiş verileriniz yerinde duruyor</strong> — bu hata yalnızca görüntülemeyi etkiledi.</p>
+      <button class="login-submit" type="button">Tekrar dene</button>
+      <button class="login-choice" type="button">Ana ekrana dön</button>
+      <p class="login-note">Destek kodu: 3f9a21c8</p>
+    </div></div>
+  </div>
+</section>
+
+<!-- ═══════════════ ENVANTER ═══════════════ -->
+<section class="sec">
+  <h2>10 · Bildirim ve durum envanteri</h2>
+  <p class="why">Tek yerde tüm uyarı dilleri. Renk anlamları sabit: kritik kırmızı, uyarı amber, bilgi/vurgu turkuaz.</p>
+  <div style="display:flex;flex-direction:column;gap:12px;max-width:640px">
+    <div class="risk crit"><b>Kritik</b><span>Toplam gecikme cezası riski yaklaşık 156.000 TL.</span></div>
+    <div class="risk"><b>Uyarı</b><span>6 saatlik mesai hâlâ yönetici onayı bekliyor; tutar kesinleşmemiştir.</span></div>
+    <div class="risk"><b>Bilgi</b><span>Toplam 16.650 blokeli bakiye var; kullanılabilir tutara dahil değil.</span></div>
+    <div class="risk"><b>Uyarı</b><span>2 siparişin sevkiyat tarihi hesaplanamadı, riski BİLİNMİYOR.</span></div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+      <span class="demo-badge">Demo veri</span>
+      <span class="demo-badge">Model bağlı değil</span>
+      <span class="call">get_bank_balance · 8ms</span>
+      <span class="call live">get_shipment_risk çalışıyor…</span>
+      <span class="call bad">get_payroll · permission_denied</span>
+    </div>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+      <button class="act">İkincil eylem</button>
+      <button class="sig-more">1 kritik konu daha var — göster</button>
+      <button class="login-submit" style="width:auto;padding:11px 22px">Birincil eylem</button>
+    </div>
+  </div>
+</section>
+
+<section class="sec">
+  <h2>11 · Değiştirilmemesi gerekenler</h2>
+  <p class="note">
+    <b>Kaynak satırı ve tazelik bilgisi.</b> Her cevabın altındaki "Kaynak · son senkronizasyon"
+    satırı zorunludur; kullanıcının rakama güvenip güvenmeyeceğini belirler.
+  </p>
+  <p class="note">
+    <b>"—" ve "bilinmiyor" ifadeleri.</b> Sıfırla aynı görünmemeli. "0 makine çalışıyor" ile
+    "makine bilgisi gelmiyor" karışırsa ya fabrika durmuş sanılır ya da gerçek duruş kaçar.
+  </p>
+  <p class="note">
+    <b>Durum rozetleri.</b> "Demo veri" / "Model bağlı değil" dürüstlük işaretleridir.
+  </p>
+  <p class="note">
+    <b>Sessiz ekran.</b> Sinyal yoksa ekranı doldurmak için sahte içerik eklenmemeli.
+  </p>
+  <p class="note warn">
+    <b>Erişilebilirlik.</b> Odak halkası (<code>:focus-visible</code>) ve
+    <code>prefers-reduced-motion</code> desteği korunmalı — fabrika ortamında klavye
+    kullanımı yaygın.
+  </p>
+</section>
+
+</div>
+
+</body>
+</html>
