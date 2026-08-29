@@ -48,6 +48,8 @@ model User {
   displayName  String   @map("display_name")
   passwordHash String?  @map("password_hash")
   totpSecret   String?  @map("totp_secret")
+  /// Kabul edilen son TOTP zaman adımı — aynı kodun tekrar kullanımını engeller.
+  lastTotpStep BigInt?  @map("last_totp_step")
   isActive     Boolean  @default(true) @map("is_active")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
@@ -114,4 +116,19 @@ model AiUsage {
 
   @@index([tenantId, userId, createdAt])
   @@map("ai_usage")
+}
+
+/// Başarısız giriş sayacı.
+///
+/// Kullanıcı tablosunda DEĞİL, e-posta anahtarıyla ayrı tablodadır: var
+/// olmayan bir e-postaya yapılan deneme de sayılmalıdır, aksi hâlde kaba
+/// kuvvet saldırısı önce geçerli e-postayı bulup sonra sınırsız dener.
+model LoginAttempt {
+  email         String    @id
+  count         Int       @default(0)
+  lockedUntil   DateTime? @map("locked_until")
+  lastFailureAt DateTime  @default(now()) @map("last_failure_at")
+
+  @@index([lockedUntil])
+  @@map("login_attempts")
 }

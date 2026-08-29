@@ -1,6 +1,7 @@
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { appRouter } from "../../../../src/server/router.js";
-import { createContext } from "../../../../src/server/context.js";
+import { TRPCError } from "@trpc/server";
+import { createContext, UnauthenticatedError } from "../../../../src/server/context.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -10,7 +11,18 @@ function handler(req: Request) {
     endpoint: "/api/trpc",
     req,
     router: appRouter,
-    createContext: () => createContext(req),
+    createContext: async () => {
+      try {
+        return await createContext(req);
+      } catch (e) {
+        // Kimliksiz istek 500 değil 401 olmalı: istemci "sunucu bozuldu"
+        // ile "giriş yapmalısın" arasındaki farkı görebilmeli.
+        if (e instanceof UnauthenticatedError) {
+          throw new TRPCError({ code: "UNAUTHORIZED", message: e.message });
+        }
+        throw e;
+      }
+    },
   });
 }
 

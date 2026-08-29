@@ -9,7 +9,7 @@
 
 import { z } from "zod";
 import { runConversation, type RunEvent } from "../../../src/ai/runner.js";
-import { createContext, ROLE_LABEL } from "../../../src/server/context.js";
+import { createContext, ROLE_LABEL, UnauthenticatedError } from "../../../src/server/context.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -22,7 +22,15 @@ export async function POST(req: Request): Promise<Response> {
     return Response.json({ error: "Geçersiz istek" }, { status: 400 });
   }
 
-  const ctx = createContext(req);
+  let ctx;
+  try {
+    ctx = await createContext(req);
+  } catch (e) {
+    if (e instanceof UnauthenticatedError) {
+      return Response.json({ error: "unauthenticated" }, { status: 401 });
+    }
+    throw e;
+  }
   const encoder = new TextEncoder();
 
   const stream = new ReadableStream<Uint8Array>({
@@ -42,7 +50,7 @@ export async function POST(req: Request): Promise<Response> {
             channel: ctx.channel,
             task: "lookup",
             display: {
-              name: "Cebrail Karaarslan",
+              name: ctx.displayName,
               roleLabel: ROLE_LABEL[ctx.principal.roles[0]!],
               companyName: "Orthaus",
             },

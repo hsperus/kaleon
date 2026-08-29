@@ -69,7 +69,7 @@ function buildWorld() {
       ],
     }),
   );
-  return buildRegistry(new InMemoryDataSource(), {
+  return buildRegistry(new InMemoryDataSource(TENANT.tenantId), {
     operations,
     documents: new InMemoryDocumentsRepository(),
     approvals: new InMemoryApprovalRepository(),

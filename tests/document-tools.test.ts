@@ -72,7 +72,7 @@ beforeEach(() => {
 
 function call(tool: string, input: unknown, principal = satinAlma, channel: Channel = "chat") {
   return invokeTool(tool, input, {
-    registry: buildRegistry(new InMemoryDataSource(), { documents: docs, approvals }),
+    registry: buildRegistry(new InMemoryDataSource("t1"), { documents: docs, approvals }),
     audit,
     principal,
     tenant: TENANT,
@@ -115,7 +115,7 @@ describe("eşleştirme tool'u", () => {
   });
 
   it("depo sorumlusu fatura eşleştiremez", async () => {
-    const registry = buildRegistry(new InMemoryDataSource(), { documents: docs, approvals });
+    const registry = buildRegistry(new InMemoryDataSource("t1"), { documents: docs, approvals });
     expect(registry.catalogFor(depo).names).not.toContain("match_invoice");
   });
 

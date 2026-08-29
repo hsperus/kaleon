@@ -73,7 +73,7 @@ class ScriptedCompleter implements Completer {
 function deps(completer: Completer, audit = new InMemoryAuditSink()) {
   return {
     gateway: completer,
-    registry: buildRegistry(new InMemoryDataSource()),
+    registry: buildRegistry(new InMemoryDataSource("t-orthaus")),
     audit,
   };
 }

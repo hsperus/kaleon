@@ -14,6 +14,7 @@ import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
 import type { AppRouter } from "../src/server/router.js";
 import { PANEL_TOOLS, Panel, type PanelPayload } from "./panels.js";
+import { LoginScreen } from "./login.js";
 import type { RunEvent } from "../src/ai/runner.js";
 
 type Role =
@@ -45,6 +46,9 @@ interface Session {
   readonly totalTools: number;
   readonly modelConnected: boolean;
   readonly maxAuthority: number;
+  readonly identitySource: "session" | "dev-header";
+  readonly dataPlane: "demo" | "empty";
+  readonly displayName: string;
 }
 
 interface ToolCall { readonly tool: string; readonly ok: boolean; readonly code?: string; readonly durationMs: number }
@@ -70,11 +74,21 @@ function client(role: Role) {
 }
 
 export default function Page() {
+  /**
+   * Kimlik durumu üç değerlidir ve üçü de ayrı ekran demektir:
+   *   null      → henüz sorulmadı (boş ekran, kısa)
+   *   "anon"    → oturum yok → giriş ekranı
+   *   Session   → içeride
+   * "Bilmiyorum"u "giriş yapılmamış" gibi göstermek, her sayfa yenilemede
+   * bir anlığına giriş ekranı yanıp sönmesine yol açar.
+   */
+  const [authState, setAuthState] = useState<"loading" | "anon" | "in">("loading");
   const [role, setRole] = useState<Role>("patron");
   const [session, setSession] = useState<Session | null>(null);
   const [turns, setTurns] = useState<Turn[]>([]);
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
+  const [reloadKey, setReloadKey] = useState(0);
   const [panels, setPanels] = useState<PanelPayload[]>([]);
   const [briefing, setBriefing] = useState<{ level: 0 | 1 | 2; signals: Signal[] } | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -82,12 +96,21 @@ export default function Page() {
 
   useEffect(() => {
     const c = client(role);
-    c.session.query().then(setSession).catch(() => setSession(null));
+    c.session
+      .query()
+      .then((s) => {
+        setSession(s);
+        setAuthState("in");
+      })
+      .catch(() => {
+        setSession(null);
+        setAuthState("anon");
+      });
     c.briefing
       .query()
       .then((b) => setBriefing({ level: b.level, signals: [...b.signals] as Signal[] }))
       .catch(() => setBriefing(null));
-  }, [role]);
+  }, [role, reloadKey]);
 
   useEffect(() => {
     stageRef.current?.scrollTo({ top: stageRef.current.scrollHeight, behavior: "smooth" });
@@ -166,6 +189,20 @@ export default function Page() {
 
   const chatting = turns.length > 0;
 
+  if (authState === "loading") return <div className="shell boot" />;
+  if (authState === "anon") {
+    return (
+      <LoginScreen
+        onSuccess={() => {
+          setTurns([]);
+          setPanels([]);
+          setAuthState("loading");
+          setReloadKey((k) => k + 1);
+        }}
+      />
+    );
+  }
+
   return (
     <div className="shell" style={{ position: "relative" }}>
       <header className="topbar">
@@ -174,35 +211,70 @@ export default function Page() {
           <span>KAELON</span>
         </div>
         <div className="who">
-          Cebrail Karaarslan · <b>{session?.roleLabel ?? "…"}</b> · Orthaus
+          {session?.displayName ?? "…"} · <b>{session?.roleLabel ?? "…"}</b>
         </div>
         <div className="spacer" />
+        {session?.dataPlane === "demo" && (
+          <span className="demo-badge" title="İşletmesel veri demo kümesinden geliyor">
+            Demo veri
+          </span>
+        )}
+        {session?.dataPlane === "empty" && (
+          <span className="demo-badge" title="Bu şirket için veri kaynağı henüz bağlanmadı">
+            Veri yüklenmedi
+          </span>
+        )}
         {session && !session.modelConnected && (
           <span className="demo-badge" title="ANTHROPIC_API_KEY tanımlı değil">
-            Demo modu · model bağlı değil
+            Model bağlı değil
           </span>
         )}
         {session && (
-          <span className="who" style={{ border: 0, paddingLeft: 0 }}>
+          <span className="who meta" style={{ border: 0, paddingLeft: 0 }}>
             {session.visibleTools.length}/{session.totalTools} tool · L{session.maxAuthority}
           </span>
         )}
-        <select
-          className="role"
-          value={role}
-          onChange={(e) => {
-            setRole(e.target.value as Role);
-            setTurns([]);
-            setPanels([]);
-          }}
-          aria-label="Rol"
-        >
-          {ROLES.map((r) => (
-            <option key={r.id} value={r.id}>
-              {r.label}
-            </option>
-          ))}
-        </select>
+        {/* Rol seçici YALNIZCA geliştirme kimliğiyle görünür. Gerçek oturumda
+            rol kullanıcının üyeliğinden gelir ve arayüzden değiştirilemez. */}
+        {session?.identitySource === "dev-header" ? (
+          <select
+            className="role"
+            value={role}
+            onChange={(e) => {
+              setRole(e.target.value as Role);
+              setTurns([]);
+              setPanels([]);
+            }}
+            aria-label="Rol (geliştirme)"
+            title="Geliştirme kimliği — üretimde bu seçici yoktur"
+          >
+            {ROLES.map((r) => (
+              <option key={r.id} value={r.id}>
+                {r.label}
+              </option>
+            ))}
+          </select>
+        ) : null}
+        {session?.identitySource === "dev-header" ? (
+          <button className="role" type="button" onClick={() => setAuthState("anon")}>
+            Gerçek giriş
+          </button>
+        ) : (
+          <button
+            className="role"
+            type="button"
+            onClick={() => {
+              void fetch("/api/auth/logout", { method: "POST" }).then(() => {
+                setSession(null);
+                setTurns([]);
+                setPanels([]);
+                setAuthState("anon");
+              });
+            }}
+          >
+            Çıkış
+          </button>
+        )}
       </header>
 
       <div className={`stage${panels.length ? " shifted" : ""}`} ref={stageRef}>
@@ -285,9 +357,15 @@ export default function Page() {
             </div>
             {!chatting && (
               <p className="foot in" style={{ animationDelay: ".52s" }}>
+                {/* Rol değiştirme ipucu yalnızca rol seçicisi varken anlamlı;
+                    gerçek oturumda rol arayüzden değiştirilemez. */}
                 {briefing && briefing.signals.length === 0
-                  ? "Bugün eşiği aşan bir şey yok — ekran bilerek sessiz."
-                  : "Rolü değiştirin — görünen sinyaller ve tool sayısı gerçekten değişir."}
+                  ? session?.dataPlane === "empty"
+                    ? "Bu şirket için veri kaynağı henüz bağlanmadı."
+                    : "Bugün eşiği aşan bir şey yok — ekran bilerek sessiz."
+                  : session?.identitySource === "dev-header"
+                    ? "Rolü değiştirin — görünen sinyaller ve tool sayısı gerçekten değişir."
+                    : `${session?.visibleTools.length ?? 0} tool yetkinizde.`}
               </p>
             )}
           </div>

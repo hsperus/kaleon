@@ -25,7 +25,7 @@ const TENANT: TenantContext = { tenantId: "t1", schema: "tenant_t1", locale: "tr
 function run(role: "patron" | "cfo" | "depo_sorumlusu" | "uretim_muduru", over?: Partial<typeof DEFAULT_THRESHOLDS>) {
   return buildBriefing(
     {
-      registry: buildRegistry(new InMemoryDataSource()),
+      registry: buildRegistry(new InMemoryDataSource("t1")),
       audit: new InMemoryAuditSink(),
       ...(over ? { thresholds: { ...DEFAULT_THRESHOLDS, ...over } } : {}),
     },
@@ -130,7 +130,7 @@ describe("sinyal sıralaması ve dayanıklılık", () => {
     };
     const b = await buildBriefing(
       {
-        registry: buildRegistry(new InMemoryDataSource()),
+        registry: buildRegistry(new InMemoryDataSource("t1")),
         audit: new InMemoryAuditSink(),
         sentinels: [bozuk, ...SENTINELS],
       },
@@ -147,7 +147,7 @@ describe("sinyal sıralaması ve dayanıklılık", () => {
   it("nöbetçiler NORMAL tool yolundan geçer — audit'e düşer", async () => {
     const audit = new InMemoryAuditSink();
     await buildBriefing(
-      { registry: buildRegistry(new InMemoryDataSource()), audit },
+      { registry: buildRegistry(new InMemoryDataSource("t1")), audit },
       {
         principal: createPrincipal({ userId: "u", tenantId: "t1", roles: ["patron"] }),
         tenant: TENANT,

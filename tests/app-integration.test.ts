@@ -18,7 +18,7 @@ const TENANT: TenantContext = { tenantId: "demo", schema: "tenant_demo", locale:
 
 function run(question: string, role: "patron" | "depo_sorumlusu" | "uretim_muduru") {
   const audit = new InMemoryAuditSink();
-  const registry = buildRegistry(new InMemoryDataSource());
+  const registry = buildRegistry(new InMemoryDataSource("demo"));
   return runConversation(
     { gateway: new ScriptedCompleter(), registry, audit },
     {
@@ -50,13 +50,13 @@ describe("uygulama zinciri — demo modu", () => {
   });
 
   it("CFO aynı soruya cevap alır — fark rolde, soruda değil", async () => {
-    const registry = buildRegistry(new InMemoryDataSource());
+    const registry = buildRegistry(new InMemoryDataSource("demo"));
     const cfo = createPrincipal({ userId: "u2", tenantId: "demo", roles: ["cfo"] });
     expect(registry.catalogFor(cfo).names).toContain("get_bank_balance");
   });
 
   it("rol değişince görünen tool sayısı gerçekten değişir", () => {
-    const registry = buildRegistry(new InMemoryDataSource());
+    const registry = buildRegistry(new InMemoryDataSource("demo"));
     const patron = createPrincipal({ userId: "u", tenantId: "demo", roles: ["patron"] });
     const depo = createPrincipal({ userId: "u", tenantId: "demo", roles: ["depo_sorumlusu"] });
     expect(registry.catalogFor(patron).names.length).toBe(registry.size);
