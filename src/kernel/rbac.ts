@@ -36,6 +36,10 @@ export const ROLE_PERMISSIONS: Record<RoleId, readonly Permission[]> = {
     "sales:*",
     "quality:*",
     "approval:*",
+    // Kullanıcı ve rol yönetimi YALNIZCA patronda. Joker verilmiyor:
+    // ileride "admin:billing" gibi izinler eklendiğinde patronun onlara da
+    // otomatik erişmesi ayrı bir karar olmalı.
+    "admin:user.manage",
   ],
   cfo: [
     "master-data:partner.read",

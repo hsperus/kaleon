@@ -36,7 +36,15 @@ export type ModuleId =
   | "hr"
   | "sales"
   | "quality"
-  | "approval";
+  | "approval"
+  /**
+   * Platform yönetimi — kullanıcı, rol, 2FA, oturum.
+   *
+   * İş modülü DEĞİLDİR ve bilinçli olarak ayrıdır: "finance:*" jokeri alan
+   * bir CFO, kullanıcı yönetimine erişmemelidir. Yetkiyi kendi kendine
+   * yükseltebilen bir rol, rol sisteminin kendisini anlamsız kılar.
+   */
+  | "admin";
 
 /** `modul:kaynak.eylem` — örn. "finance:bank.read" */
 export type Permission = `${ModuleId}:${string}`;

@@ -15,6 +15,7 @@ import superjson from "superjson";
 import type { AppRouter } from "../src/server/router.js";
 import { PANEL_TOOLS, Panel, type PanelPayload } from "./panels.js";
 import { LoginScreen } from "./login.js";
+import { AdminPanel } from "./admin.js";
 import type { RunEvent } from "../src/ai/runner.js";
 import { formatDuration, toolLabel } from "../src/ai/tool-labels.js";
 
@@ -43,6 +44,7 @@ interface Signal {
 }
 
 interface Session {
+  readonly userId: string;
   readonly roleLabel: string;
   readonly visibleTools: readonly string[];
   readonly totalTools: number;
@@ -51,6 +53,7 @@ interface Session {
   readonly identitySource: "session" | "dev-header";
   readonly dataPlane: "demo" | "postgres";
   readonly displayName: string;
+  readonly canManageUsers: boolean;
 }
 
 interface ToolCall { readonly tool: string; readonly ok: boolean; readonly code?: string; readonly durationMs: number }
@@ -74,6 +77,28 @@ interface Turn {
   readonly risks: readonly TurnRisk[];
   /** Şu an çalışan tool — kullanıcı boş ekrana bakmasın. */
   readonly running: string | null;
+}
+
+/**
+ * Yönetim çağrıları için tRPC köprüsü.
+ *
+ * Panel bileşeni tRPC'yi tanımaz: arayüzü saf bir sözleşmedir ve test
+ * edilebilir. Bağlama burada yapılır.
+ */
+function adminApi(role: Role) {
+  const c = client(role);
+  return {
+    users: () => c.adminUsers.query(),
+    roles: () => c.adminRoles.query(),
+    createUser: (i: { email: string; displayName: string; roles: string[] }) =>
+      c.adminCreateUser.mutate(i),
+    setRoles: (i: { userId: string; roles: string[] }) => c.adminSetRoles.mutate(i),
+    setActive: (i: { userId: string; active: boolean }) => c.adminSetActive.mutate(i),
+    issueReset: (i: { userId: string }) => c.adminIssueReset.mutate(i),
+    revokeSessions: (i: { userId: string }) => c.adminRevokeSessions.mutate(i),
+    enableTotp: (i: { userId: string }) => c.adminEnableTotp.mutate(i),
+    disableTotp: (i: { userId: string }) => c.adminDisableTotp.mutate(i),
+  };
 }
 
 function client(role: Role) {
@@ -134,6 +159,7 @@ export default function Page() {
   const [history, setHistory] = useState<
     { id: string; title: string; updatedAt: string }[] | null
   >(null);
+  const [showAdmin, setShowAdmin] = useState(false);
 
   useEffect(() => {
     const c = client(role);
@@ -392,6 +418,26 @@ export default function Page() {
             />
           </svg>
         </button>
+        {session?.canManageUsers && (
+          <button
+            className="icon-btn"
+            type="button"
+            onClick={() => setShowAdmin(true)}
+            title="Kullanıcılar"
+            aria-label="Kullanıcı yönetimi"
+          >
+            <svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true">
+              <circle cx="8" cy="5.5" r="2.6" stroke="currentColor" strokeWidth="1.4" fill="none" />
+              <path
+                d="M2.8 13.6c.7-2.6 2.7-4 5.2-4s4.5 1.4 5.2 4"
+                stroke="currentColor"
+                strokeWidth="1.4"
+                strokeLinecap="round"
+                fill="none"
+              />
+            </svg>
+          </button>
+        )}
         {conversationId && turns.length > 0 && (
           <button
             className="icon-btn"
@@ -450,6 +496,14 @@ export default function Page() {
           </button>
         )}
       </header>
+
+      {showAdmin && session && (
+        <AdminPanel
+          selfId={session.userId}
+          onClose={() => setShowAdmin(false)}
+          api={adminApi(role)}
+        />
+      )}
 
       {history !== null && (
         <>

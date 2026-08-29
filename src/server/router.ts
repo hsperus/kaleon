@@ -7,6 +7,26 @@
  */
 
 import { TRPCError } from "@trpc/server";
+import * as admin from "./admin.js";
+import { holds } from "../kernel/rbac.js";
+
+/**
+ * Yönetim hatalarını tRPC hatasına çevirir.
+ *
+ * `AdminError` kullanıcıya GÖSTERİLEBİLİR bir mesaj taşır ("Kendi patron
+ * rolünüzü kaldıramazsınız"). Beklenmeyen hatalar olduğu gibi yükselir ve
+ * genel hata yoluna düşer — iç ayrıntı sızmaz.
+ */
+async function adminCall<T>(fn: () => Promise<T>): Promise<T> {
+  try {
+    return await fn();
+  } catch (e) {
+    if (e instanceof admin.AdminError) {
+      throw new TRPCError({ code: "FORBIDDEN", message: e.message });
+    }
+    throw e;
+  }
+}
 import { z } from "zod";
 import { procedure, router } from "./trpc.js";
 import { runConversation } from "../ai/runner.js";
@@ -30,6 +50,9 @@ export const appRouter = router({
       identitySource: ctx.identitySource,
       dataPlane: ctx.dataPlane,
       displayName: ctx.displayName,
+      // Arayüz yönetim düğmesini bu bayrağa göre gösterir. Yetki kontrolü
+      // yine sunucuda; bayrak yalnızca gereksiz bir düğmeyi gizler.
+      canManageUsers: holds(ctx.principal, "admin:user.manage"),
     };
   }),
 
@@ -123,6 +146,72 @@ export const appRouter = router({
     .mutation(async ({ ctx, input }) => {
       const removed = await ctx.conversations.remove(input.id, ctx.principal.userId);
       if (!removed) throw new TRPCError({ code: "NOT_FOUND" });
+      return { ok: true };
+    }),
+
+  // ─────────────── Kullanıcı yönetimi ───────────────
+  //
+  // Her işlem üç kapıdan geçer: yetki (`admin:user.manage`, yalnızca
+  // patronda), kiracı sınırı (hedef kullanıcının BU tenant'ta üyeliği
+  // olmalı) ve kendi ayağına sıkma koruması.
+
+  adminUsers: procedure.query(async ({ ctx }) => {
+    return admin.listUsers(ctx.principal, ctx.tenant.tenantId);
+  }),
+
+  adminRoles: procedure.query(({ ctx }) => {
+    // Rol listesi yetkisizden de saklanır: hangi rollerin var olduğu,
+    // sistemin yetki haritası hakkında bilgi verir.
+    if (!holds(ctx.principal, "admin:user.manage")) return [];
+    return admin.ASSIGNABLE_ROLES.map((id) => ({ id, label: ROLE_LABEL[id] }));
+  }),
+
+  adminCreateUser: procedure
+    .input(
+      z.object({
+        email: z.string().email().max(320),
+        displayName: z.string().min(2).max(120),
+        roles: z.array(z.string().min(2).max(40)).min(1).max(7),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => adminCall(() => admin.createUser(ctx.principal, ctx.tenant.tenantId, input))),
+
+  adminSetRoles: procedure
+    .input(z.object({ userId: z.string().uuid(), roles: z.array(z.string()).min(1).max(7) }))
+    .mutation(async ({ ctx, input }) => {
+      await adminCall(() => admin.setRoles(ctx.principal, ctx.tenant.tenantId, input));
+      return { ok: true };
+    }),
+
+  adminSetActive: procedure
+    .input(z.object({ userId: z.string().uuid(), active: z.boolean() }))
+    .mutation(async ({ ctx, input }) => {
+      await adminCall(() => admin.setActive(ctx.principal, ctx.tenant.tenantId, input));
+      return { ok: true };
+    }),
+
+  adminIssueReset: procedure
+    .input(z.object({ userId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) =>
+      adminCall(() => admin.issueReset(ctx.principal, ctx.tenant.tenantId, input.userId)),
+    ),
+
+  adminRevokeSessions: procedure
+    .input(z.object({ userId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) =>
+      adminCall(() => admin.revokeSessions(ctx.principal, ctx.tenant.tenantId, input.userId)),
+    ),
+
+  adminEnableTotp: procedure
+    .input(z.object({ userId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) =>
+      adminCall(() => admin.enableTwoFactor(ctx.principal, ctx.tenant.tenantId, input.userId)),
+    ),
+
+  adminDisableTotp: procedure
+    .input(z.object({ userId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      await adminCall(() => admin.disableTwoFactor(ctx.principal, ctx.tenant.tenantId, input.userId));
       return { ok: true };
     }),
 

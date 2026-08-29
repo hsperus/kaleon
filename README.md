@@ -38,6 +38,46 @@ sessizce bozar.
 `KAELON_ALLOW_DEMO_MODE=1` açıkça verilmelidir — sistem sessizce demo moduna
 *düşmez*, operatör bilerek *seçer* ve bu her açılışta loglanır.
 
+## Kullanıcı yönetimi
+
+Arayüzden (yalnızca **patron** görür — `admin:user.manage` izni jokerle
+verilmez): kullanıcı ekleme, rol atama, 2FA açma/kapatma, parola sıfırlama
+kodu üretme, oturum düşürme, pasifleştirme.
+
+**Parola yönetici tarafından yazılmaz.** Kullanıcı oluşturulunca tek
+kullanımlık bir kod çıkar; kullanıcı kendi parolasını belirler. Yöneticinin
+parola yazması, o parolanın bilinmesi demektir — ve pratikte herkese aynısı
+verilir.
+
+**Sır bir kez gösterilir.** 2FA sırrı ve sıfırlama kodu yalnızca üretildiği
+anda görünür; listede tutulsaydı listeyi gören herkes herkesin ikinci
+faktörünü görürdü.
+
+Parolasını unutan kullanıcı giriş ekranındaki **"Parolamı unuttum"** ile
+yöneticiden aldığı kodu girer. Kod 1 saat geçerli, tek kullanımlık ve
+sıfırlama tüm oturumları düşürür.
+
+## Veri girişi (içe aktarma)
+
+Sohbete CSV eklenir; **sistem dosyanın ne olduğunu başlıklarından anlar**.
+Emin olamazsa sorar. Akış SAP'nin göç mantığıyla aynıdır: yükle → **simüle
+et** → hataları gör → kaydet. Önizleme hiçbir şey yazmaz.
+
+| Dosya | Yetki | Kim yükler |
+|---|---|---|
+| Cari listesi | `master-data:partner.write` | patron, satın alma |
+| Personel listesi | `master-data:employee.write` | patron, İK |
+| Banka bakiyeleri | `finance:bank.write` | patron, CFO |
+| Puantaj (PDKS) | `hr:attendance.write` | patron, İK |
+| Satış siparişleri | `sales:order.write` | patron, CFO |
+
+Yetkisi olmayan nesne tanıma adayı bile olmaz. Hatalı satır dosyayı
+durdurmaz: satır numarasıyla raporlanır, gerisi aktarılır. Aynı dosya iki
+kez yüklenirse mükerrer kayıt oluşmaz.
+
+Türkçe Excel çıktısı doğrudan çalışır: noktalı virgül ayırıcı, BOM,
+`1.234,56` sayı ve `31.12.2026` tarih biçimi.
+
 ## Kurulum komutları
 
 ```bash
@@ -47,6 +87,7 @@ npm run tenant -- migrate --all                   # şema güncellemeleri
 npm run user   -- create <e-posta> "<Ad>" <parola>
 npm run user   -- grant  <e-posta> <slug> <rol...>
 npm run user   -- totp   <e-posta>                # 2FA aç
+npm run user   -- reset  <e-posta>                # parola sıfırlama kodu
 npm run user   -- revoke <e-posta>                # tüm oturumlarını düşür
 ```
 
@@ -205,7 +246,9 @@ görüldü.
 
 Bunlar unutulmuş değil, ertelenmiş işlerdir:
 
-- Parola sıfırlama akışı, e-posta doğrulama, OAuth/SSO
+- E-posta gönderimi (SMTP). Parola sıfırlama çalışıyor ama kod yönetici
+  tarafından elden iletiliyor; SMTP eklendiğinde aynı kod e-postayla gider.
+- E-posta doğrulama, OAuth/SSO
 - Dağıtık IP sınırı ve dağıtık iş zamanlayıcı (Redis gerekir)
 - Banka ve PDKS entegratör adaptörleri (canlı besleme gerekir)
 - Vardiya/yoklama beslemesi → `staffOnShift` bilinmiyor
