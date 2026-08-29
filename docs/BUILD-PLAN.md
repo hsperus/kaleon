@@ -77,8 +77,11 @@
   rol değiştirici (geliştirme), tool çağrısı rozetleri, kaynak satırı,
   audit uç noktası. Model bağlı değilken senaryo tabanlı completer devreye
   giriyor ve arayüz bunu AÇIKÇA yazıyor
-- **Kalan:** streaming, panel sistemi, Boss Mode ekranları, saha dokunmatik
-  katmanı, gerçek oturum (Better Auth)
+- **Tamam (devam):** NDJSON akış uç noktası, ajan döngüsünden canlı ilerleme
+  olayları (tool_start/tool_end/text/done), panel çekmecesi (5 tool için
+  yapılandırılmış görünüm), kelime kelime beliriş
+- **Kalan:** Boss Mode ekranları, saha dokunmatik katmanı, gerçek oturum
+  (Better Auth), gerçek model akışı (API anahtarı gerektirir)
 
 ### Aşama 5 — Entegrasyon katmanı (3-4 hafta)
 - Adapter deseni: `connect / sync / send / validate / normalize`

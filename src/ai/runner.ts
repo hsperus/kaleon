@@ -33,6 +33,8 @@ export interface RunRequest {
   readonly task: TaskKind;
   readonly display: { name: string; roleLabel: string; companyName: string };
   readonly now?: () => Date;
+  /** İlerleme olayları. Verilmezse döngü sessiz çalışır. */
+  readonly onEvent?: (event: RunEvent) => void;
 }
 
 export interface ToolCallRecord {
@@ -41,6 +43,32 @@ export interface ToolCallRecord {
   readonly code?: string;
   readonly durationMs: number;
 }
+
+/**
+ * Ajan döngüsünün ilerleme olayları.
+ *
+ * Neden var: bir tool çağrısı yüz milisaniyeler, model turu saniyeler sürer.
+ * Kullanıcının bu süre boyunca boş ekrana bakması, sistemin donduğu izlenimi
+ * verir. Olaylar akarken arayüz "şu an ne yapılıyor"u gösterebilir.
+ *
+ * Olaylar döngünün GERÇEK adımlarıdır; süsleme değildir. `tool_start`
+ * gerçekten o tool çağrılmadan hemen önce yayınlanır.
+ */
+export type RunEvent =
+  | { readonly type: "tool_start"; readonly tool: string }
+  | {
+      readonly type: "tool_end";
+      readonly tool: string;
+      readonly ok: boolean;
+      readonly code?: string;
+      readonly durationMs: number;
+      /** Panelde gösterilebilecek yapılandırılmış sonuç. */
+      readonly data?: unknown;
+      readonly sources?: readonly { system: string; syncedAt: string; recordCount?: number }[];
+      readonly risks?: readonly { severity: string; message: string }[];
+    }
+  | { readonly type: "text"; readonly text: string }
+  | { readonly type: "done"; readonly result: RunResult };
 
 export interface RunResult {
   readonly answer: string;
@@ -110,7 +138,7 @@ export async function runConversation(
     if (warn) budgetWarning = warn;
 
     if (message.stop_reason === "refusal") {
-      return {
+      return finish({
         answer:
           "Bu isteği güvenlik nedeniyle işleyemiyorum. Soruyu farklı biçimde sorabilir " +
           "veya yetkili bir kullanıcıdan destek isteyebilirsiniz.",
@@ -120,7 +148,7 @@ export async function runConversation(
         stopReason: message.stop_reason,
         refused: true,
         ...(budgetWarning ? { budgetWarning } : {}),
-      };
+      });
     }
 
     // Sunucu tool'u (tool arama) sürüyor — asistan turunu geri it ve devam et.
@@ -134,15 +162,17 @@ export async function runConversation(
     );
 
     if (toolUses.length === 0) {
-      return {
-        answer: textOf(message),
+      const finalText = textOf(message);
+      req.onEvent?.({ type: "text", text: finalText });
+      return finish({
+        answer: finalText,
         toolCalls,
         iterations,
         costUsd,
         stopReason: message.stop_reason,
         refused: false,
         ...(budgetWarning ? { budgetWarning } : {}),
-      };
+      });
     }
 
     messages.push({ role: "assistant", content: message.content });
@@ -150,6 +180,7 @@ export async function runConversation(
     // Paralel tool kullanımı varsayılan olarak açık — hepsini eşzamanlı çalıştır.
     const results = await Promise.all(
       toolUses.map(async (use) => {
+        req.onEvent?.({ type: "tool_start", tool: use.name });
         const invoked = await invokeTool(use.name, use.input, {
           registry: deps.registry,
           audit: deps.audit,
@@ -170,6 +201,19 @@ export async function runConversation(
           durationMs: invoked.durationMs,
           ...(invoked.outcome.ok ? {} : { code: invoked.outcome.code }),
         });
+        req.onEvent?.({
+          type: "tool_end",
+          tool: use.name,
+          ok: invoked.outcome.ok,
+          durationMs: invoked.durationMs,
+          ...(invoked.outcome.ok
+            ? {
+                data: invoked.outcome.data,
+                sources: invoked.outcome.sources,
+                ...(invoked.outcome.risks ? { risks: invoked.outcome.risks } : {}),
+              }
+            : { code: invoked.outcome.code }),
+        });
         const block: Anthropic.Beta.BetaToolResultBlockParam = {
           type: "tool_result",
           tool_use_id: use.id,
@@ -184,7 +228,7 @@ export async function runConversation(
     messages.push({ role: "user", content: results });
   }
 
-  return {
+  return finish({
     answer:
       "Bu soruyu verilen adım sınırı içinde tamamlayamadım. Soruyu daraltıp tekrar sorabilirsiniz.",
     toolCalls,
@@ -193,5 +237,10 @@ export async function runConversation(
     stopReason: "max_iterations",
     refused: false,
     ...(budgetWarning ? { budgetWarning } : {}),
-  };
+  });
+
+  function finish(result: RunResult): RunResult {
+    req.onEvent?.({ type: "done", result });
+    return result;
+  }
 }
