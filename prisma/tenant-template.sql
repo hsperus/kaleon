@@ -344,6 +344,50 @@ CREATE TABLE "integration_errors" (
     CONSTRAINT "integration_errors_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "bank_accounts" (
+    "id" UUID NOT NULL,
+    "bank" TEXT NOT NULL,
+    "external_id" TEXT NOT NULL,
+    "iban" TEXT,
+    "currency" TEXT NOT NULL,
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "bank_accounts_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "bank_balance_snapshots" (
+    "id" UUID NOT NULL,
+    "account_id" UUID NOT NULL,
+    "as_of" TIMESTAMP(3) NOT NULL,
+    "available" DECIMAL(18,2) NOT NULL,
+    "blocked" DECIMAL(18,2) NOT NULL DEFAULT 0,
+    "raw_payload_id" UUID,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "bank_balance_snapshots_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "attendance_days" (
+    "id" UUID NOT NULL,
+    "employee_id" UUID NOT NULL,
+    "work_date" DATE NOT NULL,
+    "worked_minutes" INTEGER NOT NULL,
+    "planned_minutes" INTEGER NOT NULL,
+    "is_weekend" BOOLEAN NOT NULL DEFAULT false,
+    "is_holiday" BOOLEAN NOT NULL DEFAULT false,
+    "approved_at" TIMESTAMP(3),
+    "approved_by" UUID,
+    "raw_payload_id" UUID,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "attendance_days_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "partners_code_key" ON "partners"("code");
 
@@ -464,6 +508,24 @@ CREATE INDEX "sync_runs_source_started_at_idx" ON "sync_runs"("source", "started
 -- CreateIndex
 CREATE INDEX "integration_errors_resolved_at_idx" ON "integration_errors"("resolved_at");
 
+-- CreateIndex
+CREATE INDEX "bank_accounts_currency_idx" ON "bank_accounts"("currency");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "bank_accounts_external_id_currency_key" ON "bank_accounts"("external_id", "currency");
+
+-- CreateIndex
+CREATE INDEX "bank_balance_snapshots_account_id_as_of_idx" ON "bank_balance_snapshots"("account_id", "as_of" DESC);
+
+-- CreateIndex
+CREATE UNIQUE INDEX "bank_balance_snapshots_account_id_as_of_key" ON "bank_balance_snapshots"("account_id", "as_of");
+
+-- CreateIndex
+CREATE INDEX "attendance_days_work_date_idx" ON "attendance_days"("work_date");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "attendance_days_employee_id_work_date_key" ON "attendance_days"("employee_id", "work_date");
+
 -- AddForeignKey
 ALTER TABLE "partner_aliases" ADD CONSTRAINT "partner_aliases_partner_id_fkey" FOREIGN KEY ("partner_id") REFERENCES "partners"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -490,4 +552,10 @@ ALTER TABLE "approval_events" ADD CONSTRAINT "approval_events_workspace_id_fkey"
 
 -- AddForeignKey
 ALTER TABLE "integration_errors" ADD CONSTRAINT "integration_errors_raw_payload_id_fkey" FOREIGN KEY ("raw_payload_id") REFERENCES "raw_payloads"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "bank_balance_snapshots" ADD CONSTRAINT "bank_balance_snapshots_account_id_fkey" FOREIGN KEY ("account_id") REFERENCES "bank_accounts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "attendance_days" ADD CONSTRAINT "attendance_days_employee_id_fkey" FOREIGN KEY ("employee_id") REFERENCES "employees"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

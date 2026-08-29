@@ -128,6 +128,8 @@ model Employee {
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
+  attendance AttendanceDay[]
+
   @@index([normalized])
   @@index([department])
   @@map("employees")
@@ -480,4 +482,94 @@ model IntegrationError {
 
   @@index([resolvedAt])
   @@map("integration_errors")
+}
+
+// ─────────────────────────── Banka ───────────────────────────
+
+/// Banka hesabı — master data.
+model BankAccount {
+  id         String   @id @default(uuid()) @db.Uuid
+  bank       String
+  /// Hesabın banka tarafındaki kimliği; entegratör bunu gönderir.
+  externalId String   @map("external_id")
+  iban       String?
+  currency   String
+  isActive   Boolean  @default(true) @map("is_active")
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  balances BankBalanceSnapshot[]
+
+  @@unique([externalId, currency])
+  @@index([currency])
+  @@map("bank_accounts")
+}
+
+/// Bakiye ANLIK GÖRÜNTÜSÜ — güncellenebilir bir alan DEĞİL.
+///
+/// Bakiye bizim hesapladığımız bir sayı değildir; bankanın belirli bir anda
+/// söylediği şeydir. Tek bir `balance` sütununu güncellemek üç şeyi birden
+/// kaybettirir: bakiyenin hangi ana ait olduğunu, hangi senkronizasyondan
+/// geldiğini ve dün ne olduğunu. "Sabah 12 milyon vardı, akşam 4 milyon"
+/// sorusunun cevabı bu tabloda durur.
+///
+/// Güncel bakiye = her hesap için `asOf` en büyük olan kayıt.
+model BankBalanceSnapshot {
+  id        String   @id @default(uuid()) @db.Uuid
+  accountId String   @map("account_id") @db.Uuid
+  /// Bankanın bildirdiği an — bizim yazdığımız an değil.
+  asOf      DateTime @map("as_of")
+  available Decimal  @db.Decimal(18, 2)
+  blocked   Decimal  @default(0) @db.Decimal(18, 2)
+  /// Bu bakiyeyi getiren ham belge — kanıt zinciri.
+  rawPayloadId String? @map("raw_payload_id") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  account BankAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  /// Aynı an için iki kez yazılmaz — senkronizasyon tekrarında idempotent.
+  @@unique([accountId, asOf])
+  @@index([accountId, asOf(sort: Desc)])
+  @@map("bank_balance_snapshots")
+}
+
+// ─────────────────────── Puantaj / PDKS ───────────────────────
+
+/// Günlük puantaj kaydı — PDKS'ten gelir.
+///
+/// GÜN BAZINDA TUTULUR, AY BAZINDA DEĞİL.
+/// Aylık toplam saklamak üç şeyi kaybettirir: hangi günün hafta sonu
+/// olduğunu, hangi günün onaylandığını ve bir düzeltmenin hangi güne
+/// dokunduğunu. Bordro itirazları gün bazındadır; toplam bir sayı itirazı
+/// çözmez.
+///
+/// FAZLA MESAİ HESAPLANIR, SAKLANMAZ: normal mesai süresi mevzuatla ve
+/// sözleşmeyle değişir; saklanmış bir "fazla mesai" alanı kural değiştiğinde
+/// geçmişi yanlış gösterir.
+model AttendanceDay {
+  id         String   @id @default(uuid()) @db.Uuid
+  employeeId String   @map("employee_id") @db.Uuid
+  /// Puantajın ait olduğu gün (yerel takvim günü).
+  workDate   DateTime @map("work_date") @db.Date
+  /// Fiilen çalışılan dakika.
+  workedMinutes Int   @map("worked_minutes")
+  /// O gün için planlanan normal süre — fazla mesai bunun üstüdür.
+  plannedMinutes Int  @map("planned_minutes")
+  /// Hafta sonu / resmî tatil mi? Ücret çarpanı buna göre değişir.
+  isWeekend  Boolean  @default(false) @map("is_weekend")
+  isHoliday  Boolean  @default(false) @map("is_holiday")
+  /// Fazla mesai yönetici onayından geçti mi?
+  /// ONAYLANMADAN BORDROYA GİRMEZ — tutar kesinleşmemiş sayılır.
+  approvedAt DateTime? @map("approved_at")
+  approvedBy String?  @map("approved_by") @db.Uuid
+  /// Bu kaydı getiren ham belge — kanıt zinciri.
+  rawPayloadId String? @map("raw_payload_id") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+  updatedAt  DateTime @updatedAt @map("updated_at")
+
+  employee Employee @relation(fields: [employeeId], references: [id], onDelete: Cascade)
+
+  /// Bir çalışanın bir günü tektir — senkronizasyon tekrarı idempotent.
+  @@unique([employeeId, workDate])
+  @@index([workDate])
+  @@map("attendance_days")
 }

@@ -244,10 +244,145 @@ describe.skipIf(!enabled)("Entity resolution kalıcılığı", () => {
   }, 60_000);
 
   it("BAĞLANMAYAN KANALLAR BOŞ DÖNER — uydurma veri yok", async () => {
-    // Banka/mesai/sevkiyat için tenant şemasında henüz tablo yok.
-    expect((await source.bankBalances()).rows).toEqual([]);
-    expect((await source.overtime()).rows).toEqual([]);
+    // Sevkiyat/WIP için tenant şemasında henüz tablo yok.
     expect((await source.shipmentRisks()).rows).toEqual([]);
     expect((await source.wipSnapshot()).rows.stations).toEqual([]);
+  });
+});
+
+/**
+ * Banka bakiyeleri.
+ *
+ * Buradaki testlerin çoğu "bakiye doğru mu" değil, "hangi bakiye" sorusunu
+ * sorar. Bir ERP'de en pahalı hata, dünkü bakiyeyi bugünkü sanmaktır.
+ */
+describe.skipIf(!enabled)("Banka bakiyeleri", () => {
+  let shared: SharedPrisma;
+  let db: TenantPrisma;
+  let source: PrismaDataSource;
+
+  const SCHEMA_B = "tenant_it_bank";
+
+  beforeAll(async () => {
+    shared = new SharedPrisma();
+    await dropTenantSchema(shared, SCHEMA_B);
+    await provisionTenantSchema(shared, SCHEMA_B);
+    db = new TenantPrisma({ datasources: { db: { url: urlForSchema(TENANT_URL!, SCHEMA_B) } } });
+    source = new PrismaDataSource(db);
+  }, 60_000);
+
+  afterAll(async () => {
+    await db?.$disconnect();
+    if (shared) {
+      await dropTenantSchema(shared, SCHEMA_B);
+      await shared.$disconnect();
+    }
+  });
+
+  beforeEach(async () => {
+    await db.bankBalanceSnapshot.deleteMany();
+    await db.bankAccount.deleteMany();
+  });
+
+  async function account(bank: string, currency: string, externalId: string) {
+    return db.bankAccount.create({ data: { bank, currency, externalId } });
+  }
+
+  it("güncel bakiye = en son anlık görüntü", async () => {
+    const acc = await account("Garanti BBVA", "TRY", "ACC-1");
+    await db.bankBalanceSnapshot.createMany({
+      data: [
+        { accountId: acc.id, asOf: new Date("2026-05-16T06:00:00Z"), available: 5_000_000, blocked: 0 },
+        { accountId: acc.id, asOf: new Date("2026-05-16T18:00:00Z"), available: 12_400_000, blocked: 0 },
+        { accountId: acc.id, asOf: new Date("2026-05-16T12:00:00Z"), available: 9_000_000, blocked: 0 },
+      ],
+    });
+    const { rows } = await source.bankBalances(SCHEMA_B, null);
+    expect(rows).toEqual([
+      { bank: "Garanti BBVA", currency: "TRY", available: 12_400_000, blocked: 0 },
+    ]);
+  });
+
+  it("GEÇMİŞ SİLİNMEZ — dünkü bakiye tabloda durur", async () => {
+    const acc = await account("Garanti BBVA", "TRY", "ACC-1");
+    await db.bankBalanceSnapshot.createMany({
+      data: [
+        { accountId: acc.id, asOf: new Date("2026-05-15T18:00:00Z"), available: 3_000_000, blocked: 0 },
+        { accountId: acc.id, asOf: new Date("2026-05-16T18:00:00Z"), available: 12_400_000, blocked: 0 },
+      ],
+    });
+    expect(await db.bankBalanceSnapshot.count()).toBe(2);
+  });
+
+  it("aynı an iki kez yazılmaz — senkronizasyon tekrarı idempotent", async () => {
+    const acc = await account("Garanti BBVA", "TRY", "ACC-1");
+    const at = new Date("2026-05-16T18:00:00Z");
+    await db.bankBalanceSnapshot.create({
+      data: { accountId: acc.id, asOf: at, available: 12_400_000, blocked: 0 },
+    });
+    await expect(
+      db.bankBalanceSnapshot.create({
+        data: { accountId: acc.id, asOf: at, available: 999, blocked: 0 },
+      }),
+    ).rejects.toThrow();
+  });
+
+  it("TAZELİK EN ESKİ HESAPTAN GELİR", async () => {
+    // İki banka beş dakika önce, biri dün senkronize olduysa doğru cevap "dün".
+    const a = await account("Garanti BBVA", "TRY", "ACC-1");
+    const b = await account("İş Bankası", "TRY", "ACC-2");
+    await db.bankBalanceSnapshot.createMany({
+      data: [
+        { accountId: a.id, asOf: new Date("2026-05-16T18:00:00Z"), available: 1, blocked: 0 },
+        { accountId: b.id, asOf: new Date("2026-05-15T09:00:00Z"), available: 2, blocked: 0 },
+      ],
+    });
+    const { freshness } = await source.bankBalances(SCHEMA_B, null);
+    expect(freshness.syncedAt).toBe("2026-05-15T09:00:00.000Z");
+  });
+
+  it("bakiyesi hiç gelmemiş hesap SIFIR olarak gösterilmez", async () => {
+    // Sıfır bir iddiadır; "bilmiyorum" ile aynı şey değildir.
+    await account("Yapı Kredi", "EUR", "ACC-3");
+    const { rows } = await source.bankBalances(SCHEMA_B, null);
+    expect(rows).toEqual([]);
+  });
+
+  it("para birimi filtresi çalışır", async () => {
+    const a = await account("Garanti BBVA", "TRY", "ACC-1");
+    const b = await account("Garanti BBVA", "EUR", "ACC-2");
+    await db.bankBalanceSnapshot.createMany({
+      data: [
+        { accountId: a.id, asOf: new Date("2026-05-16T18:00:00Z"), available: 12_400_000, blocked: 0 },
+        { accountId: b.id, asOf: new Date("2026-05-16T18:00:00Z"), available: 198_400, blocked: 0 },
+      ],
+    });
+    const eur = await source.bankBalances(SCHEMA_B, "EUR");
+    expect(eur.rows).toEqual([
+      { bank: "Garanti BBVA", currency: "EUR", available: 198_400, blocked: 0 },
+    ]);
+  });
+
+  it("blokeli tutar ayrı taşınır, kullanılabilire karışmaz", async () => {
+    const a = await account("İş Bankası", "EUR", "ACC-9");
+    await db.bankBalanceSnapshot.create({
+      data: {
+        accountId: a.id,
+        asOf: new Date("2026-05-16T18:00:00Z"),
+        available: 126_050,
+        blocked: 16_650,
+      },
+    });
+    const { rows } = await source.bankBalances(SCHEMA_B, null);
+    expect(rows[0]).toMatchObject({ available: 126_050, blocked: 16_650 });
+  });
+
+  it("pasif hesap listelenmez", async () => {
+    const a = await account("Kapanmış Banka", "TRY", "ACC-X");
+    await db.bankBalanceSnapshot.create({
+      data: { accountId: a.id, asOf: new Date("2026-05-16T18:00:00Z"), available: 5, blocked: 0 },
+    });
+    await db.bankAccount.update({ where: { id: a.id }, data: { isActive: false } });
+    expect((await source.bankBalances(SCHEMA_B, null)).rows).toEqual([]);
   });
 });

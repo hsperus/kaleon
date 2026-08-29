@@ -27,6 +27,7 @@
 import type { DataSource, PartnerCandidateRow, PartnerHint, WithFreshness } from "../data/port.js";
 import { normalizeName } from "../modules/master-data/normalize.js";
 import { isValidTckn, isValidVkn } from "../modules/master-data/identifiers.js";
+import { PrismaAttendanceSource } from "./attendance-source.js";
 import type { TenantDb } from "./client.js";
 
 /** Bir sorguda belleğe alınacak en fazla aday. */
@@ -182,22 +183,83 @@ function toCandidate(p: PartnerWithRelations): PartnerCandidateRow {
 }
 
 /**
+ * Banka bakiyeleri.
+ *
+ * GÜNCEL BAKİYE HESAPLANIR, SAKLANMAZ: her hesabın `as_of` değeri en büyük
+ * anlık görüntüsü alınır. Tek bir güncellenebilir `balance` sütunu, bakiyenin
+ * hangi ana ait olduğunu ve dün ne olduğunu kaybettirirdi.
+ *
+ * TAZELİK EN ESKİ KAYITTAN GELİR: üç bankadan ikisi beş dakika önce, biri
+ * dün senkronize olduysa, kullanıcıya söylenecek doğru cevap "dün"dür.
+ * En yenisini göstermek, bayat veriyi taze gibi sunmak olurdu.
+ */
+export class PrismaBankSource {
+  readonly #db: TenantDb;
+
+  constructor(db: TenantDb) {
+    this.#db = db;
+  }
+
+  async balances(
+    currency: string | null,
+  ): Promise<WithFreshness<readonly import("../data/port.js").BankBalance[]>> {
+    const accounts = await this.#db.bankAccount.findMany({
+      where: { isActive: true, ...(currency ? { currency } : {}) },
+      orderBy: [{ bank: "asc" }, { currency: "asc" }],
+      include: {
+        // Her hesabın YALNIZCA en güncel anlık görüntüsü.
+        balances: { orderBy: { asOf: "desc" }, take: 1 },
+      },
+    });
+
+    const rows: import("../data/port.js").BankBalance[] = [];
+    let oldest: Date | null = null;
+
+    for (const acc of accounts) {
+      const snap = acc.balances[0];
+      // Hesap açılmış ama hiç bakiye gelmemişse SIFIR YAZILMAZ — sıfır bir
+      // iddiadır ve yanlış olur. Hesap listelenmez.
+      if (!snap) continue;
+      rows.push({
+        bank: acc.bank,
+        currency: acc.currency,
+        available: Number(snap.available),
+        blocked: Number(snap.blocked),
+      });
+      if (!oldest || snap.asOf < oldest) oldest = snap.asOf;
+    }
+
+    return {
+      rows,
+      freshness: {
+        syncedAt: (oldest ?? new Date()).toISOString(),
+        recordCount: rows.length,
+      },
+    };
+  }
+}
+
+/**
  * Bir tenant için tam veri kaynağı.
  *
- * Şu an YALNIZCA cari çözümleme Postgres'ten geliyor; banka, mesai, sevkiyat
- * ve WIP için tenant şemasında henüz tablo yok. Bu sınıf o metotlarda BOŞ
+ * Cari çözümleme, banka ve puantaj Postgres'ten geliyor; sevkiyat ve WIP için
+ * tenant şemasında henüz tablo yok. Bu sınıf o metotlarda BOŞ
  * döner — uydurma veri değil, boş. Hangi kanalın bağlı olduğu
  * `connectedChannels` ile dışarıya bildirilir; arayüz "veri yok" ile
  * "bağlanmadı" arasındaki farkı gösterebilsin diye.
  */
 export class PrismaDataSource implements DataSource {
   readonly #master: PrismaMasterDataSource;
+  readonly #bank: PrismaBankSource;
+  readonly #attendance: PrismaAttendanceSource;
 
   constructor(db: TenantDb) {
     this.#master = new PrismaMasterDataSource(db);
+    this.#bank = new PrismaBankSource(db);
+    this.#attendance = new PrismaAttendanceSource(db);
   }
 
-  readonly connectedChannels = ["partners"] as const;
+  readonly connectedChannels = ["partners", "bank", "attendance"] as const;
 
   async wipSnapshot(): Promise<WithFreshness<import("../data/port.js").WipSnapshot>> {
     return empty({
@@ -216,12 +278,18 @@ export class PrismaDataSource implements DataSource {
     return empty([]);
   }
 
-  async bankBalances(): Promise<WithFreshness<readonly import("../data/port.js").BankBalance[]>> {
-    return empty([]);
+  async bankBalances(
+    _tenantId: string,
+    currency: string | null,
+  ): Promise<WithFreshness<readonly import("../data/port.js").BankBalance[]>> {
+    return this.#bank.balances(currency);
   }
 
-  async overtime(): Promise<WithFreshness<readonly import("../data/port.js").OvertimeRecord[]>> {
-    return empty([]);
+  async overtime(
+    _tenantId: string,
+    args: { employeeQuery: string | null; department: string | null; period: string },
+  ): Promise<WithFreshness<readonly import("../data/port.js").OvertimeRecord[]>> {
+    return this.#attendance.overtime(args);
   }
 
   async partnerCandidates(
