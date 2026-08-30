@@ -15,9 +15,6 @@ export function Hero() {
   return (
     <>
       <section className="mk-hero">
-        <span className="mk-badge k-fade">
-          <i /> 136 iş · tek arayüz · denetim kaydı açık
-        </span>
         <h1 className="mk-h1">
           <span className="k-rise" style={{ animationDelay: ".05s" }}>
             Soruyorsunuz.

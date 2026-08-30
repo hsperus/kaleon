@@ -39,7 +39,6 @@ export function Shell({ children }: { children: ReactNode }) {
       <div className="mk-bg" aria-hidden>
         <div className="mk-blob-a" />
         <div className="mk-blob-b" />
-        <div className="mk-grid" />
       </div>
 
       <header className="mk-top">

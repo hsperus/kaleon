@@ -2082,17 +2082,6 @@ button.role, select.role {
   background: radial-gradient(circle, rgba(31, 122, 82, .18), rgba(31, 122, 82, .06) 40%, transparent 68%);
   animation: kDrift2 34s ease-in-out infinite;
 }
-/* Izgara ortada görünür, kenarlarda erir — sonsuz bir düzlem hissi. */
-.mk-grid {
-  position: absolute; inset: 0;
-  background-image:
-    linear-gradient(rgba(255, 255, 255, .035) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, .035) 1px, transparent 1px);
-  background-size: 88px 88px;
-  mask-image: radial-gradient(ellipse 80% 55% at 50% 12%, #000, transparent 78%);
-  -webkit-mask-image: radial-gradient(ellipse 80% 55% at 50% 12%, #000, transparent 78%);
-}
-
 /* ── Üst çubuk ── */
 .mk-top {
   position: fixed; top: 0; left: 0; right: 0; z-index: 20;
@@ -2138,16 +2127,6 @@ button.role, select.role {
 .mk-sec { position: relative; z-index: 1; max-width: 1120px; margin: 0 auto; padding: clamp(96px, 14vw, 170px) clamp(16px, 4vw, 28px) 0 }
 .mk-hero { position: relative; z-index: 1; max-width: 1120px; margin: 0 auto; padding: clamp(120px, 16vw, 186px) clamp(16px, 4vw, 28px) 0; text-align: center }
 .mk-anchor { display: block; height: 0; scroll-margin-top: 80px }
-
-/* Durum kapsülü — nefes alan nokta, sistemin çalıştığını söyler. */
-.mk-badge {
-  display: inline-flex; align-items: center; gap: 9px;
-  padding: 6px 14px 6px 10px;
-  border: 1px solid rgba(255, 255, 255, .10); border-radius: 980px;
-  background: rgba(255, 255, 255, .03);
-  font-size: 12px; color: var(--fg-2);
-}
-.mk-badge i { width: 6px; height: 6px; border-radius: 50%; background: var(--green); animation: kBreathe 2.6s ease-in-out infinite }
 
 .mk-h1 {
   margin: 26px 0 0;
@@ -2370,7 +2349,7 @@ button.role, select.role {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .mk-blob-a, .mk-blob-b, .mk-badge i, .mk-demo-q i { animation: none }
+  .mk-blob-a, .mk-blob-b, .mk-demo-q i { animation: none }
   .k-rise, .k-rise-sm, .k-fade,
   .mk-demo-q span, .mk-step, .mk-demo-p, .mk-demo-table, .mk-mono,
   .mk-bars i, .mk-role-bar {

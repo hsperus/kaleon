@@ -56,11 +56,6 @@ export function Roles() {
           <br />
           <span className="dim">İnsan onaylar.</span>
         </h2>
-        <div className="mk-acts k-rise-sm" style={{ marginTop: 40 }}>
-          <a className="mk-pill-lg mk-pill-blue" href="/uygulama">
-            Sisteme gir
-          </a>
-        </div>
       </section>
     </>
   );
