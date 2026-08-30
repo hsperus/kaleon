@@ -1509,12 +1509,46 @@ model JournalLine {
   /// 120/320 gibi hesaplarda zorunlu — kimden alacaklı, kime borçlu.
   partnerId   String? @map("partner_id")
 
+  /// İŞLEM PARA BİRİMİ. Defter TL tutar (debit/credit) ile birlikte
+  /// özgün tutarı da taşır — SAP'nin ACDOCA'sındaki gibi. TL satırda
+  /// fx alanları TL tutarın aynısıdır ve kur 1'dir; böylece "dövizli
+  /// mi" diye ayıran bir dal hiçbir sorguda gerekmez.
+  currency    String  @default("TRY")
+  fxDebit     Decimal @default(0) @map("fx_debit") @db.Decimal(18, 2)
+  fxCredit    Decimal @default(0) @map("fx_credit") @db.Decimal(18, 2)
+  /// Kaydın atıldığı andaki kur — SONRADAN DEĞİŞMEZ. Dönem sonu
+  /// değerlemesi bu kuru bugünkü kurla karşılaştırır; güncellenseydi
+  /// fark hesaplanamaz, sadece kaybolurdu.
+  fxRate      Decimal @default(1) @map("fx_rate") @db.Decimal(18, 6)
+
   entry JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
 
   @@unique([entryId, lineNo])
   @@index([accountCode, entryId])
   @@index([partnerId])
+  @@index([currency, accountCode])
   @@map("journal_lines")
+}
+
+/// Dönem sonu kur değerlemesi koşusu.
+///
+/// Fişten ayrı tutulur: aynı döneme iki kez değerleme yapılırsa
+/// hangisinin geçerli olduğu `source_kind` bakılarak anlaşılamaz.
+model FxRevaluation {
+  id         String   @id @default(uuid()) @db.Uuid
+  /// Değerleme tarihi — dönemin son günü.
+  asOf       DateTime @map("as_of") @db.Date
+  /// Oluşan yevmiye fişi; ters kayıtta null'a düşer.
+  entryId    String?  @map("entry_id") @db.Uuid
+  /// Toplam kur farkı; pozitif kâr, negatif zarar.
+  difference Decimal  @db.Decimal(18, 2)
+  lineCount  Int      @map("line_count")
+  /// Kullanılan kurlar — "hangi kurla değerlediniz" sorusunun cevabı.
+  rates      Json
+  createdBy  String   @map("created_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@map("fx_revaluations")
 }
 
 // ─────────────────── Stok sayımı ───────────────────

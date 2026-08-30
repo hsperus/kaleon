@@ -39,6 +39,7 @@ import { PrismaUploadStore } from "../db/upload-store.js";
 import { SalesRepository } from "../db/sales-repository.js";
 import { ValuationRepository } from "../db/valuation-repository.js";
 import { PeriodRepository } from "../db/period-repository.js";
+import { RevaluationRepository } from "../db/revaluation-repository.js";
 import { BatchRepository } from "../db/batch-repository.js";
 import { ProcurementRepository } from "../db/procurement-repository.js";
 import { LeaveRepository } from "../db/leave-repository.js";
@@ -324,6 +325,7 @@ function buildRegistryForTenant(tenant: TenantContext, isDemo = false): ToolRegi
     sales: new SalesRepository(db),
     valuation: new ValuationRepository(db),
     periods: new PeriodRepository(db),
+    revaluation: new RevaluationRepository(db),
     batches: new BatchRepository(db),
     procurement: new ProcurementRepository(db),
     leave: new LeaveRepository(db),

@@ -32,6 +32,10 @@ export const JOURNAL_SOURCES = [
   "stock_movement",
   "manual",
   "period_close",
+  // Dönem sonu kur değerlemesi. Ayrı bir kaynak olması gerekiyor:
+  // "manual" deseydik, elle girilen fişlerle değerleme fişleri
+  // birbirine karışır ve değerlemeyi geri almak imkânsızlaşırdı.
+  "fx_revaluation",
 ] as const;
 export type JournalSource = (typeof JOURNAL_SOURCES)[number];
 
@@ -50,10 +54,106 @@ export interface DraftLine {
   readonly description: string;
   /** Cari kırılımı — 120/320 gibi hesaplarda zorunlu. */
   readonly partnerId?: string | null;
+
+  /*
+   * İŞLEM PARA BİRİMİ.
+   *
+   * Verilmezse satır TL kabul edilir ve döviz tarafı TL tutarın
+   * aynısıyla doldurulur. Böylece eski çağıranların hiçbiri
+   * değişmek zorunda kalmaz ama defterde döviz alanı boş kalmaz —
+   * boş kalsaydı her toplamda COALESCE gerekir ve biri unutulurdu.
+   */
+  readonly currency?: string;
+  /** İşlem para birimindeki borç tutarı. */
+  readonly fxDebit?: number;
+  /** İşlem para birimindeki alacak tutarı. */
+  readonly fxCredit?: number;
+  /** Kaydın atıldığı andaki kur. TL satırda 1. */
+  readonly fxRate?: number;
+}
+
+/** Döviz alanları doldurulmuş satır — `balance` bunu üretir. */
+export interface SettledFx {
+  readonly currency: string;
+  readonly fxDebit: number;
+  readonly fxCredit: number;
+  readonly fxRate: number;
+}
+
+/**
+ * Satırın döviz tarafını tamamlar ve tutarlılığını denetler.
+ *
+ * ÜÇ KURAL:
+ *
+ *  1. TL SATIRIN KURU 1'DİR. "TRY ama kur 32" yazılabilseydi hangi
+ *     rakamın doğru olduğu belirsizleşirdi.
+ *
+ *  2. DÖVİZ YÖNÜ TL YÖNÜYLE AYNIDIR. Borç tarafı TL'de dolu, dövizde
+ *     boşsa satır kendi kendisiyle çelişir ve bakiye sorgusu sessizce
+ *     yanlış sonuç verir.
+ *
+ *  3. DÖVİZLİ SATIRDA TUTAR SIFIR OLAMAZ. Sıfır döviz tutarlı bir TL
+ *     kaydı, "kur sonsuz" demektir.
+ */
+/*
+ * DİKKAT: bu dosyadaki `kurus()` LİRAYI KURUŞA ÇEVİRİR (×100), lirayı
+ * yuvarlamaz — denge karşılaştırması tam sayı üzerinden yapılsın diye
+ * öyle yazılmış. Döviz tutarları lira cinsinden saklandığı için ayrı
+ * bir yuvarlayıcı gerekiyor; `kurus` kullanılsaydı deftere yazılan her
+ * döviz tutarı yüz katına çıkardı.
+ */
+function iki(n: number): number {
+  return Math.round(n * 100) / 100;
+}
+
+export function settleFx(l: DraftLine): SettledFx {
+  const currency = l.currency ?? "TRY";
+
+  if (currency === "TRY") {
+    if (l.fxRate !== undefined && l.fxRate !== 1) {
+      throw new JournalError(
+        `${l.accountCode} satırı TL ama kur ${l.fxRate} verilmiş. TL'nin kuru 1'dir.`,
+      );
+    }
+    return { currency, fxDebit: iki(l.debit), fxCredit: iki(l.credit), fxRate: 1 };
+  }
+
+  const rate = l.fxRate;
+  if (rate === undefined || !(rate > 0)) {
+    throw new JournalError(
+      `${l.accountCode} satırı ${currency} cinsinden ama kur verilmemiş. ` +
+        `Kuru bilinmeyen bir tutar deftere yazılamaz — yazılsaydı TL karşılığı ` +
+        `uydurulmuş olurdu.`,
+    );
+  }
+
+  const fxDebit = iki(l.fxDebit ?? 0);
+  const fxCredit = iki(l.fxCredit ?? 0);
+
+  if (fxDebit === 0 && fxCredit === 0) {
+    throw new JournalError(
+      `${l.accountCode} satırı ${currency} cinsinden ama döviz tutarı sıfır. ` +
+        `Sıfır döviz karşılığı bir TL tutarı, kurun sonsuz olduğu anlamına gelir.`,
+    );
+  }
+  if ((l.debit > 0) !== (fxDebit > 0) || (l.credit > 0) !== (fxCredit > 0)) {
+    throw new JournalError(
+      `${l.accountCode} satırında TL ve döviz yönü uyuşmuyor: ` +
+        `TL ${l.debit > 0 ? "borç" : "alacak"}, döviz ` +
+        `${fxDebit > 0 ? "borç" : "alacak"}. Aynı satır iki yöne birden yazılamaz.`,
+    );
+  }
+
+  return { currency, fxDebit, fxCredit, fxRate: rate };
 }
 
 export interface BalancedEntry {
-  readonly lines: readonly (DraftLine & { lineNo: number })[];
+  /*
+   * Döviz alanları ARTIK ZORUNLU. `balance` her satırı `settleFx`'ten
+   * geçirir; çıktıda opsiyonel bırakılsaydı yazma katmanı varsayılan
+   * uydurmak zorunda kalır ve doğrulama atlanabilirdi.
+   */
+  readonly lines: readonly (DraftLine & SettledFx & { lineNo: number })[];
   readonly totalDebit: number;
   readonly totalCredit: number;
 }
@@ -83,7 +183,7 @@ export function balance(lines: readonly DraftLine[]): BalancedEntry {
 
   let debit = 0;
   let credit = 0;
-  const out: (DraftLine & { lineNo: number })[] = [];
+  const out: (DraftLine & SettledFx & { lineNo: number })[] = [];
 
   lines.forEach((l, i) => {
     const a: Account = account(l.accountCode);
@@ -111,7 +211,7 @@ export function balance(lines: readonly DraftLine[]): BalancedEntry {
 
     debit += kurus(l.debit);
     credit += kurus(l.credit);
-    out.push({ ...l, lineNo: i + 1 });
+    out.push({ ...l, ...settleFx(l), lineNo: i + 1 });
   });
 
   if (debit !== credit) {

@@ -33,8 +33,30 @@ export function salesInvoiceLines(inv: {
   vatAmount: number;
   totalAmount: number;
   export?: boolean;
+  /*
+   * DÖVİZ YALNIZCA CARİ SATIRINA YAZILIR — gelire ve KDV'ye değil.
+   *
+   * 600 Yurtiçi Satışlar bir TL hesabıdır: ciro her zaman defter para
+   * biriminde ölçülür ve dönem sonunda yeniden değerlenmez. 391 de
+   * öyle — KDV Hazine'ye TL olarak ödenir.
+   *
+   * Kur riski taşıyan tek satır 120'dir: müşteri EUR ödeyecek, ve o
+   * EUR'nun TL karşılığı ödeme gününe kadar değişecek. Değerleme de
+   * yalnızca bu satırı bulmalı; gelire döviz yazılsaydı dönem sonunda
+   * geçmiş ciro yeniden değerlenir ve büyüme rakamı kurdan şişerdi.
+   */
+  currency?: string;
+  /** Faturanın kendi para birimindeki toplam tutarı. */
+  fxTotal?: number;
+  /** Fatura tarihindeki kur. */
+  fxRate?: number;
 }): readonly DraftLine[] {
   const revenue = inv.export ? "601" : "600";
+  const fx =
+    inv.currency && inv.currency !== "TRY" && inv.fxTotal !== undefined && inv.fxRate !== undefined
+      ? { currency: inv.currency, fxDebit: inv.fxTotal, fxCredit: 0, fxRate: inv.fxRate }
+      : {};
+
   const lines: DraftLine[] = [
     {
       accountCode: "120",
@@ -42,6 +64,7 @@ export function salesInvoiceLines(inv: {
       credit: 0,
       description: `${inv.documentNo} satış faturası`,
       partnerId: inv.partnerId,
+      ...fx,
     },
     {
       accountCode: revenue,

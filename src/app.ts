@@ -9,6 +9,7 @@ import { itemTools, type ItemRepository } from "./modules/master-data/item-tools
 import { salesTools } from "./modules/sales/sales-tools.js";
 import { valuationTools } from "./modules/inventory/valuation-tools.js";
 import { periodTools } from "./modules/finance/period-tools.js";
+import { revaluationTools } from "./modules/finance/revaluation-tools.js";
 import { batchTools } from "./modules/inventory/batch-tools.js";
 import { procurementTools } from "./modules/procurement/procurement-tools.js";
 import { leaveTools } from "./modules/hr/leave-tools.js";
@@ -48,6 +49,7 @@ import type { LeaveRepository } from "./db/leave-repository.js";
 import type { ProcurementRepository } from "./db/procurement-repository.js";
 import type { BatchRepository } from "./db/batch-repository.js";
 import type { PeriodRepository } from "./db/period-repository.js";
+import type { RevaluationRepository } from "./db/revaluation-repository.js";
 import type { ValuationRepository } from "./db/valuation-repository.js";
 import type { SalesRepository } from "./db/sales-repository.js";
 import { InMemoryAuditSink, type AuditSink } from "./kernel/audit.js";
@@ -89,6 +91,7 @@ export interface Repositories {
   readonly valuation?: ValuationRepository;
   /** Muhasebe dönemi ve dönem kapama. */
   readonly periods?: PeriodRepository;
+  readonly revaluation?: RevaluationRepository;
   /** Parti izleme ve şecere. */
   readonly batches?: BatchRepository;
   /** Satın alma talebi ve ödeme. */
@@ -161,6 +164,11 @@ export function buildRegistry(db: DataSource, repos: Repositories = {}): ToolReg
     ...(repos.sales ? salesTools(repos.sales) : []),
     ...(repos.valuation ? valuationTools(repos.valuation) : []),
     ...(repos.periods ? periodTools(repos.periods) : []),
+    // Kur değerlemesi HEM defteri HEM kur tablosunu okur; ikisi de
+    // yoksa tool hiç kurulmaz — yarım bir değerleme yanlış sayı üretir.
+    ...(repos.revaluation && repos.valuation
+      ? revaluationTools(repos.revaluation, repos.valuation)
+      : []),
     ...(repos.batches ? batchTools(repos.batches) : []),
     ...(repos.procurement ? procurementTools(repos.procurement) : []),
     ...(repos.leave ? leaveTools(repos.leave) : []),
