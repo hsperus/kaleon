@@ -7,6 +7,7 @@
  */
 
 import { describe, expect, it } from "vitest";
+import { invokeConfirmed } from "./helpers/confirm.js";
 import { fold, jaroWinkler, normalizeName, tokenSimilarity } from "../src/modules/master-data/normalize.js";
 import { isValidTckn, isValidVkn, parseTaxId } from "../src/modules/master-data/identifiers.js";
 import {
@@ -230,7 +231,7 @@ describe("resolve_partner tool — uçtan uca", () => {
     const { InMemoryAuditSink } = await import("../src/kernel/audit.js");
     const { createPrincipal } = await import("../src/kernel/rbac.js");
 
-    const res = await invokeTool(
+    const res = await invokeConfirmed(
       "resolve_partner",
       { name: "Burçelik", taxId: null, externalSystem: null, externalId: null },
       {

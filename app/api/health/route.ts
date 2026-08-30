@@ -14,6 +14,7 @@
 
 import { sharedClient } from "../../../src/db/client.js";
 import { checkEnv } from "../../../src/server/env.js";
+import { modelConfigError } from "../../../src/ai/gateway.js";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,11 +43,23 @@ export async function GET(req: Request): Promise<Response> {
         // Ayrıntılı hata metni dışarı verilmez; sağlık uç noktası çoğu
         // kurulumda kimlik doğrulaması olmadan erişilebilirdir.
         env: { ok: env.ok, errorCount: env.errors.length, warningCount: env.warnings.length },
-        model: { connected: Boolean(process.env["ANTHROPIC_API_KEY"]) },
+        // "BAĞLI" İLE "ÇALIŞIYOR" AYNI ŞEY DEĞİLDİR. Anahtar tanımlıyken
+        // istekler yapılandırma nedeniyle reddediliyorsa (eksik çalışma
+        // alanı, kapatılmış model) sistem "bağlı" der ama her soru hata
+        // döner; operatör nereye bakacağını bilemez. Bu mesaj sağlayıcının
+        // kendi açıklamasıdır ve gizli bilgi taşımaz.
+        model: modelState(),
       },
     },
     { status: ok ? 200 : 503, headers: { "Cache-Control": "no-store" } },
   );
+}
+
+function modelState(): { connected: boolean; working?: boolean; error?: string } {
+  const connected = Boolean(process.env["ANTHROPIC_API_KEY"]);
+  if (!connected) return { connected: false };
+  const err = modelConfigError();
+  return err ? { connected: true, working: false, error: err.message } : { connected: true };
 }
 
 async function checkDatabase(): Promise<{ ok: boolean; latencyMs: number; error?: string }> {

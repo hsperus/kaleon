@@ -129,6 +129,10 @@ export async function POST(req: Request): Promise<Response> {
             history,
             signal: req.signal,
             onEvent: send,
+            // Yazma tool'ları bunsuz çalışmaz: insan onayı bir seçenek
+            // değil, akışın zorunlu adımıdır.
+            pending: ctx.pending,
+            conversationId: activeConversationId,
           },
         );
 

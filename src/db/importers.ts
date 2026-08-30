@@ -17,11 +17,14 @@
  */
 
 import type { TenantDb } from "./client.js";
+import type { Prisma } from "./generated/tenant/index.js";
+import { setChangeActor } from "./change-log.js";
 import { normalizeName } from "../modules/master-data/normalize.js";
 import { resolvePartner } from "../modules/master-data/resolver.js";
 import { PrismaMasterDataSource } from "./master-data-source.js";
 import type {
   AttendanceRow,
+  ItemImportRow,
   BankBalanceRow,
   EmployeeRow,
   PartnerRow,
@@ -43,16 +46,39 @@ export interface Classification {
 /** Bir nesne için yazma sözleşmesi. */
 export interface Importer<T> {
   classify(rows: readonly T[]): Promise<Classification>;
-  commit(rows: readonly T[]): Promise<ImportOutcome>;
+  /**
+   * Satırları yazar.
+   *
+   * `userId` ANA VERİ DEĞİŞİKLİK BELGESİNE geçer: dosyayı kimin yüklediği,
+   * "bu vergi numarasını kim değiştirmiş" sorusunun tek cevabıdır.
+   * Verilmezse değişiklik yine kaydedilir ama aktörü bilinmez.
+   */
+  commit(rows: readonly T[], userId?: string): Promise<ImportOutcome>;
 }
+
+/**
+ * Yazma yüzeyi: ya istemcinin kendisi ya da bir işlem istemcisi.
+ * Aktör kaydı işlem gerektirir; aktörsüz yolda işlem açmak gereksizdir.
+ */
+type Writer = TenantDb | Prisma.TransactionClient;
 
 const EMPTY: ImportOutcome = { created: 0, updated: 0, skipped: 0, failures: [] };
 
-/** Ortak sayaç toplayıcı — her yazıcıda aynı döngüyü tekrar yazmamak için. */
+/**
+ * Ortak sayaç toplayıcı — her yazıcıda aynı döngüyü tekrar yazmamak için.
+ *
+ * HER SATIR KENDİ İŞLEMİNDE. Tümü tek işlemde olsaydı, tek bozuk satır
+ * 4000 satırlık dosyanın tamamını geri alırdı — oysa buradaki tasarımın
+ * temeli "hatalı satır diğerlerini durdurmaz"dır.
+ *
+ * Aktör de o işlem içinde kurulur: `SET LOCAL` yalnızca kendi işleminde
+ * yaşar ve havuzdan gelen bir sonraki bağlantıya sızmaz.
+ */
 async function runRows<T>(
   rows: readonly T[],
   refOf: (row: T) => string,
-  handle: (row: T) => Promise<"created" | "updated" | "skipped">,
+  handle: (row: T, db: Writer) => Promise<"created" | "updated" | "skipped">,
+  ctx: { db: TenantDb; userId: string | undefined },
 ): Promise<ImportOutcome> {
   let created = 0;
   let updated = 0;
@@ -61,7 +87,12 @@ async function runRows<T>(
 
   for (const row of rows) {
     try {
-      const result = await handle(row);
+      const result = ctx.userId
+        ? await ctx.db.$transaction(async (tx) => {
+            await setChangeActor(tx, ctx.userId);
+            return handle(row, tx);
+          })
+        : await handle(row, ctx.db);
       if (result === "created") created++;
       else if (result === "updated") updated++;
       else skipped++;
@@ -95,11 +126,11 @@ export class PartnerImporter implements Importer<PartnerRow> {
     return { toCreate: rows.length - toUpdate, toUpdate };
   }
 
-  async commit(rows: readonly PartnerRow[]): Promise<ImportOutcome> {
-    return runRows(rows, (r) => r.code, async (row) => {
+  async commit(rows: readonly PartnerRow[], userId?: string): Promise<ImportOutcome> {
+    return runRows(rows, (r) => r.code, async (row, db) => {
       const existing = await this.#find(row);
       if (!existing) {
-        await this.db.partner.create({
+        await db.partner.create({
           data: {
             code: row.code,
             legalName: row.legalName,
@@ -115,7 +146,7 @@ export class PartnerImporter implements Importer<PartnerRow> {
         return "created";
       }
 
-      const current = await this.db.partner.findUniqueOrThrow({
+      const current = await db.partner.findUniqueOrThrow({
         where: { id: existing.id },
         select: { legalName: true, isSupplier: true, isCustomer: true },
       });
@@ -125,7 +156,7 @@ export class PartnerImporter implements Importer<PartnerRow> {
         // Eski unvan alias olarak saklanır: eski belgelerdeki isim hâlâ bu
         // firmaya çözülebilmeli. Kaynak `automatic` — bu bir tahmin değil,
         // müşterinin kendi ana verisinden gelen kayıtlı bir olgu.
-        await this.db.partnerAlias.upsert({
+        await db.partnerAlias.upsert({
           where: {
             partnerId_normalized: {
               partnerId: existing.id,
@@ -141,7 +172,7 @@ export class PartnerImporter implements Importer<PartnerRow> {
           },
           update: {},
         });
-        await this.db.partner.update({
+        await db.partner.update({
           where: { id: existing.id },
           data: { legalName: row.legalName, normalized: row.normalized },
         });
@@ -151,7 +182,7 @@ export class PartnerImporter implements Importer<PartnerRow> {
       // Tür bayrakları yalnızca EKLENİR: bir cari hem müşteri hem tedarikçi
       // olabilir; eksik sütunlu bir dosya diğerini silmemeli.
       if ((row.isSupplier && !current.isSupplier) || (row.isCustomer && !current.isCustomer)) {
-        await this.db.partner.update({
+        await db.partner.update({
           where: { id: existing.id },
           data: {
             isSupplier: current.isSupplier || row.isSupplier,
@@ -162,12 +193,12 @@ export class PartnerImporter implements Importer<PartnerRow> {
       }
 
       if (row.taxId) {
-        const has = await this.db.partnerTaxId.findFirst({
+        const has = await db.partnerTaxId.findFirst({
           where: { partnerId: existing.id, value: row.taxId.value },
           select: { id: true },
         });
         if (!has) {
-          await this.db.partnerTaxId.create({
+          await db.partnerTaxId.create({
             data: { partnerId: existing.id, kind: row.taxId.kind, value: row.taxId.value },
           });
           changed = true;
@@ -175,6 +206,82 @@ export class PartnerImporter implements Importer<PartnerRow> {
       }
 
       return changed ? "updated" : "skipped";
+    }, { db: this.db, userId });
+  }
+}
+
+// ────────────────────────── Malzeme ──────────────────────────
+
+export class ItemImporter implements Importer<ItemImportRow> {
+  constructor(private readonly db: TenantDb) {}
+
+  async classify(rows: readonly ItemImportRow[]): Promise<Classification> {
+    const codes = rows.map((r) => r.code);
+    const existing = await this.db.item.count({ where: { code: { in: codes } } });
+    return { toCreate: rows.length - existing, toUpdate: existing };
+  }
+
+  async commit(rows: readonly ItemImportRow[], userId?: string): Promise<ImportOutcome> {
+    return runRows(rows, (r) => r.code, async (row, db) => {
+      const found = await db.item.findUnique({
+        where: { code: row.code },
+        select: { id: true, baseUom: true },
+      });
+
+      if (found) {
+        // TEMEL BİRİM DEĞİŞTİRİLEMEZ. Stok bakiyesi o birimde tutuluyor;
+        // birimi değiştirmek geçmiş tüm hareketlerin anlamını bozar —
+        // 500 kg birdenbire 500 adet olur.
+        if (found.baseUom !== row.baseUom) {
+          throw new Error(
+            `Temel birim değiştirilemez: "${row.code}" sistemde "${found.baseUom}", ` +
+              `dosyada "${row.baseUom}". Stok bakiyesi mevcut birimde tutuluyor.`,
+          );
+        }
+        await db.item.update({
+          where: { id: found.id },
+          data: {
+            name: row.name,
+            normalized: row.normalized,
+            type: row.type,
+            procurementType: row.procurementType,
+            batchManaged: row.batchManaged,
+            ...(row.leadTimeDays !== null ? { leadTimeDays: row.leadTimeDays } : {}),
+          },
+        });
+        if (row.altUom) await this.#upsertUnit(db, found.id, row.altUom);
+        return "updated";
+      }
+
+      const created = await db.item.create({
+        data: {
+          code: row.code,
+          name: row.name,
+          normalized: row.normalized,
+          type: row.type,
+          baseUom: row.baseUom,
+          procurementType: row.procurementType,
+          batchManaged: row.batchManaged,
+          leadTimeDays: row.leadTimeDays,
+        },
+        select: { id: true },
+      });
+      if (row.altUom) await this.#upsertUnit(db, created.id, row.altUom);
+      return "created";
+    }, { db: this.db, userId });
+  }
+
+  // Yazma yüzeyi DIŞARIDAN GELİR: satırın kendi işlemi içinde yazılmalı,
+  // aksi hâlde birim ayrı bir işlemde kalır ve satır geri alınsa bile durur.
+  async #upsertUnit(
+    db: Writer,
+    itemId: string,
+    unit: { uom: string; factor: number },
+  ): Promise<void> {
+    await db.itemUnit.upsert({
+      where: { itemId_uom: { itemId, uom: unit.uom } },
+      create: { itemId, uom: unit.uom, factor: unit.factor },
+      update: { factor: unit.factor },
     });
   }
 }
@@ -190,9 +297,9 @@ export class EmployeeImporter implements Importer<EmployeeRow> {
     return { toCreate: rows.length - existing, toUpdate: existing };
   }
 
-  async commit(rows: readonly EmployeeRow[]): Promise<ImportOutcome> {
-    return runRows(rows, (r) => r.code, async (row) => {
-      const found = await this.db.employee.findUnique({ where: { code: row.code } });
+  async commit(rows: readonly EmployeeRow[], userId?: string): Promise<ImportOutcome> {
+    return runRows(rows, (r) => r.code, async (row, db) => {
+      const found = await db.employee.findUnique({ where: { code: row.code } });
       const data = {
         fullName: row.fullName,
         normalized: row.normalized,
@@ -204,12 +311,12 @@ export class EmployeeImporter implements Importer<EmployeeRow> {
         ...(row.grossSalary !== null ? { grossSalary: row.grossSalary } : {}),
       };
       if (!found) {
-        await this.db.employee.create({ data: { code: row.code, ...data } });
+        await db.employee.create({ data: { code: row.code, ...data } });
         return "created";
       }
-      await this.db.employee.update({ where: { code: row.code }, data });
+      await db.employee.update({ where: { code: row.code }, data });
       return "updated";
-    });
+    }, { db: this.db, userId });
   }
 }
 
@@ -235,9 +342,9 @@ export class BankImporter implements Importer<BankBalanceRow> {
     return { toCreate: rows.length - toUpdate, toUpdate };
   }
 
-  async commit(rows: readonly BankBalanceRow[]): Promise<ImportOutcome> {
-    return runRows(rows, (r) => `${r.bank}/${r.externalId}`, async (row) => {
-      const account = await this.db.bankAccount.upsert({
+  async commit(rows: readonly BankBalanceRow[], userId?: string): Promise<ImportOutcome> {
+    return runRows(rows, (r) => `${r.bank}/${r.externalId}`, async (row, db) => {
+      const account = await db.bankAccount.upsert({
         where: { externalId_currency: { externalId: row.externalId, currency: row.currency } },
         create: {
           bank: row.bank,
@@ -250,7 +357,7 @@ export class BankImporter implements Importer<BankBalanceRow> {
       });
 
       const asOf = new Date(row.asOf);
-      const existing = await this.db.bankBalanceSnapshot.findUnique({
+      const existing = await db.bankBalanceSnapshot.findUnique({
         where: { accountId_asOf: { accountId: account.id, asOf } },
         select: { id: true },
       });
@@ -262,11 +369,11 @@ export class BankImporter implements Importer<BankBalanceRow> {
         return "skipped";
       }
 
-      await this.db.bankBalanceSnapshot.create({
+      await db.bankBalanceSnapshot.create({
         data: { accountId: account.id, asOf, available: row.available, blocked: row.blocked },
       });
       return "created";
-    });
+    }, { db: this.db, userId });
   }
 }
 
@@ -294,8 +401,8 @@ export class AttendanceImporter implements Importer<AttendanceRow> {
     return { toCreate: rows.length - toUpdate, toUpdate };
   }
 
-  async commit(rows: readonly AttendanceRow[]): Promise<ImportOutcome> {
-    return runRows(rows, (r) => `${r.employeeCode} ${r.workDate}`, async (row) => {
+  async commit(rows: readonly AttendanceRow[], userId?: string): Promise<ImportOutcome> {
+    return runRows(rows, (r) => `${r.employeeCode} ${r.workDate}`, async (row, db) => {
       const employeeId = await this.#employeeId(row.employeeCode);
       if (!employeeId) {
         // PERSONEL UYDURULMAZ. Puantaj dosyasından personel kartı açmak,
@@ -315,17 +422,17 @@ export class AttendanceImporter implements Importer<AttendanceRow> {
         ...(row.approved ? { approvedAt: new Date() } : {}),
       };
 
-      const existing = await this.db.attendanceDay.findUnique({
+      const existing = await db.attendanceDay.findUnique({
         where: { employeeId_workDate: { employeeId, workDate } },
         select: { id: true },
       });
       if (existing) {
-        await this.db.attendanceDay.update({ where: { id: existing.id }, data });
+        await db.attendanceDay.update({ where: { id: existing.id }, data });
         return "updated";
       }
-      await this.db.attendanceDay.create({ data: { employeeId, workDate, ...data } });
+      await db.attendanceDay.create({ data: { employeeId, workDate, ...data } });
       return "created";
-    });
+    }, { db: this.db, userId });
   }
 }
 
@@ -357,8 +464,8 @@ export class SalesOrderImporter implements Importer<SalesOrderRow> {
     return { toCreate: rows.length - existing, toUpdate: existing };
   }
 
-  async commit(rows: readonly SalesOrderRow[]): Promise<ImportOutcome> {
-    return runRows(rows, (r) => r.orderNo, async (row) => {
+  async commit(rows: readonly SalesOrderRow[], userId?: string): Promise<ImportOutcome> {
+    return runRows(rows, (r) => r.orderNo, async (row, db) => {
       const partnerId = await this.#customerId(row.customerRef);
       if (!partnerId) {
         throw new Error(
@@ -374,17 +481,17 @@ export class SalesOrderImporter implements Importer<SalesOrderRow> {
         currency: row.currency,
       };
 
-      const existing = await this.db.salesOrder.findUnique({
+      const existing = await db.salesOrder.findUnique({
         where: { orderNo: row.orderNo },
         select: { id: true },
       });
       if (existing) {
-        await this.db.salesOrder.update({ where: { id: existing.id }, data });
+        await db.salesOrder.update({ where: { id: existing.id }, data });
         return "updated";
       }
-      await this.db.salesOrder.create({ data: { orderNo: row.orderNo, ...data } });
+      await db.salesOrder.create({ data: { orderNo: row.orderNo, ...data } });
       return "created";
-    });
+    }, { db: this.db, userId });
   }
 }
 
@@ -393,6 +500,8 @@ export function importerFor(objectId: string, db: TenantDb): Importer<never> {
   switch (objectId) {
     case "partners":
       return new PartnerImporter(db) as unknown as Importer<never>;
+    case "items":
+      return new ItemImporter(db) as unknown as Importer<never>;
     case "employees":
       return new EmployeeImporter(db) as unknown as Importer<never>;
     case "bank":

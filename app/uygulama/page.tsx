@@ -12,12 +12,21 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { createTRPCClient, httpBatchLink } from "@trpc/client";
 import superjson from "superjson";
-import type { AppRouter } from "../src/server/router.js";
-import { PANEL_TOOLS, Panel, type PanelPayload } from "./panels.js";
-import { LoginScreen } from "./login.js";
-import { AdminPanel } from "./admin.js";
-import type { RunEvent } from "../src/ai/runner.js";
-import { formatDuration, toolLabel } from "../src/ai/tool-labels.js";
+import type { AppRouter } from "../../src/server/router.js";
+import { PANEL_TOOLS, Panel, type PanelPayload } from "../panels.js";
+import { DocumentSheet } from "../document.js";
+import { InvoiceBody, invoiceSheets } from "../invoice-doc.js";
+import { DespatchBody, despatchSheets } from "../despatch-doc.js";
+import { BalanceSheetBody, balanceSheets, type BalanceSheetView } from "../balance-doc.js";
+import { StatementBody, statementSheets, type StatementView } from "../statement-doc.js";
+import { PayslipBody, payslipSheets, type PayslipView } from "../payslip-doc.js";
+import type { DespatchView, InvoiceView } from "../../src/db/einvoice-repository.js";
+import { ActionForm, type PendingAction } from "../action-form.js";
+import { RichText } from "../rich-text.js";
+import { LoginScreen } from "../login.js";
+import { AdminPanel } from "../admin.js";
+import type { RunEvent } from "../../src/ai/runner.js";
+import { formatDuration, toolLabel } from "../../src/ai/tool-labels.js";
 
 type Role =
   | "patron" | "cfo" | "ik_muduru" | "uretim_muduru"
@@ -53,6 +62,8 @@ interface Session {
   readonly identitySource: "session" | "dev-header";
   readonly dataPlane: "demo" | "postgres";
   readonly displayName: string;
+  /** Belge antedinde görünür. */
+  readonly companyName: string;
   readonly canManageUsers: boolean;
 }
 
@@ -62,6 +73,21 @@ interface TurnRisk {
   readonly severity: string;
   readonly message: string;
 }
+
+/**
+ * Cevaba iliştirilmiş belge.
+ *
+ * TÜR AYRI DURUYOR ÇÜNKÜ BELGELER AYNI DEĞİL. Fatura tutar taşır,
+ * irsaliye taşımaz; irsaliye plaka taşır, fatura taşımaz. İkisini tek
+ * bir "genel belge" tipine sıkıştırmak, her ikisinde de yarısı boş bir
+ * form üretirdi.
+ */
+type AttachedDoc =
+  | { readonly kind: "invoice"; readonly invoice: InvoiceView }
+  | { readonly kind: "despatch"; readonly despatch: DespatchView }
+  | { readonly kind: "balance-sheet"; readonly sheet: BalanceSheetView }
+  | { readonly kind: "statement"; readonly statement: StatementView }
+  | { readonly kind: "payslip"; readonly payslip: PayslipView };
 
 interface Turn {
   readonly question: string;
@@ -75,8 +101,25 @@ interface Turn {
    * bilgi sessizce kaybolur. Yapısal uyarı, yapısal olarak gösterilir.
    */
   readonly risks: readonly TurnRisk[];
+  /**
+   * Onay bekleyen işlemler.
+   *
+   * Turun İÇİNDE durur, ayrı bir kuyrukta değil: form, hangi cümleden
+   * doğduğu görünmeden gösterilirse kullanıcı neyi onayladığını bilemez.
+   */
+  readonly pending: readonly PendingAction[];
+  /** Onaylanan işlemlerin sonucu — formun yerini alır. */
+  readonly completed: readonly { label: string; ok: boolean; message: string }[];
   /** Şu an çalışan tool — kullanıcı boş ekrana bakmasın. */
   readonly running: string | null;
+  /**
+   * Bu turda üretilen belgeler.
+   *
+   * TURUN İÇİNDE DURUR, panelde değil. Panel canlı bir veri
+   * göstergesidir ve yenisi geldiğinde eskisinin yerini alır; belge ise
+   * o soruya ait, orada kalması gereken bir çıktıdır.
+   */
+  readonly docs: readonly AttachedDoc[];
 }
 
 /**
@@ -99,6 +142,26 @@ function adminApi(role: Role) {
     enableTotp: (i: { userId: string }) => c.adminEnableTotp.mutate(i),
     disableTotp: (i: { userId: string }) => c.adminDisableTotp.mutate(i),
   };
+}
+
+/**
+ * Tool'un girdi şemasını getirir — formun kaynağı.
+ *
+ * Şema TOOL'UN KENDİSİNDEN gelir; arayüzde ikinci bir form tanımı
+ * tutulmaz. Tutulsaydı, tool değişip form değişmediğinde kullanıcı
+ * olmayan bir alanı doldurmaya çalışırdı.
+ */
+async function fetchToolSchema(
+  tool: string,
+  role: Role,
+): Promise<{ label: string; description: string; schema: unknown } | null> {
+  try {
+    return await client(role).toolSchema.query({ tool });
+  } catch {
+    // Şema alınamazsa form yerine ham girdi gösterilir; işlem yine
+    // onaylanabilir olmalı — onay, formun çalışmasına bağlı değildir.
+    return null;
+  }
 }
 
 function client(role: Role) {
@@ -136,6 +199,16 @@ export default function Page() {
    */
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [panels, setPanels] = useState<PanelPayload[]>([]);
+  /** Şu an gönderilen onay — düğme iki kez basılmasın. */
+  const [confirming, setConfirming] = useState<string | null>(null);
+  /**
+   * Sayfa açıldığında bulunan, önceki oturumdan kalmış onaylar.
+   *
+   * Sayfa yenilendiğinde kaybolsalardı, kullanıcı hazırladığı faturayı
+   * bulamaz ve baştan anlatmak zorunda kalırdı — üstelik işlem hâlâ
+   * bekliyor olurdu ve iki kez hazırlanma riski doğardı.
+   */
+  const [orphans, setOrphans] = useState<PendingAction[]>([]);
   const [briefing, setBriefing] = useState<{ level: 0 | 1 | 2; signals: Signal[] } | null>(null);
   const stageRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -179,6 +252,31 @@ export default function Page() {
       .catch(() => setBriefing(null));
   }, [role, reloadKey]);
 
+  // Açılışta bekleyen onayları getir.
+  useEffect(() => {
+    let alive = true;
+    client(role)
+      .pendingActions.query()
+      .then((rows) => {
+        if (!alive) return;
+        setOrphans(
+          rows.map((r) => ({
+            pendingId: r.id,
+            tool: r.tool,
+            label: r.label,
+            description: r.description,
+            input: r.input,
+            authority: r.authority,
+            schema: (r.schema as never) ?? null,
+          })),
+        );
+      })
+      .catch(() => setOrphans([]));
+    return () => {
+      alive = false;
+    };
+  }, [role, reloadKey]);
+
   useEffect(() => {
     stageRef.current?.scrollTo({ top: stageRef.current.scrollHeight, behavior: "smooth" });
   }, [turns, busy]);
@@ -188,7 +286,10 @@ export default function Page() {
       if (!question.trim() || busy) return;
       setBusy(true);
       setValue("");
-      setTurns((t) => [...t, { question, answer: null, toolCalls: [], risks: [], running: null }]);
+      setTurns((t) => [
+        ...t,
+        { question, answer: null, toolCalls: [], risks: [], running: null, pending: [], completed: [], docs: [] },
+      ]);
 
       const patch = (fn: (t: Turn) => Turn) =>
         setTurns((list) => {
@@ -247,12 +348,48 @@ export default function Page() {
                 // Aynı uyarı iki tool'dan da gelebilir; tekrarı gösterme.
                 risks: dedupeRisks([...t.risks, ...(ev.risks ?? [])]),
               }));
+              // Belge cevabın yanına iliştirilir.
+              const doc = asAttachedDoc(ev.ok ? ev.data : undefined);
+              if (doc) {
+                const key = docKey(doc);
+                patch((t) => ({
+                  ...t,
+                  // Aynı belge iki kez sorulursa iki kart çıkmasın.
+                  docs: [...t.docs.filter((d) => docKey(d) !== key), doc],
+                }));
+              }
               if (ev.ok && PANEL_TOOLS.has(ev.tool) && ev.data !== undefined) {
                 setPanels((p) => [
                   { tool: ev.tool, data: ev.data, sources: ev.sources ?? [] },
                   ...p.filter((x) => x.tool !== ev.tool),
                 ]);
               }
+            } else if (ev.type === "pending") {
+              // ONAY BEKLEYEN İŞLEM HATA DEĞİLDİR: tool listesine
+              // "başarısız" olarak düşmez, formu açar.
+              const p = ev as unknown as {
+                tool: string;
+                pendingId: string;
+                input: unknown;
+                authority: number;
+              };
+              const meta = await fetchToolSchema(p.tool, role);
+              patch((t) => ({
+                ...t,
+                running: null,
+                pending: [
+                  ...t.pending,
+                  {
+                    pendingId: p.pendingId,
+                    tool: p.tool,
+                    label: meta?.label ?? p.tool,
+                    description: meta?.description ?? null,
+                    input: p.input,
+                    authority: p.authority,
+                    schema: (meta?.schema as never) ?? null,
+                  },
+                ],
+              }));
             } else if (ev.type === "text") {
               patch((t) => ({ ...t, answer: ev.text, running: null }));
             } else if (ev.type === "error") {
@@ -268,6 +405,99 @@ export default function Page() {
       }
     },
     [busy, role],
+  );
+
+  /**
+   * Onay bekleyen işlemi çalıştırır.
+   *
+   * Form kapanır ve YERİNE SONUÇ GELİR: "onayladım, ne oldu?" sorusu
+   * ekranda cevapsız kalmamalıdır.
+   */
+  const confirmAction = useCallback(
+    async (turnIndex: number, action: PendingAction, input: unknown) => {
+      setConfirming(action.pendingId);
+      try {
+        const res = await client(role).confirmAction.mutate({
+          pendingId: action.pendingId,
+          input,
+        });
+        const ok = res.outcome.ok;
+        // Tool kendi sonucunu anlatıyorsa onu kullan; anlatmıyorsa
+        // geçmiş zamanlı etiket yeter. "Stok hareketi kaydedildi
+        // tamamlandı" gibi iki kez çekimlenmiş bir cümle kurulmamalı.
+        const message = ok
+          ? ((res.outcome as unknown as { risks?: readonly { message: string }[] }).risks?.[0]
+              ?.message ?? `${res.label}.`)
+          : (res.outcome as unknown as { message: string }).message;
+
+        setTurns((list) => {
+          const next = [...list];
+          const t = next[turnIndex];
+          if (!t) return list;
+          next[turnIndex] = {
+            ...t,
+            // Başarısızsa form AÇIK KALIR: kullanıcı bir alanı düzeltip
+            // yeniden gönderebilmeli, formu baştan doldurmamalı.
+            pending: ok ? t.pending.filter((p) => p.pendingId !== action.pendingId) : t.pending,
+            completed: [...t.completed, { label: res.label, ok, message }],
+          };
+          return next;
+        });
+      } catch (e) {
+        setTurns((list) => {
+          const next = [...list];
+          const t = next[turnIndex];
+          if (!t) return list;
+          next[turnIndex] = {
+            ...t,
+            completed: [
+              ...t.completed,
+              { label: action.label, ok: false, message: (e as Error).message },
+            ],
+          };
+          return next;
+        });
+      } finally {
+        setConfirming(null);
+      }
+    },
+    [role],
+  );
+
+  const cancelAction = useCallback(
+    async (turnIndex: number, action: PendingAction) => {
+      await client(role).cancelAction.mutate({ pendingId: action.pendingId }).catch(() => null);
+      setTurns((list) => {
+        const next = [...list];
+        const t = next[turnIndex];
+        if (!t) return list;
+        next[turnIndex] = {
+          ...t,
+          pending: t.pending.filter((p) => p.pendingId !== action.pendingId),
+          completed: [...t.completed, { label: action.label, ok: false, message: "Vazgeçildi; hiçbir kayıt oluşmadı." }],
+        };
+        return next;
+      });
+    },
+    [role],
+  );
+
+  /** Konuşma dışında duran bekleyen onay — aynı akış, ayrı yer. */
+  const resolveOrphan = useCallback(
+    async (action: PendingAction, input: unknown | null) => {
+      setConfirming(action.pendingId);
+      try {
+        if (input === null) {
+          await client(role).cancelAction.mutate({ pendingId: action.pendingId });
+        } else {
+          await client(role).confirmAction.mutate({ pendingId: action.pendingId, input });
+        }
+        setOrphans((list) => list.filter((o) => o.pendingId !== action.pendingId));
+      } finally {
+        setConfirming(null);
+      }
+    },
+    [role],
   );
 
   /** Yeni konuşma — geçmiş kopar, ekran temizlenir. */
@@ -306,6 +536,13 @@ export default function Page() {
             toolCalls: [],
             risks: [],
             running: null,
+            pending: [],
+            completed: [],
+            // Geçmiş konuşmada belge yeniden kurulmaz: fatura o andaki
+            // hâliyle saklanmadığı için eski bir görüntüyü "güncel
+            // fatura" gibi göstermek yanlış olur. Soru tekrar
+            // sorulduğunda belge yeniden üretilir.
+            docs: [],
           })),
         );
         setPanels([]);
@@ -584,7 +821,11 @@ export default function Page() {
                   </div>
                 ) : (
                   <div className="reply">
-                    <Reveal text={t.answer} />
+                    <RichText
+                      text={t.answer}
+                      org={session?.companyName ?? "İşletme"}
+                      question={t.question}
+                    />
                     {visibleRisks(t.risks, t.answer).map((r, k) => (
                       <div className={`risk ${riskClass(r.severity)}`} key={k}>
                         <b>{RISK_LABEL[r.severity] ?? "Not"}</b>
@@ -593,9 +834,47 @@ export default function Page() {
                     ))}
                   </div>
                 )}
+
+                {t.docs.map((d) => (
+                  <DocCard key={docKey(d)} doc={d} org={session?.companyName ?? "İşletme"} />
+                ))}
+
+                {t.completed.map((c, k) => (
+                  <div className={`done-row${c.ok ? "" : " bad"}`} key={`d${k}`}>
+                    <b>{c.ok ? "Tamamlandı" : "Yapılmadı"}</b>
+                    <span>{c.message}</span>
+                  </div>
+                ))}
+
+                {t.pending.map((p) => (
+                  <ActionForm
+                    key={p.pendingId}
+                    action={p}
+                    busy={confirming === p.pendingId}
+                    onConfirm={(input) => void confirmAction(i, p, input)}
+                    onCancel={() => void cancelAction(i, p)}
+                  />
+                ))}
               </div>
             ))}
           </div>
+
+          {orphans.length > 0 && (
+            <div className="orphans">
+              <p className="orphan-note">
+                Önceki oturumdan kalan {orphans.length} işlem onayınızı bekliyor.
+              </p>
+              {orphans.map((o) => (
+                <ActionForm
+                  key={o.pendingId}
+                  action={o}
+                  busy={confirming === o.pendingId}
+                  onConfirm={(input) => void resolveOrphan(o, input)}
+                  onCancel={() => void resolveOrphan(o, null)}
+                />
+              ))}
+            </div>
+          )}
 
           <div className="dock">
             {upload && (
@@ -734,6 +1013,173 @@ function riskClass(severity: string): string {
  * kullanıcıya "sistem kendini tekrarlıyor" hissi verir. Katmamışsa satır
  * gerekli — asıl mesele uyarının BİR KEZ görünmesi, hiç görünmemesi değil.
  */
+/** Belgenin kimliği — aynı belgenin iki kez iliştirilmesini önler. */
+function docKey(d: AttachedDoc): string {
+  if (d.kind === "invoice") return `f:${d.invoice.documentNo}`;
+  if (d.kind === "despatch") return `i:${d.despatch.documentNo}`;
+  if (d.kind === "statement") return `m:${d.statement.partnerId}:${d.statement.to}`;
+  if (d.kind === "payslip") return `p:${d.payslip.employeeCode}:${d.payslip.period}`;
+  return `b:${d.sheet.asOf}`;
+}
+
+/**
+ * Belgenin cevabın altındaki kartı.
+ *
+ * BELGE KENDİLİĞİNDEN AÇILMAZ. Kullanıcı "şu faturayı göster" dediğinde
+ * ekranı kaplayan bir katman açmak, cevabı okumasını engeller ve
+ * kontrolü elinden alır; kart görünür, açmaya o karar verir.
+ */
+function DocCard({ doc, org }: { doc: AttachedDoc; org: string }) {
+  const [open, setOpen] = useState(false);
+  const tl = (n: number): string =>
+    new Intl.NumberFormat("tr-TR", { maximumFractionDigits: 0 }).format(n);
+
+  // Her belgenin kartında onu AYIRT EDEN şey yazar: faturada tutar,
+  // irsaliyede plaka, bilançoda denklik.
+  const view =
+    doc.kind === "invoice"
+      ? {
+          no: doc.invoice.documentNo,
+          title: `Fatura ${doc.invoice.documentNo}`,
+          who: doc.invoice.customer.legalName,
+          detail: new Intl.NumberFormat("tr-TR", {
+            style: "currency",
+            currency: doc.invoice.currency,
+          }).format(doc.invoice.totalAmount),
+          flag:
+            doc.invoice.status !== "issued" && doc.invoice.status !== "paid" ? "taslak" : null,
+          sheets: invoiceSheets(doc.invoice),
+          body: <InvoiceBody inv={doc.invoice} />,
+        }
+      : doc.kind === "despatch"
+        ? {
+            no: doc.despatch.documentNo,
+            title: `İrsaliye ${doc.despatch.documentNo}`,
+            who: doc.despatch.customer.legalName,
+            detail: `${doc.despatch.lines.length} kalem${doc.despatch.plateNo ? ` · ${doc.despatch.plateNo}` : ""}`,
+            flag: doc.despatch.status !== "posted" ? "taslak" : null,
+            sheets: despatchSheets(doc.despatch),
+            body: <DespatchBody d={doc.despatch} />,
+          }
+        : doc.kind === "payslip"
+        ? {
+            no: doc.payslip.employeeCode,
+            title: `Bordro ${doc.payslip.employeeName} ${doc.payslip.period.slice(0, 7)}`,
+            who: doc.payslip.employeeName,
+            detail: `Net ${tl(doc.payslip.netSalary)} · ${doc.payslip.period.slice(0, 7)}`,
+            flag: null,
+            sheets: payslipSheets(doc.payslip),
+            body: <PayslipBody p={doc.payslip} />,
+          }
+        : doc.kind === "statement"
+        ? {
+            no: "Mutabakat",
+            title: `Mutabakat ${doc.statement.partnerName}`,
+            who: doc.statement.partnerName,
+            detail: `${tl(Math.abs(doc.statement.closingBalance))} ${
+              doc.statement.closingBalance >= 0 ? "borç" : "alacak"
+            } · ${doc.statement.movements.length} hareket`,
+            flag: null,
+            sheets: statementSheets(doc.statement),
+            body: <StatementBody s={doc.statement} />,
+          }
+        : {
+            no: "Bilanço",
+            title: `Bilanço ${doc.sheet.asOf.slice(0, 10)}`,
+            who: doc.sheet.asOf.slice(0, 10),
+            detail: `Aktif ${tl(doc.sheet.totalAssets)} · Pasif ${tl(doc.sheet.totalLiabilities)}`,
+            // DENK DEĞİLSE KARTTA GÖRÜNÜR: açmadan önce bilinmeli.
+            flag: doc.sheet.balanced ? null : "DENK DEĞİL",
+            sheets: balanceSheets(doc.sheet),
+            body: <BalanceSheetBody b={doc.sheet} />,
+          };
+
+  return (
+    <>
+      <button type="button" className="doc-card" onClick={() => setOpen(true)}>
+        <span className="doc-card-icon" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6">
+            <path d="M6 2h8l4 4v16H6z" strokeLinejoin="round" />
+            <path d="M14 2v4h4" strokeLinejoin="round" />
+            <path d="M9 12h6M9 16h6" strokeLinecap="round" />
+          </svg>
+        </span>
+        <span className="doc-card-text">
+          <b>{view.no}</b>
+          <span>
+            {view.who} · {view.detail}
+            {view.flag ? ` · ${view.flag}` : ""}
+          </span>
+        </span>
+        <span className="doc-card-go">Belgeyi aç</span>
+      </button>
+      {open && (
+        <DocumentSheet
+          meta={{ title: view.title, org, question: view.who }}
+          sheets={view.sheets}
+          onClose={() => setOpen(false)}
+        >
+          {view.body}
+        </DocumentSheet>
+      )}
+    </>
+  );
+}
+
+/**
+ * Tool sonucunu belgeye çevirir.
+ *
+ * KÖRÜ KÖRÜNE CAST EDİLMEZ. Sunucudan gelen veri bir gün biçim
+ * değiştirirse, `as InvoiceView` demek arayüzü çalışma anında patlatır;
+ * burada beklenen alanlar KONTROL EDİLİR ve uymuyorsa belge hiç
+ * gösterilmez — cevabın kendisi yine görünür.
+ */
+export function asAttachedDoc(data: unknown): AttachedDoc | null {
+  if (typeof data !== "object" || data === null) return null;
+  const d = data as { kind?: unknown; invoice?: unknown; despatch?: unknown; payslip?: unknown };
+
+  if (d.kind === "invoice" && typeof d.invoice === "object" && d.invoice !== null) {
+    const inv = d.invoice as Partial<InvoiceView>;
+    if (typeof inv.documentNo !== "string" || !Array.isArray(inv.lines)) return null;
+    if (typeof inv.totalAmount !== "number" || typeof inv.currency !== "string") return null;
+    if (typeof inv.customer !== "object" || inv.customer === null) return null;
+    return { kind: "invoice", invoice: inv as InvoiceView };
+  }
+
+  if (d.kind === "despatch" && typeof d.despatch === "object" && d.despatch !== null) {
+    const dsp = d.despatch as Partial<DespatchView>;
+    if (typeof dsp.documentNo !== "string" || !Array.isArray(dsp.lines)) return null;
+    if (typeof dsp.customer !== "object" || dsp.customer === null) return null;
+    return { kind: "despatch", despatch: dsp as DespatchView };
+  }
+
+  if (d.kind === "payslip" && typeof (d as { payslip?: unknown }).payslip === "object") {
+    const ps = (d as { payslip: Partial<PayslipView> }).payslip;
+    if (typeof ps.employeeCode !== "string" || typeof ps.netSalary !== "number") return null;
+    if (typeof ps.period !== "string" || typeof ps.totalGross !== "number") return null;
+    return { kind: "payslip", payslip: { ...ps, kind: "payslip" } as PayslipView };
+  }
+
+  // Mutabakat da tool'un data'sının kendisidir.
+  if (d.kind === "statement") {
+    const st = data as Partial<StatementView>;
+    if (typeof st.partnerId !== "string" || !Array.isArray(st.movements)) return null;
+    if (typeof st.closingBalance !== "number" || typeof st.openingBalance !== "number") return null;
+    return { kind: "statement", statement: st as StatementView };
+  }
+
+  // Bilanço tool'un data'sının KENDİSİDİR (ayrı bir alan içinde değil).
+  if (d.kind === "balance-sheet") {
+    const b = data as Partial<BalanceSheetView>;
+    if (!Array.isArray(b.assets) || !Array.isArray(b.liabilities)) return null;
+    if (typeof b.totalAssets !== "number" || typeof b.totalLiabilities !== "number") return null;
+    if (typeof b.asOf !== "string") return null;
+    return { kind: "balance-sheet", sheet: b as BalanceSheetView };
+  }
+
+  return null;
+}
+
 function visibleRisks(risks: readonly TurnRisk[], answer: string | null): readonly TurnRisk[] {
   if (!answer) return risks;
   const haystack = answer.toLocaleLowerCase("tr").replace(/\s+/g, " ");
@@ -821,19 +1267,3 @@ function Signals({ signals, onAsk }: { signals: readonly Signal[]; onAsk: (q: st
  * Gerçek model bağlandığında metin parça parça akacak ve aynı bileşen onu
  * geldiği hızda gösterecek.
  */
-function Reveal({ text }: { text: string }) {
-  const parts = text.split(/(\s+)/);
-  return (
-    <div className="txt">
-      {parts.map((p, i) =>
-        /^\s+$/.test(p) ? (
-          p
-        ) : (
-          <span className="w" key={i} style={{ animationDelay: `${Math.min(i * 0.014, 1.2)}s` }}>
-            {p}
-          </span>
-        ),
-      )}
-    </div>
-  );
-}

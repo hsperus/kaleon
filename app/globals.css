@@ -100,7 +100,26 @@ body {
   font-size: 15px;
   line-height: 1.6;
   -webkit-font-smoothing: antialiased;
+  /*
+   * UYGULAMA SABİT YÜKSEKLİKLİDİR, TANITIM SAYFASI DEĞİL.
+   *
+   * Bu kural sohbet ekranı için konmuştu: uygulama kendi içinde
+   * kaydırılır, gövde kaymaz. Tanıtım sayfası eklenince aynı kural
+   * onu da kilitledi — sayfa 4300px uzunluğundaydı ve TEKERLEKLE
+   * KAYDIRILAMIYORDU. Kullanıcı ilk ekrandan aşağısını hiç göremedi.
+   *
+   * Yanıltıcı yanı şuydu: `window.scrollTo` çalışıyor, `scrollY`
+   * değişiyor ama görüntü kırpıldığı için ekran boş kalıyordu. Bu
+   * yüzden tarayıcı denetimi "sayfa boş" gibi göründü ve sorun
+   * render hatası sanıldı.
+   */
   overflow: hidden;
+}
+
+/* Tanıtım sayfası varsa gövde kaydırılabilir olur. */
+body:has(.mk) {
+  overflow: auto;
+  overflow-x: hidden;
 }
 
 button { font: inherit; color: inherit; background: none; border: none; cursor: pointer; }
@@ -689,4 +708,1606 @@ button.role, select.role {
 
 @media (max-width: 900px) {
   .admin { width: 100%; }
+}
+
+/* ─────────────────── İşlem formu ───────────────────
+ *
+ * Form aynı zamanda ONAY EKRANIDIR. Bu yüzden iki şeyi birden yapması
+ * gerekiyor: hızlı doldurulmak (klavyeyle, sekmeyle) ve ne olacağını
+ * tereddütsüz göstermek. Fazla süs ikisini de bozar.
+ *
+ * L3 işlemler kırmızıya boyanmaz — kırmızı zemin bir onay ekranını
+ * korkutucu yapar ama okunur yapmaz. Sol kenarda ince bir çizgi ve
+ * düğmede net bir fiil yeter.
+ */
+.action-form {
+  margin: 14px 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  padding: 16px 18px 14px;
+  animation: blurIn .34s var(--glide) both;
+}
+
+.action-form.danger {
+  border-color: color-mix(in srgb, var(--crit) 28%, var(--line));
+  box-shadow: inset 3px 0 0 0 var(--crit);
+}
+
+.af-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 4px;
+}
+
+.af-head h3 {
+  font-size: 17px;
+  font-weight: 590;
+  letter-spacing: -0.01em;
+  margin: 2px 0 0;
+  color: var(--ink);
+}
+
+.af-eyebrow {
+  font-size: 11px;
+  font-weight: 590;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.af-level {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--muted);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 2px 6px;
+  font-variant-numeric: tabular-nums;
+}
+
+.af-note {
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--muted);
+  margin: 8px 0 14px;
+}
+
+.af-note.danger {
+  color: var(--crit);
+  font-weight: 500;
+}
+
+.af-fields {
+  display: grid;
+  gap: 12px;
+}
+
+.af-field {
+  display: grid;
+  gap: 5px;
+}
+
+.af-field label {
+  font-size: 12.5px;
+  font-weight: 550;
+  color: var(--ink-2);
+}
+
+.af-req { color: var(--crit); }
+
+.af-field input[type="text"],
+.af-field input[type="number"],
+.af-field select,
+.af-field textarea {
+  /* 40px: dokunmatikte rahat, masaüstünde ağır değil. */
+  min-height: 40px;
+  padding: 9px 11px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--ink);
+  background: var(--surface-2);
+  border: 1px solid transparent;
+  border-radius: 9px;
+  outline: none;
+  transition: border-color .16s var(--glide), background .16s var(--glide);
+}
+
+.af-field textarea {
+  resize: vertical;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+.af-field input:focus,
+.af-field select:focus,
+.af-field textarea:focus {
+  background: var(--surface);
+  border-color: var(--accent);
+}
+
+.af-field.invalid input,
+.af-field.invalid select,
+.af-field.invalid textarea {
+  border-color: var(--crit);
+}
+
+.af-field small {
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--faint);
+}
+
+.af-check {
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 8px;
+}
+
+.af-check input { min-height: 0; accent-color: var(--accent); }
+.af-check small { grid-column: 1 / -1; }
+
+.af-empty,
+.af-error {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 10px 0 0;
+}
+
+.af-error { color: var(--crit); }
+
+.af-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 16px;
+}
+
+.af-foot button {
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 550;
+  padding: 9px 16px;
+  border-radius: 9px;
+  cursor: pointer;
+  border: 1px solid transparent;
+  transition: opacity .16s var(--glide), background .16s var(--glide);
+}
+
+.af-cancel {
+  background: transparent;
+  color: var(--muted);
+  border-color: var(--line);
+}
+
+.af-cancel:hover:not(:disabled) { color: var(--ink-2); }
+
+.af-ok {
+  background: var(--accent);
+  color: #fff;
+}
+
+.action-form.danger .af-ok { background: var(--crit); }
+
+.af-foot button:disabled { opacity: .5; cursor: default; }
+
+/* Onaylanan işlemin sonucu — formun yerini alır. */
+.done-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  margin: 10px 0 0;
+  padding: 9px 12px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--ink-2);
+  animation: blurIn .3s var(--glide) both;
+}
+
+.done-row b {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  color: var(--accent-ink);
+  white-space: nowrap;
+}
+
+.done-row.bad b { color: var(--crit); }
+
+/* Hareket azaltma tercihi: form ve sonuç satırı anında görünür. */
+@media (prefers-reduced-motion: reduce) {
+  .action-form,
+  .done-row {
+    animation: none;
+  }
+}
+
+/* Önceki oturumdan kalan onaylar — sohbetin dışında, dock'un üstünde. */
+.orphans { margin: 0 0 12px; }
+
+.orphan-note {
+  font-size: 12.5px;
+  color: var(--muted);
+  margin: 0 0 6px;
+}
+
+/* ─────────────────── Zengin cevap ───────────────────
+ *
+ * Model markdown yazıyor; buraya kadar düz metin olarak geliyordu ve
+ * kullanıcı `**kalın**` yazısını yıldızlarıyla birlikte görüyordu.
+ *
+ * TİPOGRAFİ CEVABIN PARÇASIDIR. Bir mizanın 40 satırı düz metin olarak
+ * verildiğinde okunmaz; sütunlara ayrıldığında ve sayılar sağa
+ * yaslandığında iki rakam gözle karşılaştırılabilir hâle gelir.
+ */
+.reply .md { display: flex; flex-direction: column; gap: 10px; white-space: normal; }
+
+.md-p { margin: 0; }
+
+.md-h {
+  margin: 6px 0 0;
+  font-size: 15.5px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+
+.md .md-h + .md-p { margin-top: -4px; }
+
+.md-list {
+  margin: 0;
+  padding-left: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.md-list li { padding-left: 2px; }
+.md-list li::marker { color: var(--faint); }
+
+.md-quote {
+  margin: 0;
+  padding: 8px 0 8px 14px;
+  border-left: 2px solid var(--line);
+  color: var(--ink-2);
+}
+
+.md-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.88em;
+  padding: 1px 5px;
+  border-radius: 5px;
+  background: var(--surface-2);
+}
+
+.md-pre {
+  margin: 0;
+  padding: 12px 14px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  overflow-x: auto;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12.5px;
+  line-height: 1.55;
+}
+
+/* Geniş tablo SAYFAYI DEĞİL KENDİNİ kaydırır. */
+.md-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: var(--surface);
+}
+
+.md-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+  /* Rakamlar sütunda hizalansın; orantılı rakamlar mizanı okunmaz yapar. */
+  font-variant-numeric: tabular-nums;
+}
+
+.md-table th,
+.md-table td {
+  padding: 8px 12px;
+  text-align: left;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.md-table th {
+  font-weight: 590;
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  text-transform: uppercase;
+  color: var(--muted);
+  background: var(--surface-2);
+  white-space: nowrap;
+}
+
+.md-table tbody tr:last-child td { border-bottom: none; }
+.md-table .num { text-align: right; white-space: nowrap; }
+
+/* ═══════════════════════════════════════════════════════════════
+ * BELGE KATMANI
+ *
+ * Sohbetteki tablo, akış içinde okunur; belge ise imzalanır,
+ * arşivlenir, bankaya verilir. İkisi aynı veriyi gösterse de aynı
+ * biçimde gösterilemez: belgenin anteti, tarihi, toplamı ve kaynağı
+ * olmak zorunda.
+ * ═══════════════════════════════════════════════════════════════ */
+
+/* ── Tablo eylem şeridi ──
+   ŞERİT SÜREKLİ GÖRÜNMEZ. Her tablonun üstünde duran iki düğme,
+   dördüncü tablodan sonra gürültüye dönüşür; imleç tablonun üstüne
+   geldiğinde belirir, klavye odağında da açılır (erişilebilirlik). */
+.md-table-fig {
+  margin: 0;
+  position: relative;
+}
+
+.tbl-acts {
+  position: absolute;
+  top: -9px;
+  right: 8px;
+  z-index: 2;
+  display: flex;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 9px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--sh-s);
+  opacity: 0;
+  transform: translateY(3px) scale(.97);
+  transition: opacity .16s var(--glide), transform .22s var(--spring-soft);
+  pointer-events: none;
+}
+
+.md-table-fig:hover .tbl-acts,
+.tbl-acts:focus-within {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+
+.tbl-act {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 550;
+  letter-spacing: .01em;
+  padding: 3px 9px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .12s var(--glide), color .12s var(--glide);
+}
+
+.tbl-act:hover:not(:disabled) { background: var(--accent-veil); color: var(--accent-ink); }
+.tbl-act:disabled { color: var(--faint); cursor: default; }
+
+.md-table-err {
+  margin: 6px 2px 0;
+  font-size: 12px;
+  color: var(--crit);
+}
+
+/* ── Örtü ──
+   Arka planı bulanıklaştırıp koyultur: belge açıkken tek bir şey
+   okunmalı. Bulanıklık desteklenmiyorsa koyuluk yine iş görür. */
+.doc-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(16, 18, 22, .34);
+  backdrop-filter: blur(14px) saturate(1.4);
+  -webkit-backdrop-filter: blur(14px) saturate(1.4);
+  animation: veil-in .22s var(--glide) both;
+}
+
+@keyframes veil-in { from { opacity: 0 } to { opacity: 1 } }
+
+.doc-sheet {
+  width: min(900px, 100%);
+  max-height: min(92vh, 1180px);
+  display: flex;
+  flex-direction: column;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  box-shadow: var(--sh-l);
+  overflow: hidden;
+  /* Aşağıdan hafifçe yükselerek gelir — yay eğrisi, sayfanın geri
+     kalanındaki hareket diliyle aynı. */
+  animation: sheet-in .42s var(--spring) both;
+}
+
+@keyframes sheet-in {
+  from { opacity: 0; transform: translateY(16px) scale(.975) }
+  to   { opacity: 1; transform: none }
+}
+
+.doc-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 11px 14px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.doc-bar-name {
+  font-size: 12.5px;
+  font-weight: 590;
+  color: var(--ink-2);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-bar-acts { display: flex; gap: 5px; flex: none }
+
+.doc-act {
+  appearance: none;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--ink-2);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 550;
+  padding: 5px 12px;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: background .12s var(--glide), border-color .12s var(--glide), transform .12s var(--glide);
+}
+
+.doc-act:hover:not(:disabled) { background: var(--accent-veil); border-color: var(--accent); color: var(--accent-ink) }
+.doc-act:active:not(:disabled) { transform: scale(.97) }
+.doc-act:disabled { color: var(--faint); cursor: default }
+.doc-close { background: var(--ink); border-color: var(--ink); color: #fff }
+.doc-close:hover { background: var(--ink-2); border-color: var(--ink-2); color: #fff }
+
+.doc-note {
+  padding: 8px 16px;
+  font-size: 12.5px;
+  color: var(--crit);
+  background: var(--crit-veil);
+  border-bottom: 1px solid var(--line);
+}
+
+.doc-scroll {
+  overflow: auto;
+  padding: 26px;
+  background: var(--bg);
+}
+
+/* ── Kâğıt ──
+   KOYU TEMADA DA BEYAZDIR. Belge önizlemesinin tek işi, yazdırıldığında
+   ne çıkacağını göstermek; temaya uyan koyu bir "kâğıt" gösterip beyaz
+   basmak, önizlemeyi yalancı yapar. Çerçeve (üst çubuk, örtü) temaya
+   uyar, kâğıt uymaz. */
+.doc-page {
+  --paper: #fff;
+  --paper-ink: #16181c;
+  --paper-ink-2: #3d434b;
+  --paper-muted: #6b7178;
+  --paper-line: #e2e4e8;
+
+  /*
+   * KÂĞIT KENDİ RENK DÜNYASIDIR.
+   *
+   * Genel değişkenler burada yeniden tanımlanıyor; böylece kâğıdın
+   * içine konan HERHANGİ bir bileşen (grafik, rozet, tablo) kendi
+   * kodunu değiştirmeden kâğıt renklerini alıyor. Aksi hâlde koyu
+   * temada grafik ekseni beyaz kâğıdın üstüne açık gri çizerdi ve
+   * hiçbir şey okunmazdı — üstelik bu, her yeni bileşende yeniden
+   * yapılacak bir hata olurdu.
+   */
+  --ink: var(--paper-ink);
+  --ink-2: var(--paper-ink-2);
+  --muted: var(--paper-muted);
+  --faint: #9aa0a6;
+  --line: var(--paper-line);
+  --line-soft: #eef0f3;
+  --surface: #fff;
+  --surface-2: #f4f5f7;
+  --bg: #fff;
+  /* Vurgu ve anlam renkleri kâğıt için sabitlenir: koyu temanın
+     açılmış tonları beyaz üzerinde soluk kalır. */
+  --accent: #0a6ad4;
+  --accent-ink: #0854a8;
+  --accent-veil: rgba(10, 106, 212, .08);
+  --crit: #c4362b;
+  --warn: #8a5d09;
+  --warn-veil: rgba(138, 93, 9, .09);
+  --ok: #1f7a52;
+
+  color: var(--paper-ink);
+  max-width: 760px;
+  margin: 0 auto;
+  padding: 44px 48px 36px;
+  background: var(--paper);
+  border: 1px solid var(--paper-line);
+  border-radius: 8px;
+  box-shadow: var(--sh-m);
+}
+
+.doc-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1.5px solid var(--paper-ink);
+}
+
+.doc-org { font-size: 14px; font-weight: 640; letter-spacing: -.01em; color: var(--paper-ink) }
+.doc-stamp { font-size: 11.5px; color: var(--paper-muted); font-variant-numeric: tabular-nums; white-space: nowrap }
+
+.doc-title {
+  margin: 22px 0 4px;
+  font-size: 21px;
+  font-weight: 620;
+  letter-spacing: -.02em;
+  color: var(--paper-ink);
+  text-wrap: balance;
+}
+
+.doc-sub { margin: 0 0 22px; font-size: 12.5px; color: var(--paper-muted) }
+
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.doc-table th,
+.doc-table td { padding: 7px 10px; text-align: left; border-bottom: 1px solid var(--paper-line) }
+.doc-table td { color: var(--paper-ink) }
+.doc-table strong { font-weight: 640; color: var(--paper-ink) }
+.doc-table th {
+  font-size: 10.5px;
+  font-weight: 620;
+  letter-spacing: .03em;
+  text-transform: uppercase;
+  color: var(--paper-ink-2);
+  border-bottom: 1px solid var(--paper-ink-2);
+}
+.doc-table .num { text-align: right; white-space: nowrap }
+.doc-foot {
+  margin-top: 26px;
+  padding-top: 12px;
+  border-top: 1px solid var(--paper-line);
+  font-size: 10.5px;
+  line-height: 1.6;
+  color: var(--paper-muted);
+}
+
+/* Hareketi azaltma tercihi: belge yine açılır, ama sıçramaz. */
+@media (prefers-reduced-motion: reduce) {
+  .doc-veil, .doc-sheet { animation-duration: .01ms }
+  .tbl-acts { transition: opacity .01ms }
+}
+
+/* ── YAZDIRMA ──
+   PDF budur. Kütüphane yerine tarayıcının motoru kullanılıyor; bu
+   yüzden yazdırma biçemi bir süs değil, ÜRÜNÜN PDF ÇIKTISININ TA
+   KENDİSİ. Ekrandaki her şey gizlenir, kâğıda yalnız belge iner. */
+@media print {
+  /* Koyu tema yazıcıya taşmasın: kâğıt beyazdır. */
+  html, body { background: #fff !important; color: #000 !important }
+
+  body > *:not(.doc-veil) { display: none !important }
+
+  .doc-veil {
+    position: static;
+    display: block;
+    padding: 0;
+    background: none;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+    animation: none;
+  }
+
+  .doc-sheet {
+    max-height: none;
+    width: auto;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    animation: none;
+    background: #fff;
+  }
+
+  /* Araç çubuğu ve uyarı kâğıda basılmaz. */
+  .doc-bar, .doc-note { display: none !important }
+
+  .doc-scroll { overflow: visible; padding: 0; background: #fff }
+
+  .doc-page {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
+    box-shadow: none;
+    background: #fff;
+    color: #000;
+  }
+
+  /* Uzun listede satır sayfa arasında bölünmesin; başlık her sayfada
+     tekrarlansın — ikinci sayfadaki rakamların hangi sütuna ait
+     olduğu belli olmalı. */
+  .doc-table thead { display: table-header-group }
+  .doc-table tr { break-inside: avoid }
+
+  @page { size: A4; margin: 18mm 16mm }
+}
+
+/* Kâğıt her iki temada da beyaz olduğu için yazdırma için ayrı bir
+   renk düzeltmesine gerek kalmıyor; yalnızca çerçeve nötrleniyor. */
+@media print {
+  .doc-scroll, .doc-sheet { background: #fff }
+}
+
+/* ── Belge kartı ──
+   Cevabın altında duran, açılmayı bekleyen belge. Panelden farkı:
+   panel canlı veridir ve yenisi eskisinin yerini alır; kart o cevaba
+   ait bir çıktıdır ve yerinde kalır. */
+.doc-card {
+  appearance: none;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  text-align: left;
+  padding: 11px 13px;
+  border-radius: 11px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  box-shadow: var(--sh-s);
+  cursor: pointer;
+  font: inherit;
+  color: var(--ink);
+  transition: border-color .14s var(--glide), transform .18s var(--spring-soft), box-shadow .18s var(--glide);
+}
+
+.doc-card:hover { border-color: var(--accent); box-shadow: var(--sh-m); transform: translateY(-1px) }
+.doc-card:active { transform: none }
+
+.doc-card-icon {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+  background: var(--accent-veil);
+  color: var(--accent);
+}
+.doc-card-icon svg { width: 17px; height: 17px }
+
+.doc-card-text { display: flex; flex-direction: column; gap: 1px; min-width: 0; flex: 1 }
+.doc-card-text b { font-size: 13.5px; font-weight: 590 }
+.doc-card-text span {
+  font-size: 12px;
+  color: var(--muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-card-go { flex: none; font-size: 12px; font-weight: 550; color: var(--accent) }
+
+/* ── Fatura belgesi ── */
+.inv-top { display: flex; align-items: flex-start; justify-content: space-between; gap: 28px; margin-top: 22px }
+.inv-top .doc-title { margin: 0 }
+
+.inv-facts { margin: 0; display: grid; gap: 3px; text-align: right; flex: none }
+.inv-facts > div { display: flex; gap: 10px; justify-content: flex-end; align-items: baseline }
+.inv-facts dt { font-size: 10px; letter-spacing: .04em; text-transform: uppercase; color: var(--paper-muted) }
+.inv-facts dd { margin: 0; font-size: 12px; font-weight: 550; color: var(--paper-ink); font-variant-numeric: tabular-nums }
+.inv-mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 10.5px !important }
+/* Taslak ya da iptal, göze çarpmalı: yanlış belgenin basılması pahalıdır. */
+.inv-flag { color: #b3261e !important }
+
+.inv-parties {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 22px;
+  margin: 24px 0 20px;
+  padding: 16px 0;
+  border-top: 1px solid var(--paper-line);
+  border-bottom: 1px solid var(--paper-line);
+}
+
+.inv-party-label {
+  font-size: 10px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--paper-muted);
+  margin-bottom: 5px;
+}
+.inv-party-name { font-size: 13px; font-weight: 620; color: var(--paper-ink); margin-bottom: 3px }
+.inv-party-line { font-size: 11.5px; line-height: 1.55; color: var(--paper-ink-2); white-space: pre-line }
+/* Eksik alan gizlenmez: bu faturanın e-Fatura olarak üretilemeyeceğini
+   söyleyen tek işaret budur. */
+.inv-missing { color: #b3261e; font-weight: 550 }
+
+.inv-lines { font-size: 11.5px }
+.inv-lines th, .inv-lines td { padding: 6px 8px }
+
+.inv-summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 32px;
+  margin-top: 22px;
+}
+
+.inv-vat { border-collapse: collapse; font-size: 11px; font-variant-numeric: tabular-nums }
+.inv-vat th {
+  font-size: 9.5px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  color: var(--paper-muted);
+  font-weight: 600;
+  text-align: left;
+  padding: 0 14px 5px 0;
+  border-bottom: 1px solid var(--paper-line);
+}
+.inv-vat td { padding: 5px 14px 5px 0; color: var(--paper-ink-2) }
+.inv-vat .num { text-align: right }
+
+.inv-totals { margin: 0; min-width: 240px; display: grid; gap: 4px }
+.inv-totals > div { display: flex; justify-content: space-between; gap: 20px; align-items: baseline }
+.inv-totals dt { font-size: 11.5px; color: var(--paper-ink-2) }
+.inv-totals dd { margin: 0; font-size: 12px; font-variant-numeric: tabular-nums; color: var(--paper-ink) }
+.inv-grand {
+  margin-top: 6px;
+  padding-top: 7px;
+  border-top: 1.5px solid var(--paper-ink);
+}
+.inv-grand dt { font-weight: 620; color: var(--paper-ink) !important; font-size: 12.5px !important }
+.inv-grand dd { font-weight: 680; font-size: 14.5px !important }
+
+.inv-words {
+  margin: 18px 0 0;
+  font-size: 11.5px;
+  color: var(--paper-ink-2);
+  line-height: 1.6;
+}
+.inv-words b { font-weight: 600; color: var(--paper-ink) }
+
+/* Dar ekranda taraflar alt alta; fatura yine okunur. */
+@media (max-width: 620px) {
+  .inv-parties { grid-template-columns: 1fr }
+  .inv-top { flex-direction: column; gap: 14px }
+  .inv-facts { text-align: left }
+  .inv-facts > div { justify-content: flex-start }
+  .inv-summary { flex-direction: column; gap: 20px }
+}
+
+/* ── İrsaliye: taşıma bilgisi ──
+   Yol denetiminde bakılan yer burasıdır; faturadaki "gerçekler"
+   bloğundan daha geniş ve daha okunur olmalı. */
+.dsp-transport {
+  margin: 20px 0;
+  padding: 14px 0;
+  border-top: 1px solid var(--paper-line);
+  border-bottom: 1px solid var(--paper-line);
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  gap: 14px 22px;
+}
+.dsp-transport dt {
+  font-size: 9.5px;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+  color: var(--paper-muted);
+  margin-bottom: 3px;
+}
+.dsp-transport dd { margin: 0; font-size: 12px; font-weight: 550; color: var(--paper-ink) }
+
+/* İmza satırı — irsaliyenin teamülü. */
+.dsp-signs {
+  margin-top: 40px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 60px;
+}
+.dsp-signs div {
+  font-size: 10.5px;
+  color: var(--paper-muted);
+  text-align: center;
+}
+.dsp-signs span {
+  display: block;
+  height: 44px;
+  border-bottom: 1px solid var(--paper-ink-2);
+  margin-bottom: 6px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+ * GRAFİK
+ *
+ * Grafik veriyi süslemez, okunur kılar. Bu yüzden her grafiğin
+ * altında kesin değer şeridi durur: grafik bir bakışta karşılaştırmak,
+ * sayı ise kesin değeri okumak içindir.
+ * ═══════════════════════════════════════════════════════════════ */
+
+.ch { margin: 0; display: flex; flex-direction: column; gap: 8px }
+
+.ch-plot {
+  position: relative;
+  /* Eksen etiketleri için sol boşluk. */
+  padding-left: 46px;
+}
+
+.ch-axis { position: absolute; inset: 0; pointer-events: none }
+
+.ch-tick { position: absolute; left: 0; right: 0; height: 0 }
+.ch-tick span {
+  position: absolute;
+  left: 0;
+  width: 40px;
+  transform: translateY(-50%);
+  text-align: right;
+  font-size: 10px;
+  color: var(--faint);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ch-tick i {
+  position: absolute;
+  left: 46px;
+  right: 0;
+  border-top: 1px solid var(--line-soft);
+}
+/* Sıfır çizgisi diğerlerinden koyu: çubuğun tabanı orasıdır. */
+.ch-tick i.zero { border-top-color: var(--line) }
+
+.ch-svg { position: relative; width: 100%; height: 100%; overflow: visible }
+
+.ch-bar {
+  fill: var(--accent);
+  /* Yükseklik animasyonu yerine dönüşüm: düzen yeniden hesaplanmaz. */
+  transform-origin: center bottom;
+  animation: bar-in .5s var(--spring) both;
+  transition: fill .12s var(--glide), opacity .12s var(--glide);
+  cursor: default;
+}
+.ch-bar.hot { fill: var(--accent-ink) }
+/* Negatif ANLAM taşır: zarar, eksi bakiye, hedefin altı. */
+.ch-bar.neg { fill: var(--crit) }
+.ch-zero { stroke: var(--line); stroke-width: .5; vector-effect: non-scaling-stroke }
+
+@keyframes bar-in { from { opacity: 0; transform: scaleY(.02) } to { opacity: 1; transform: none } }
+
+.ch-line {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  /* Oran korunmadığı için çizgi kalınlığı ezilmemeli. */
+  vector-effect: non-scaling-stroke;
+}
+
+.ch-dots { position: absolute; inset: 0 0 0 46px; pointer-events: none }
+.ch-dot {
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  margin: -8px 0 0 -8px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  pointer-events: auto;
+  cursor: default;
+}
+.ch-dot::after {
+  content: "";
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: var(--surface);
+  border: 2px solid var(--accent);
+  transition: transform .16s var(--spring-soft);
+}
+.ch-dot:hover::after, .ch-dot:focus-visible::after { transform: scale(1.5) }
+
+.ch-labels {
+  display: flex;
+  padding-left: 46px;
+  font-size: 10.5px;
+  color: var(--muted);
+}
+.ch-labels span {
+  flex: 1;
+  text-align: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 0 2px;
+}
+/* Değeri olmayan etiket soluk: çubuğun neden olmadığı görünsün. */
+.ch-labels .gone { color: var(--faint); font-style: italic }
+
+.ch-readout {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-height: 17px;
+  font-size: 12px;
+  padding-left: 46px;
+}
+.ch-readout b { font-weight: 590; color: var(--ink) }
+.ch-readout span { color: var(--ink-2); font-variant-numeric: tabular-nums }
+.ch-hint { color: var(--faint) !important; font-size: 11px }
+
+.ch-missing { font-size: 11px; color: var(--warn); padding-left: 46px }
+.ch-refuse {
+  margin: 0;
+  padding: 14px;
+  border-radius: 10px;
+  background: var(--warn-veil);
+  color: var(--warn);
+  font-size: 12.5px;
+  line-height: 1.5;
+}
+
+/* ── Halka ── */
+.ch-donut { flex-direction: row; align-items: center; gap: 22px; flex-wrap: wrap }
+.ch-ring { position: relative; width: 148px; height: 148px; flex: none }
+.ch-ring svg { width: 100%; height: 100% }
+.ch-slice {
+  animation: slice-in .45s var(--glide) both;
+  transition: opacity .12s var(--glide);
+  cursor: default;
+}
+.ch-slice.hot { opacity: .78 }
+@keyframes slice-in { from { opacity: 0 } to { opacity: 1 } }
+
+.ch-center {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  text-align: center;
+  pointer-events: none;
+}
+.ch-center b { display: block; font-size: 17px; font-weight: 620; letter-spacing: -.02em; color: var(--ink); font-variant-numeric: tabular-nums }
+.ch-center span { font-size: 10.5px; color: var(--muted); max-width: 92px; display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+
+.ch-legend { list-style: none; margin: 0; padding: 0; flex: 1; min-width: 190px; display: flex; flex-direction: column; gap: 5px }
+.ch-legend li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 3px 6px;
+  border-radius: 6px;
+  transition: background .12s var(--glide);
+}
+.ch-legend li.hot { background: var(--surface-2) }
+.ch-legend i { width: 9px; height: 9px; border-radius: 3px; flex: none }
+.ch-legend span { flex: 1; color: var(--ink-2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap }
+.ch-legend b { font-weight: 550; color: var(--ink); font-variant-numeric: tabular-nums }
+
+.ch-spark { display: inline-block; vertical-align: middle }
+.ch-spark polyline { fill: none; stroke: var(--accent); stroke-width: 2.5; vector-effect: non-scaling-stroke; stroke-linecap: round }
+
+@media (prefers-reduced-motion: reduce) {
+  .ch-bar, .ch-slice { animation-duration: .01ms }
+}
+
+/* Grafik kâğıda da basılır; animasyon ve ipucu basılmaz. */
+@media print {
+  .ch-bar, .ch-slice { animation: none }
+  .ch-readout, .ch-dots { display: none }
+}
+
+/* Belge sekmeleri — Belge / Grafik. */
+.doc-tabs {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 8px;
+  background: var(--bg);
+  border: 1px solid var(--line);
+  margin-left: auto;
+  margin-right: 12px;
+}
+.doc-tabs button {
+  appearance: none;
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 550;
+  padding: 3px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background .14s var(--glide), color .14s var(--glide);
+}
+.doc-tabs button.on { background: var(--surface); color: var(--ink); box-shadow: var(--sh-s) }
+
+/* Gizli sekme DOM'da kalır: yazdırma her zaman belgeyi basar. */
+.doc-hide { display: none }
+@media print { .doc-hide { display: none !important } .doc-chart { display: none !important } }
+
+.doc-chart { margin-top: 22px }
+.ch-stack { display: flex; flex-direction: column; gap: 30px }
+.ch-block { display: flex; flex-direction: column; gap: 12px }
+.ch-title {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: -.01em;
+  color: var(--paper-ink, var(--ink));
+}
+.ch-note { margin: 0; font-size: 11px; line-height: 1.55; color: var(--paper-muted, var(--muted)) }
+
+/* ── Bilanço ── iki sütun: aktif solda, pasif sağda. */
+.bs-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 26px;
+  margin-top: 22px;
+}
+.bs-side { display: flex; flex-direction: column; gap: 12px }
+.bs-side-title {
+  margin: 0;
+  padding-bottom: 7px;
+  border-bottom: 1.5px solid var(--paper-ink);
+  font-size: 11px;
+  font-weight: 640;
+  letter-spacing: .06em;
+  color: var(--paper-ink);
+}
+.bs-group { display: flex; flex-direction: column; gap: 2px }
+.bs-group-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--paper-ink);
+  padding-bottom: 2px;
+}
+.bs-group-head b { font-weight: 700 }
+.bs-line {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 11.5px;
+  color: var(--paper-ink-2);
+  padding-left: 12px;
+}
+.bs-line i { font-style: normal; color: var(--paper-muted); font-variant-numeric: tabular-nums }
+.bs-side .num { font-variant-numeric: tabular-nums; white-space: nowrap }
+.bs-total {
+  margin-top: auto;
+  padding-top: 9px;
+  border-top: 1.5px solid var(--paper-ink);
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12.5px;
+  font-weight: 660;
+  color: var(--paper-ink);
+}
+.bs-empty { margin: 0; font-size: 11.5px; color: var(--paper-muted) }
+.bs-warn {
+  margin: 16px 0 0;
+  padding: 11px 13px;
+  border-radius: 8px;
+  background: rgba(196, 54, 43, .08);
+  border: 1px solid rgba(196, 54, 43, .3);
+  color: #a32a20;
+  font-size: 12px;
+  line-height: 1.55;
+}
+
+@media (max-width: 640px) { .bs-grid { grid-template-columns: 1fr } }
+
+/* Mutabakat mektubunda dönem sonu bakiyesi büyük ve tek başına durur:
+   karşı tarafın karşılaştıracağı rakam odur. */
+.st-closing {
+  font-size: 20px;
+  font-weight: 660;
+  letter-spacing: -.02em;
+  color: var(--paper-ink);
+  font-variant-numeric: tabular-nums;
+  margin-bottom: 4px;
+}
+.st-closing span {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: .06em;
+  color: var(--paper-muted);
+  margin-left: 5px;
+}
+
+/* ── Bordro pusulası ── kazançlar solda, kesintiler sağda. */
+.ps-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 26px;
+  margin-top: 20px;
+}
+.ps-grid section { display: flex; flex-direction: column; gap: 3px }
+.ps-grid .bs-side-title { margin-bottom: 8px }
+
+.ps-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--paper-ink-2);
+  padding: 2px 0;
+}
+.ps-row.strong {
+  font-weight: 620;
+  color: var(--paper-ink);
+  border-top: 1px solid var(--paper-line);
+  margin-top: 4px;
+  padding-top: 5px;
+}
+.ps-label { display: flex; align-items: baseline; gap: 6px }
+/* Oran ve not, kalemin yanında küçük durur: çalışan kesintinin neden
+   o kadar olduğunu pusuladan okuyabilmeli. */
+.ps-label i {
+  font-style: normal;
+  font-size: 9.5px;
+  letter-spacing: .03em;
+  color: var(--paper-muted);
+  border: 1px solid var(--paper-line);
+  border-radius: 4px;
+  padding: 0 4px;
+}
+.ps-row .num { font-variant-numeric: tabular-nums; white-space: nowrap }
+
+.ps-net {
+  margin-top: 20px;
+  padding: 12px 16px;
+  border-radius: 8px;
+  background: var(--surface-2);
+  border: 1.5px solid var(--paper-ink);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  font-weight: 680;
+  color: var(--paper-ink);
+}
+.ps-net span:first-child { font-size: 11px; letter-spacing: .06em }
+.ps-net .num { font-size: 18px; font-variant-numeric: tabular-nums }
+
+@media (max-width: 640px) { .ps-grid { grid-template-columns: 1fr } }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+ * TANITIM SAYFALARI
+ *
+ * SADELİK BİR TERCİH DEĞİL, İDDİANIN KENDİSİ. Ürün "menü yok, ekran
+ * yok" diyor; sayfası kalabalık olsaydı iddiayı ilk cümlede
+ * yalanlardı. Bu yüzden her sayfada tek fikir var, bol boşluk var ve
+ * dekoratif hiçbir şey yok.
+ *
+ * ÖLÇÜ MOTİFİ: ince cetvel taksimatı, hizalanmış rakamlar. İmalat
+ * yazılımının görsel dili atölyeden gelir, jenerik SaaS
+ * gradyanından değil.
+ *
+ * HAREKET UYGULAMAYLA AYNI YAY EĞRİLERİNİ KULLANIR (--spring,
+ * --glide). Farklı olsaydı giriş yapan kullanıcı başka bir ürüne
+ * girmiş gibi hissederdi.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+.mk {
+  /* Tanıtım kendi renk dünyasını kurar; temaya uymaz çünkü pazarlama
+     yüzeyi her ziyaretçide aynı görünmelidir. */
+  --bg: #0a0c0f;
+  --bg-2: #0f1216;
+  --fg: #f4f6f8;
+  --fg-2: #9aa3ae;
+  --fg-3: #5f6873;
+  --hair: #1b2027;
+  --blue: #5aa2ff;
+
+  background: var(--bg);
+  color: var(--fg);
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+.mk a { color: inherit; text-decoration: none }
+
+/* ── Gezinme ── */
+.mk-top {
+  position: sticky;
+  top: 0;
+  z-index: 40;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 15px clamp(20px, 6vw, 60px);
+  background: color-mix(in oklab, var(--bg) 78%, transparent);
+  backdrop-filter: blur(18px) saturate(1.4);
+  -webkit-backdrop-filter: blur(18px) saturate(1.4);
+  border-bottom: 1px solid var(--hair);
+}
+.mk-logo { font-size: 14px; font-weight: 700; letter-spacing: .16em }
+.mk-nav { display: flex; align-items: center; gap: clamp(16px, 3vw, 32px); font-size: 13.5px }
+.mk-nav a { color: var(--fg-3); transition: color .18s var(--glide) }
+.mk-nav a:hover, .mk-nav a.on { color: var(--fg) }
+.mk-enter {
+  padding: 7px 17px;
+  border-radius: 9px;
+  background: var(--fg);
+  color: var(--bg) !important;
+  font-weight: 600;
+  transition: transform .22s var(--spring-soft);
+}
+.mk-enter:hover { transform: translateY(-1px) }
+
+/* ── Açığa çıkma ── tek bir hareket kuralı, her yerde aynı. */
+.mk-rv {
+  opacity: 0;
+  transform: translateY(18px);
+  transition: opacity .75s var(--glide), transform .9s var(--spring-soft);
+}
+.mk-rv.in { opacity: 1; transform: none }
+
+/* ── Sayfa iskeleti ── */
+.mk-page, .hr {
+  flex: 1;
+  width: 100%;
+  max-width: 940px;
+  margin: 0 auto;
+  padding: clamp(52px, 9vw, 108px) clamp(20px, 6vw, 40px) clamp(70px, 10vw, 120px);
+}
+
+.mk-head { margin-bottom: clamp(40px, 6vw, 72px) }
+.mk-eyebrow {
+  margin: 0 0 18px;
+  font-size: 11px;
+  letter-spacing: .2em;
+  text-transform: uppercase;
+  color: var(--fg-3);
+}
+.mk-h1, .hr-h1 {
+  margin: 0 0 20px;
+  font-size: clamp(36px, 7vw, 72px);
+  line-height: 1.04;
+  font-weight: 640;
+  letter-spacing: -.04em;
+  text-wrap: balance;
+}
+.mk-dim, .hr-dim { color: var(--fg-3) }
+.mk-lede, .hr-lede {
+  margin: 0;
+  max-width: 580px;
+  font-size: clamp(15.5px, 2vw, 18.5px);
+  line-height: 1.6;
+  color: var(--fg-2);
+}
+
+.mk-cta {
+  display: inline-block;
+  padding: 14px 30px;
+  border-radius: 12px;
+  background: var(--fg);
+  color: var(--bg) !important;
+  font-size: 15px;
+  font-weight: 620;
+  transition: transform .24s var(--spring-soft), box-shadow .24s var(--glide);
+  box-shadow: 0 10px 30px -16px rgba(255,255,255,.5);
+}
+.mk-cta:hover { transform: translateY(-2px); box-shadow: 0 18px 40px -18px rgba(255,255,255,.6) }
+.mk-cta:active { transform: none }
+.mk-ghost {
+  display: inline-block;
+  padding: 14px 26px;
+  border-radius: 12px;
+  border: 1px solid var(--hair);
+  color: var(--fg-2) !important;
+  font-size: 15px;
+  transition: border-color .2s var(--glide), color .2s var(--glide);
+}
+.mk-ghost:hover { border-color: #2c333c; color: var(--fg) !important }
+
+.mk-end {
+  margin-top: clamp(56px, 8vw, 96px);
+  padding-top: clamp(36px, 5vw, 56px);
+  border-top: 1px solid var(--hair);
+  text-align: center;
+}
+.mk-end p {
+  margin: 0 auto 26px;
+  max-width: 520px;
+  font-size: 16px;
+  line-height: 1.6;
+  color: var(--fg-2);
+}
+
+/* ── Ayak ── */
+.mk-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 26px clamp(20px, 6vw, 60px);
+  border-top: 1px solid var(--hair);
+  font-size: 12.5px;
+  color: var(--fg-3);
+}
+.mk-foot-logo { font-weight: 700; letter-spacing: .14em }
+.mk-foot nav { display: flex; gap: 20px }
+.mk-foot nav a:hover { color: var(--fg-2) }
+
+/* ═══ ANA SAYFA ═══ */
+.hr { text-align: center; display: flex; flex-direction: column; align-items: center }
+.hr-top { max-width: 700px }
+
+/* Kumpas taksimatı — ölçü motifi. Süs değil: ürünün ne yaptığını ima eder. */
+.hr-rule { display: flex; justify-content: center; align-items: flex-end; gap: 7px; height: 18px; margin-bottom: 40px; opacity: .45 }
+.hr-rule i { width: 1px; height: 5px; background: var(--fg-3) }
+.hr-rule i.maj { height: 15px; background: var(--blue) }
+
+.hr-lede { margin: 0 auto }
+
+.hr-demo {
+  width: 100%;
+  max-width: 640px;
+  margin: clamp(40px, 6vw, 70px) auto 0;
+  text-align: left;
+  padding: 24px clamp(18px, 3vw, 28px);
+  border-radius: 18px;
+  background: var(--bg-2);
+  border: 1px solid var(--hair);
+  box-shadow: 0 40px 90px -60px rgba(0,0,0,1);
+  /* Cevap gelince sayfa zıplamasın diye yer önceden ayrılır. */
+  min-height: 400px;
+}
+.hr-ask {
+  display: inline-block;
+  padding: 10px 16px;
+  border-radius: 14px;
+  background: #171c22;
+  font-size: 14.5px;
+}
+.hr-caret {
+  display: inline-block; width: 2px; height: 15px; margin-left: 3px;
+  vertical-align: -2px; background: var(--blue);
+  animation: mk-blink 1s steps(2) infinite;
+}
+@keyframes mk-blink { 50% { opacity: 0 } }
+
+.hr-step {
+  display: flex; align-items: center; gap: 8px;
+  margin: 16px 0 14px;
+  font-size: 12px; color: var(--fg-3);
+}
+.hr-step::before {
+  content: ""; width: 5px; height: 5px; border-radius: 50%;
+  background: var(--blue);
+  animation: mk-pulse 1.1s var(--glide) infinite;
+}
+.hr-step.done::before { animation: none; background: #34a06f }
+@keyframes mk-pulse { 50% { opacity: .25; transform: scale(.6) } }
+
+/* Cevap uygulamanın kendi render'ıyla çiziliyor; renkler burada uyarlanıyor. */
+.hr-reply, .cp-out {
+  --ink: var(--fg); --ink-2: var(--fg-2); --muted: var(--fg-3); --faint: #4d555f;
+  --line: var(--hair); --line-soft: #151a20; --surface: #12161b; --surface-2: #151a20;
+  --accent: var(--blue);
+}
+.hr-reply { animation: mk-fade .55s var(--glide) both }
+@keyframes mk-fade { from { opacity: 0; transform: translateY(8px) } to { opacity: 1; transform: none } }
+.hr-reply .md, .cp-out .md { font-size: 14px; line-height: 1.65; color: var(--fg-2) }
+.hr-reply .md strong, .cp-out .md strong { color: var(--fg) }
+.hr-reply .tbl-acts, .cp-out .tbl-acts { display: none }
+.hr-src {
+  margin: 14px 0 0; padding-top: 12px; border-top: 1px solid var(--hair);
+  font-size: 11px; color: var(--fg-3);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+.hr-acts { display: flex; gap: 12px; justify-content: center; margin-top: 40px; flex-wrap: wrap }
+
+/* Üç kapı — her fikir kendi sayfasına. */
+.hr-doors {
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px;
+  width: 100%; margin-top: clamp(60px, 9vw, 110px);
+}
+.hr-door {
+  display: flex; flex-direction: column; gap: 8px;
+  padding: 24px 22px 22px;
+  border-radius: 15px;
+  border: 1px solid var(--hair);
+  background: var(--bg-2);
+  text-align: left;
+  height: 100%;
+  transition: border-color .25s var(--glide), transform .35s var(--spring-soft);
+}
+.hr-door:hover { border-color: #2c333c; transform: translateY(-3px) }
+.hr-door-t { font-size: 16px; font-weight: 620; letter-spacing: -.015em }
+.hr-door-d { font-size: 13.5px; line-height: 1.55; color: var(--fg-2); flex: 1 }
+.hr-door-go { font-size: 17px; color: var(--fg-3); transition: transform .3s var(--spring-soft), color .2s var(--glide) }
+.hr-door:hover .hr-door-go { color: var(--blue); transform: translateX(4px) }
+
+/* ═══ NE YAPAR ═══ */
+.cp-tabs {
+  display: flex; gap: 4px; padding: 4px;
+  border-radius: 13px; background: var(--bg-2); border: 1px solid var(--hair);
+  width: fit-content; max-width: 100%; overflow-x: auto; margin-bottom: 22px;
+}
+.cp-tabs button {
+  padding: 9px 20px; border-radius: 10px;
+  font-size: 13.5px; font-weight: 550; color: var(--fg-3); white-space: nowrap;
+  transition: background .22s var(--glide), color .22s var(--glide);
+}
+.cp-tabs button:hover { color: var(--fg-2) }
+.cp-tabs button.on { background: var(--fg); color: var(--bg) }
+
+.cp-panel {
+  border-radius: 16px; border: 1px solid var(--hair); background: var(--bg-2);
+  overflow: hidden;
+  animation: mk-fade .45s var(--glide) both;
+}
+.cp-ask {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  flex-wrap: wrap; padding: 16px 22px; border-bottom: 1px solid var(--hair);
+}
+.cp-q { font-size: 14.5px }
+/* Tool adı DEĞİL, çıktı TÜRÜ gösterilir: ziyaretçi için anlamlı olan budur. */
+.cp-kind {
+  font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+  padding: 4px 11px; border-radius: 20px;
+  background: color-mix(in oklab, var(--blue) 15%, transparent);
+  color: var(--blue);
+}
+.cp-out { padding: 22px; min-height: 262px; display: flex; align-items: center }
+.cp-out > * { width: 100% }
+.cp-note {
+  margin: 0; padding: 15px 22px 19px; border-top: 1px solid var(--hair);
+  font-size: 13px; line-height: 1.6; color: var(--fg-2);
+}
+
+.cp-chart { display: flex; flex-direction: column; gap: 14px }
+.cp-bars { display: flex; align-items: flex-end; gap: 7px; height: 168px }
+.cp-bars i {
+  flex: 1; border-radius: 5px 5px 0 0;
+  background: linear-gradient(to top, var(--blue), color-mix(in oklab, var(--blue) 45%, transparent));
+  transition: height .75s var(--spring-soft);
+}
+.cp-axis { display: flex; justify-content: space-between; font-size: 11.5px; color: var(--fg-3); font-variant-numeric: tabular-nums }
+
+/* Belge beyazdır — ürünün kendi ayrımı: ekran koyu, kâğıt beyaz. */
+.cp-doc { background: #fff; color: #16181c; border-radius: 11px; padding: 20px 22px; font-size: 12px }
+.cp-doc-head {
+  display: flex; justify-content: space-between; align-items: baseline;
+  padding-bottom: 10px; margin-bottom: 14px; border-bottom: 1.5px solid #16181c;
+}
+.cp-doc-head b { font-size: 13px; font-weight: 640 }
+.cp-doc-head span { color: #6b7178; font-size: 11px }
+.cp-doc-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 0 24px }
+.cp-doc-cols h4 { margin: 0 0 9px; font-size: 9.5px; letter-spacing: .1em; color: #6b7178; font-weight: 640 }
+.cp-doc-pair { display: contents }
+.cp-doc-pair p {
+  display: flex; justify-content: space-between; gap: 10px; margin: 0 0 6px; color: #3d434b;
+}
+.cp-doc-pair b { font-weight: 600; color: #16181c; font-variant-numeric: tabular-nums }
+.cp-doc-foot {
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  margin-top: 14px; padding-top: 11px; border-top: 1.5px solid #16181c;
+  font-weight: 640; font-variant-numeric: tabular-nums;
+}
+.cp-doc-foot .ok {
+  font-size: 10px; letter-spacing: .1em; padding: 3px 10px; border-radius: 5px;
+  background: rgba(31,122,82,.12); color: #1f7a52;
+}
+
+.cp-gate {
+  border-radius: 12px; border: 1px solid var(--hair); background: #12161b; padding: 20px 22px;
+  opacity: 0; transform: translateY(10px);
+  transition: opacity .55s var(--glide), transform .7s var(--spring-soft);
+}
+.cp-gate.in { opacity: 1; transform: none }
+.cp-gate-badge { font-size: 10px; letter-spacing: .12em; text-transform: uppercase; color: var(--blue) }
+.cp-gate h4 { margin: 10px 0 16px; font-size: 17px; font-weight: 620 }
+.cp-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 12px }
+.cp-field label { font-size: 10.5px; letter-spacing: .05em; color: var(--fg-3) }
+.cp-field div {
+  padding: 9px 12px; border-radius: 9px; border: 1px solid var(--hair);
+  background: #0c1014; font-size: 13px; color: var(--fg);
+}
+.cp-gate-acts { display: flex; justify-content: flex-end; gap: 8px; margin-top: 16px }
+.cp-gate-acts span { padding: 8px 18px; border-radius: 9px; font-size: 13px; font-weight: 560 }
+.cp-gate-acts .ghost { color: var(--fg-3) }
+.cp-gate-acts .solid { background: var(--blue); color: #05121f }
+.cp-gate-note { margin: 13px 0 0; font-size: 11.5px; color: var(--fg-3) }
+
+/* ═══ MEVZUAT ═══ */
+.lw-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px }
+.lw-card {
+  padding: 24px 22px; border-radius: 15px;
+  border: 1px solid var(--hair); background: var(--bg-2); height: 100%;
+  transition: border-color .25s var(--glide), transform .35s var(--spring-soft);
+}
+.lw-card:hover { border-color: #2c333c; transform: translateY(-2px) }
+/* Rakam önce gelir: iddia değil ölçü gösteriyoruz. */
+.lw-n {
+  display: block; margin-bottom: 12px;
+  font-size: 21px; font-weight: 680; letter-spacing: -.02em;
+  color: var(--blue); font-variant-numeric: tabular-nums;
+}
+.lw-card h3 { margin: 0 0 8px; font-size: 15.5px; font-weight: 620; letter-spacing: -.012em }
+.lw-card p { margin: 0; font-size: 13.5px; line-height: 1.58; color: var(--fg-2) }
+
+/* ═══ ROLLER ═══ */
+.rl-list { display: flex; flex-direction: column; gap: 2px }
+.rl-row {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  grid-template-areas: "meta bar" "meta desc";
+  gap: 6px 24px;
+  padding: 20px 0;
+  border-bottom: 1px solid var(--hair);
+  align-items: center;
+}
+.rl-meta { grid-area: meta; display: flex; align-items: baseline; gap: 10px }
+.rl-name { font-size: 15.5px; font-weight: 600 }
+.rl-n { font-size: 12.5px; color: var(--fg-3); font-variant-numeric: tabular-nums }
+.rl-bar { grid-area: bar; height: 4px; border-radius: 3px; background: var(--hair); overflow: hidden }
+/* Yetki genişliğini çubukla göstermek sayıyı tekrar etmekten güçlü:
+   operatörün ne kadar dar olduğu bir bakışta görünür. */
+.rl-bar i {
+  display: block; height: 100%; border-radius: 3px; background: var(--blue);
+  transition: width 1s var(--spring-soft);
+}
+.rl-d { grid-area: desc; margin: 0; font-size: 13.5px; color: var(--fg-2) }
+
+.rl-rule {
+  margin-top: clamp(50px, 7vw, 84px);
+  padding: clamp(28px, 4vw, 40px);
+  border-radius: 18px;
+  border: 1px solid var(--hair);
+  background: var(--bg-2);
+}
+.rl-rule h2 { margin: 0 0 12px; font-size: clamp(20px, 3vw, 28px); font-weight: 640; letter-spacing: -.025em }
+.rl-rule p { margin: 0; max-width: 620px; font-size: 15px; line-height: 1.62; color: var(--fg-2) }
+
+@media (max-width: 780px) {
+  .hr-doors, .lw-grid { grid-template-columns: 1fr }
+  .rl-row { grid-template-columns: 1fr; grid-template-areas: "meta" "bar" "desc"; gap: 10px }
+  .mk-nav a:not(.mk-enter) { display: none }
+  .mk-foot { justify-content: center; text-align: center }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .mk-rv { opacity: 1; transform: none; transition: none }
+  .hr-reply, .cp-panel, .cp-gate { animation: none; opacity: 1; transform: none }
+  .cp-bars i, .rl-bar i { transition: none }
+  .hr-caret, .hr-step::before { animation: none }
 }

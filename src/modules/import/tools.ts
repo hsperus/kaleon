@@ -23,6 +23,7 @@
  */
 
 import { z } from "zod";
+import { BusinessRuleError } from "../../kernel/errors.js";
 import { defineTool } from "../../kernel/tool.js";
 import { holds } from "../../kernel/rbac.js";
 import type { Principal, ToolOk } from "../../kernel/types.js";
@@ -31,13 +32,32 @@ import { detectObject, type ImportObject } from "./framework.js";
 import { IMPORT_OBJECTS, findObject, parseWith } from "./objects.js";
 import type { Classification, ImportOutcome } from "../../db/importers.js";
 
+/**
+ * İçe aktarma kuralı hatası.
+ *
+ * DÜZ `Error` KULLANICIYA ULAŞMIYORDU. Yetkisi olmayan biri içe
+ * aktarmayı denediğinde ekranda "Tool çalıştırılamadı: commit_import"
+ * yazıyordu — yani kişi neden reddedildiğini bilmiyor, sistemi bozuk
+ * sanıyordu. Oysa cevap basitti: o dosya türünü içe aktarma yetkisi
+ * yok.
+ *
+ * `BusinessRuleError` kullanıcıya görünür (`userFacing`) ve mesaj
+ * olduğu gibi ekrana çıkar.
+ */
+class ImportRuleError extends BusinessRuleError {
+  constructor(message: string) {
+    super(message, "import");
+  }
+}
+
 export interface UploadStore {
   get(uploadId: string, tenantId: string): Promise<{ filename: string; content: string } | null>;
 }
 
 export interface Importer<T> {
   classify(rows: readonly T[]): Promise<Classification>;
-  commit(rows: readonly T[]): Promise<ImportOutcome>;
+  /** `userId` ana veri değişiklik belgesine geçer: dosyayı kim yükledi. */
+  commit(rows: readonly T[], userId?: string): Promise<ImportOutcome>;
 }
 
 export interface ImportDeps {
@@ -93,12 +113,12 @@ export function importTools(deps: ImportDeps) {
     requires: [],
     async execute(input, ctx): Promise<ToolOk<PreviewSummary>> {
       const file = await deps.uploads.get(input.uploadId, ctx.tenant.tenantId);
-      if (!file) throw new Error(`Yüklenmiş dosya bulunamadı: ${input.uploadId}`);
+      if (!file) throw new ImportRuleError(`Yüklenmiş dosya bulunamadı: ${input.uploadId}`);
 
       const table = parseCsv(file.content);
       const allowed = allowedObjects(ctx.principal);
       if (allowed.length === 0) {
-        throw new Error("Dosya içe aktarma yetkiniz yok.");
+        throw new ImportRuleError("Dosya içe aktarma yetkiniz yok.");
       }
 
       // Kullanıcı türü söylediyse ona uy; söylemediyse başlıklardan anla.
@@ -107,14 +127,14 @@ export function importTools(deps: ImportDeps) {
 
       if (input.object) {
         object = findObject(input.object);
-        if (!object) throw new Error(`Bilinmeyen dosya türü: ${input.object}`);
+        if (!object) throw new ImportRuleError(`Bilinmeyen dosya türü: ${input.object}`);
         if (!allowed.includes(object)) {
-          throw new Error(`"${object.label}" içe aktarma yetkiniz yok.`);
+          throw new ImportRuleError(`"${object.label}" içe aktarma yetkiniz yok.`);
         }
       } else {
         const matches = detectObject(table.headers, allowed);
         if (matches.length === 0) {
-          throw new Error(
+          throw new ImportRuleError(
             `Dosya tanınamadı. Sütun başlıkları: ${table.headers.slice(0, 6).join(", ")}. ` +
               `Yükleyebildikleriniz: ${allowed.map((o) => o.label).join(", ")}.`,
           );
@@ -199,25 +219,27 @@ export function importTools(deps: ImportDeps) {
     requires: [],
     async execute(input, ctx) {
       const object = findObject(input.object);
-      if (!object) throw new Error(`Bilinmeyen dosya türü: ${input.object}`);
+      if (!object) throw new ImportRuleError(`Bilinmeyen dosya türü: ${input.object}`);
 
       // YETKİ BURADA DA DOĞRULANIR. Tool'un `requires` listesi boş çünkü
       // gereken izin NESNEYE bağlı; katalog süzgeci bunu bilemez. İkinci
       // kapı olmadan, kataloğu atlayan bir çağrı (eski konuşma, elle istek)
       // yetkisiz yazma yapabilirdi.
       if (!holds(ctx.principal, object.requires)) {
-        throw new Error(`"${object.label}" içe aktarma yetkiniz yok.`);
+        throw new ImportRuleError(`"${object.label}" içe aktarma yetkiniz yok.`);
       }
 
       const file = await deps.uploads.get(input.uploadId, ctx.tenant.tenantId);
-      if (!file) throw new Error(`Yüklenmiş dosya bulunamadı: ${input.uploadId}`);
+      if (!file) throw new ImportRuleError(`Yüklenmiş dosya bulunamadı: ${input.uploadId}`);
 
       const { valid, errors } = parseWith(object, parseCsv(file.content));
       // Yazmaya YALNIZCA geçerli satırlar gider; hatalıları da denemek
       // önizlemenin anlamını yok eder.
       const outcome = await deps
         .importerFor(object.id, ctx.tenant.tenantId)
-        .commit(valid as readonly never[]);
+        // DOSYAYI KİMİN YÜKLEDİĞİ KAYDA GEÇER. Geçmezse "bu vergi
+        // numarasını kim değiştirmiş" sorusunun cevabı olmaz.
+        .commit(valid as readonly never[], ctx.principal.userId);
 
       return {
         ok: true as const,

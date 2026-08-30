@@ -25,9 +25,14 @@ export type GoldenCategory =
   | "master-data"
   | "documents"
   | "approval"
-  | "quality"
   | "security"
-  | "honesty";
+  | "honesty"
+  // Sonradan eklenen modüller: muhasebe, satış ve izleme kendi
+  // kategorilerini hak ediyor — "finance" altına sıkıştırmak,
+  // koşum çıktısında hangi alanın zayıf olduğunu gizlerdi.
+  | "accounting"
+  | "sales"
+  | "briefing";
 
 export interface GoldenQuestion {
   readonly id: string;
@@ -35,6 +40,17 @@ export interface GoldenQuestion {
   readonly question: string;
   /** Soruyu soran rol — RBAC değerlendirmenin parçasıdır. */
   readonly askedBy: RoleId;
+  /**
+   * Bu tool'lardan EN AZ BİRİ çağrılmalı.
+   *
+   * GERÇEK SORULARIN BİRDEN FAZLA DOĞRU CEVABI OLABİLİR. "Bu maaş bana
+   * kaça mal olur" sorusuna aylık simülasyon da yıllık plan da doğru
+   * cevaptır. Tek bir tool dayatan bir kural, modelin DAHA İYİ olanı
+   * seçtiği durumlarda bile "düştü" der; böyle sahte düşüşler
+   * biriktiğinde koşuma kimse bakmaz olur ve gerçek düşüşler de
+   * görünmez.
+   */
+  readonly anyOfTools?: readonly string[];
   /** Bu tool'ların HEPSİ çağrılmalı. */
   readonly mustCallTools: readonly string[];
   /** Bu tool'lardan HİÇBİRİ çağrılmamalı. Boşsa kontrol yok. */
@@ -842,6 +858,100 @@ export const GOLDEN_QUESTIONS: readonly GoldenQuestion[] = [
     mustCallTools: ["get_factory_wip", "get_bank_balance", "get_overtime"],
     requiresSource: true,
     rationale: "ÜÇ SORU BİRDEN: model üçünü de cevaplamalı, birini düşürmemeli.",
+  },
+
+  // ────────────────── Yeni modüller: seçim doğruluğu ──────────────────
+  //
+  // BU VAKALAR SONRADAN EKLENDİ VE SEBEBİ ŞU: bordro, sabit kıymet,
+  // iade ve izleme modülleri (26 tool) yazıldı, testleri geçti,
+  // üretime çıktı — ama GERÇEK MODELİN onları doğru seçip seçmediği
+  // hiç ölçülmedi. Tool'un çalışması ile modelin onu bulması ayrı iki
+  // şeydir; ikincisi ölçülmezse tool var ama erişilemez olur.
+  {
+    id: "PAY-001",
+    category: "hr",
+    question: "Brüt 100 bin TL maaş bana kaça mal olur?",
+    askedBy: "cfo",
+    mustCallTools: [],
+    /*
+     * İKİ CEVAP DA DOĞRU — VE BUNU KOŞUM ÖĞRETTİ.
+     *
+     * İlk hâlinde yalnızca `simulate_payroll` zorunluydu; canlı model
+     * `plan_annual_payroll` seçti ve vaka düştü. Oysa "bana kaça mal
+     * olur" sorusu aylık da yıllık da okunabilir ve yıllık plan
+     * ikisini birden verir — model DAHA İYİ olanı seçmişti. Hatalı
+     * olan kuraldı.
+     */
+    anyOfTools: ["simulate_payroll", "plan_annual_payroll"],
+    mustNotCallTools: ["run_payroll"],
+    mustContain: [],
+    requiresSource: true,
+    rationale:
+      "Maliyet sorusu HESAPLAMADIR, bordro çalıştırmak değil. Model " +
+      "run_payroll'a giderse tahakkuk kaydı yazacak bir işlem önerir.",
+  },
+  {
+    id: "PAY-002",
+    category: "hr",
+    question: "Bu çalışan bana yılda kaça mal olur? Brüt 100 bin.",
+    askedBy: "cfo",
+    mustCallTools: ["plan_annual_payroll"],
+    mustNotCallTools: ["run_payroll"],
+    mustContain: [],
+    requiresSource: true,
+    rationale:
+      "YILLIK maliyet tek ayın 12 katı değildir; model ayrı tool'u " +
+      "seçmezse dilim atlamasını kaçırır ve rakam yanlış çıkar.",
+  },
+  {
+    id: "ASSET-001",
+    category: "accounting",
+    question: "Makinelerimizin net defter değeri ne kadar?",
+    askedBy: "cfo",
+    mustCallTools: ["list_fixed_assets"],
+    mustNotCallTools: ["run_depreciation", "dispose_fixed_asset"],
+    mustContain: [],
+    requiresSource: true,
+    rationale: "Okuma sorusu; amortisman ayırmak ya da kıymet satmak değil.",
+  },
+  {
+    id: "ACC-B01",
+    category: "accounting",
+    question: "Bilançomuzu çıkar",
+    askedBy: "cfo",
+    mustCallTools: ["get_balance_sheet"],
+    mustNotCallTools: ["get_income_statement"],
+    mustContain: [],
+    requiresSource: true,
+    rationale:
+      "Bilanço ile gelir tablosu karıştırılmamalı: biri o an neye sahip " +
+      "olunduğunu, diğeri dönemde ne kazanıldığını söyler.",
+  },
+  {
+    id: "WATCH-001",
+    category: "briefing",
+    question: "Bekleyen onay sayısı 3'ü geçerse bana haber ver",
+    askedBy: "patron",
+    mustCallTools: ["create_watch"],
+    mustNotCallTools: [],
+    mustContain: [],
+    requiresSource: false,
+    rationale:
+      "Kalıcı izleme isteği. Model bunu tek seferlik bir sorgu sanarsa " +
+      "kullanıcı haber bekler ve hiç gelmez.",
+  },
+  {
+    id: "CN-001",
+    category: "sales",
+    question: "FTR2026000001 faturasına kesilen iadeleri göster",
+    askedBy: "cfo",
+    mustCallTools: ["list_invoice_credit_notes"],
+    mustNotCallTools: ["issue_credit_note"],
+    mustContain: [],
+    requiresSource: true,
+    rationale:
+      "GÖSTERMEK ile KESMEK arasındaki fark: model issue_credit_note'a " +
+      "giderse okuma isteğine karşılık bir iade belgesi hazırlar.",
   },
 ];
 

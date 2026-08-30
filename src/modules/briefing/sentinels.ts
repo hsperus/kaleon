@@ -60,7 +60,15 @@ export interface Signal {
 export interface Sentinel {
   readonly id: string;
   readonly tool: string;
-  readonly input: unknown;
+  /**
+   * Tool girdisi.
+   *
+   * FONKSİYON OLABİLİR ÇÜNKÜ BAZI NÖBETÇİLER TARİHE BAĞLIDIR. "Bu ayın
+   * bordrosu çalıştı mı" sorusu sabit bir girdiyle sorulamaz; sabit
+   * yazılsaydı nöbetçi bir ay sonra yanlış ayı kontrol ederdi ve
+   * kimse fark etmezdi.
+   */
+  readonly input: unknown | ((now: Date) => unknown);
   /** Bu nöbetçi yalnızca bu izne sahip rollerde koşar. */
   readonly requires: Permission;
   readonly evaluate: (data: unknown, t: BriefingThresholds) => readonly Signal[];
@@ -239,6 +247,128 @@ export const SENTINELS: readonly Sentinel[] = [
             tool: "get_overtime",
             input: { employeeQuery: null, department: null, period: "2026-05" },
           },
+        },
+      ];
+    },
+  },
+
+  /*
+   * ── MALİ NÖBETÇİLER ──
+   *
+   * NÖBETÇİLER BEŞ TANEYDİ VE HEPSİ ÜRETİM/SEVKİYAT TARAFINDAYDI.
+   * Muhasebe, bordro ve sabit kıymet hiç izlenmiyordu: bilanço denk
+   * olmasa, ayın bordrosu unutulsa ya da amortisman hiç ayrılmasa
+   * sistem tek kelime etmiyordu. Bunlar sorulduğunda değil,
+   * OLDUĞUNDA öğrenilmesi gereken şeylerdir.
+   */
+  {
+    id: "balance-sheet-integrity",
+    tool: "get_balance_sheet",
+    input: (now: Date) => ({ asOf: now.toISOString().slice(0, 10) }),
+    requires: "accounting:ledger.read",
+    evaluate: (data) => {
+      const d = data as { balanced?: boolean; difference?: number } | null;
+      if (!d || d.balanced !== false) return [];
+      const diff = typeof d.difference === "number" ? d.difference : null;
+      return [
+        {
+          id: "balance-sheet-unbalanced",
+          // BİLANÇONUN DENK OLMAMASI HER ZAMAN KRİTİKTİR: tutarın
+          // büyüklüğüne bakılmaz, çünkü sorun tutar değil güvendir.
+          level: 2,
+          title: "Bilanço denk değil.",
+          detail:
+            diff === null
+              ? "Aktif ile pasif toplamı tutmuyor; tek taraflı kayıt var."
+              : `Aktif ile pasif arasında ${tl(Math.abs(diff))} TL fark var. ` +
+                `Tüm mali tablolar bu fark giderilene kadar şüphelidir.`,
+          impact: diff,
+          drilldown: { tool: "get_balance_sheet", input: {} },
+        },
+      ];
+    },
+  },
+  {
+    id: "fixed-asset-reconciliation",
+    tool: "list_fixed_assets",
+    input: { status: "hepsi" },
+    requires: "accounting:ledger.read",
+    evaluate: (data) => {
+      const d = data as {
+        reconciliation?: { matched?: boolean; costDifference?: number; accumulatedDifference?: number };
+      } | null;
+      const r = d?.reconciliation;
+      if (!r || r.matched !== false) return [];
+      const diff = Math.abs(r.costDifference ?? 0) + Math.abs(r.accumulatedDifference ?? 0);
+      return [
+        {
+          id: "fixed-asset-drift",
+          level: levelForAmount(diff, DEFAULT_THRESHOLDS),
+          title: "Sabit kıymet kaydı defterle uyuşmuyor.",
+          detail:
+            `Kıymet listesi ile muhasebe defteri arasında ${tl(diff)} TL fark var. ` +
+            `Bilanço ile kıymet listesi farklı rakam söylüyor.`,
+          impact: diff,
+          drilldown: { tool: "list_fixed_assets", input: { status: "hepsi" } },
+        },
+      ];
+    },
+  },
+  {
+    id: "payroll-missing",
+    tool: "get_payroll_summary",
+    /*
+     * GEÇEN AYIN BORDROSU KONTROL EDİLİR, BU AYIN DEĞİL.
+     *
+     * Ayın 3'ünde "bu ayın bordrosu yok" demek gürültüdür — daha
+     * çalıştırılmasının vakti gelmemiştir. Geçen ay bitmiştir ve
+     * bordrosu çalışmış olmalıdır.
+     */
+    input: (now: Date) => {
+      const prev = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - 1, 15));
+      return { period: prev.toISOString().slice(0, 10) };
+    },
+    requires: "hr:payroll.read",
+    evaluate: (data) => {
+      // Bordro varsa `data` dolu döner; yoksa null.
+      if (data !== null && data !== undefined) return [];
+      return [
+        {
+          id: "payroll-not-run",
+          level: 2,
+          title: "Geçen ayın bordrosu çalıştırılmamış.",
+          detail:
+            "Bordro çalıştırılmadan personel gideri deftere girmez ve SGK bildirimi " +
+            "yapılamaz. Ödemeler yapılmış olsa bile muhasebe kaydı eksiktir.",
+          impact: null,
+          drilldown: { tool: "get_payroll_summary", input: {} },
+        },
+      ];
+    },
+  },
+  {
+    id: "einvoice-queue",
+    tool: "list_pending_einvoices",
+    input: { limit: 50 },
+    requires: "documents:einvoice.read",
+    evaluate: (data) => {
+      const d = data as { invoices?: readonly unknown[]; total?: number } | null;
+      const count = d?.invoices?.length ?? 0;
+      if (count === 0) return [];
+      const total = typeof d?.total === "number" ? d.total : null;
+      return [
+        {
+          id: "einvoice-pending",
+          level: levelForAmount(total ?? 0, DEFAULT_THRESHOLDS),
+          title: `${count} e-Fatura entegratöre gönderilmeyi bekliyor.`,
+          detail:
+            total === null
+              ? "Belgesi üretilmiş ama gönderilmemiş faturalar var."
+              : `Toplam ${tl(total)} TL tutarında fatura gönderim kuyruğunda; ` +
+                `gönderilmeyen fatura mevzuat açısından kesilmemiş sayılmaz ama ` +
+                `alıcıya ulaşmaz ve tahsilat gecikir.`,
+          impact: total,
+          drilldown: { tool: "list_pending_einvoices", input: { limit: 50 } },
         },
       ];
     },

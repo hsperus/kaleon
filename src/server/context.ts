@@ -19,18 +19,13 @@ import type { Channel, Principal, RoleId, TenantContext } from "../kernel/types.
 import { InMemoryAuditSink, type AuditEntry, type AuditSink } from "../kernel/audit.js";
 import { PostgresAuditSink } from "../db/audit-sink.js";
 import { InMemoryDataSource } from "../data/memory.js";
-import { InMemoryOperationsRepository } from "../modules/operations/repository.js";
-import {
-  InMemoryApprovalRepository,
-  InMemoryDocumentsRepository,
-} from "../modules/documents/repository.js";
 import { buildRegistry } from "../app.js";
 import type { ToolRegistry } from "../kernel/registry.js";
 import Anthropic from "@anthropic-ai/sdk";
 import type { Completer } from "../ai/gateway.js";
 import { LlmGateway } from "../ai/gateway.js";
 import { ScriptedCompleter } from "../ai/scripted.js";
-import { InMemoryLedger } from "../ai/ledger.js";
+import { PostgresLedger } from "../ai/ledger.js";
 import { SYSTEM_PROMPT } from "../ai/system-prompt.js";
 import { createWorkOrder } from "../modules/operations/work-order.js";
 import { principalFromSession } from "./auth.js";
@@ -41,6 +36,34 @@ import { PrismaOperationsRepository } from "../db/operations-repository.js";
 import { PrismaConversationRepository } from "../db/conversation-repository.js";
 import { importerFor } from "../db/importers.js";
 import { PrismaUploadStore } from "../db/upload-store.js";
+import { SalesRepository } from "../db/sales-repository.js";
+import { ValuationRepository } from "../db/valuation-repository.js";
+import { PeriodRepository } from "../db/period-repository.js";
+import { BatchRepository } from "../db/batch-repository.js";
+import { ProcurementRepository } from "../db/procurement-repository.js";
+import { LeaveRepository } from "../db/leave-repository.js";
+import { ChangeLogRepository } from "../db/change-log.js";
+import { JournalRepository } from "../db/journal-repository.js";
+import { StockCountRepository } from "../db/stock-count-repository.js";
+import { MrpRepository } from "../db/mrp-repository.js";
+import { DemoDataSource } from "../data/demo-source.js";
+import { log } from "./log.js";
+import { AssetRepository } from "../db/asset-repository.js";
+import { CreditNoteRepository } from "../db/credit-note-repository.js";
+import { PayrollRepository } from "../db/payroll-repository.js";
+import { WatchRepository } from "../db/watch-repository.js";
+import { EInvoiceRepository } from "../db/einvoice-repository.js";
+import { CostingRepository } from "../db/costing-repository.js";
+import { QuotationRepository } from "../db/quotation-repository.js";
+import { MaintenanceRepository } from "../db/maintenance-repository.js";
+import { DocumentFlowRepository } from "../db/document-flow-repository.js";
+import { OrganizationRepository } from "../db/organization-repository.js";
+import { CapacityRepository } from "../db/capacity-repository.js";
+import { SerialRepository } from "../db/serial-repository.js";
+import { InMemoryPendingStore, PrismaPendingStore } from "../db/pending-store.js";
+import { singleton } from "./singleton.js";
+import type { PendingStore } from "../kernel/pending.js";
+import { PrismaItemRepository } from "../db/item-repository.js";
 import {
   InMemoryConversationRepository,
   type ConversationRepository,
@@ -88,14 +111,24 @@ export const ROLE_LABEL: Record<RoleId, string> = {
   operator: "Operatör",
 };
 
-/** Model bağlı mı? Bağlı değilse arayüz bunu açıkça yazar. */
-export const MODEL_CONNECTED = Boolean(process.env["ANTHROPIC_API_KEY"]);
+/**
+ * Model bağlı mı? Bağlı değilse arayüz bunu açıkça yazar.
+ *
+ * TESTTE ASLA BAĞLI DEĞİLDİR. Ortamda geçerli bir anahtar bulunması,
+ * test koşusunun gerçek modele gidip PARA HARCAMASI anlamına gelirdi —
+ * üstelik testler ağ ve model değişkenliğine bağlı hâle gelir, aynı kod
+ * bir gün geçer bir gün kalırdı. Model yolu ayrı bir eval koşusuyla
+ * sınanır; birim ve entegrasyon testleri betikli tamamlayıcıyla çalışır.
+ */
+const IN_TEST = Boolean(process.env["VITEST"] ?? process.env["VITEST_WORKER_ID"]);
+export const MODEL_CONNECTED = !IN_TEST && Boolean(process.env["ANTHROPIC_API_KEY"]);
 
 // ─── Süreç ömrü boyunca paylaşılan bağımlılıklar (demo verisi) ───
 
-const operations = new InMemoryOperationsRepository({ bomRevisions: { "FR-22": "R3" } });
-const documents = new InMemoryDocumentsRepository();
-const approvals = new InMemoryApprovalRepository();
+/**
+ * Demo iş verisi. Süreç geneline bağlanır: onaylanan bir stok hareketi
+ * `/api/trpc` içinde yazılır, sonraki soru `/api/ask` içinde okunur.
+ */
 /**
  * DENETİM KAYDI VERİTABANINA YAZILIR.
  *
@@ -118,13 +151,26 @@ function auditFor(tenant: TenantContext): PostgresAuditSink {
   auditByTenant.set(tenant.tenantId, sink);
   return sink;
 }
-const ledger = new InMemoryLedger();
+/**
+ * Harcama defteri KALICIDIR. Bellekte tutulsaydı sunucu her yeniden
+ * başladığında harcama sıfırlanır ve aylık tavan hiçbir zaman dolmazdı —
+ * geliştirme sırasında bu dakikada bir olur.
+ */
+const ledger = new PostgresLedger(sharedClient() as never);
 
-async function seedDemo(tenantId: string): Promise<void> {
+/**
+ * Demo iş emri — DEMO ŞEMASINA yazılır, belleğe değil.
+ *
+ * Önceden bellek deposuna yazılıyordu ve demo registry'si de bellekten
+ * okuduğu için tutarlıydı. Demo artık gerçek şemadan okuduğuna göre,
+ * belleğe yazılan bir iş emri hiçbir yerde görünmezdi.
+ */
+async function seedDemo(tenant: TenantContext): Promise<void> {
   if (demoSeeded) return;
   demoSeeded = true;
-  await operations.saveWorkOrder(
-    tenantId,
+  const repo = new PrismaOperationsRepository(tenantClient(tenant.schema));
+  await repo.saveWorkOrder(
+    tenant.tenantId,
     createWorkOrder({
     id: "WO-2026-0612",
     itemId: "FR-22",
@@ -185,7 +231,11 @@ async function demoTenantContext(): Promise<TenantContext> {
     locale: row.locale,
     baseCurrency: row.baseCurrency,
   };
-  await seedDemo(demoTenant.tenantId);
+  // Demo verisi eksikse akış çalışmaz; hata sessizce yutulmaz ama
+  // uygulamayı da düşürmez — kullanıcı yine giriş yapabilmeli.
+  await seedDemo(demoTenant).catch((e: unknown) => {
+    log.warn("demo iş emri kurulamadı", { error: e instanceof Error ? e.message : String(e) });
+  });
   return demoTenant;
 }
 
@@ -209,7 +259,15 @@ const registryByTenant = new Map<string, ToolRegistry>();
 export function uploadStoreFor(tenant: TenantContext): PrismaUploadStore {
   return new PrismaUploadStore(tenantClient(tenant.schema));
 }
-const conversationsByTenant = new Map<string, ConversationRepository>();
+/**
+ * DEMO KONUŞMALARI BELLEKTEDİR ve route'lar arasında paylaşılmalıdır:
+ * konuşma `/api/ask` içinde büyür, `/api/trpc` içinde okunur. Modül
+ * değişkeni olsaydı geçmiş listesi boş görünürdü.
+ */
+const conversationsByTenant = singleton(
+  "conversations.byTenant",
+  () => new Map<string, ConversationRepository>(),
+);
 
 /**
  * Konuşma deposu — tenant başına.
@@ -230,43 +288,62 @@ function conversationsFor(tenant: TenantContext, isDemo: boolean): ConversationR
 /**
  * Tenant'ın registry'si.
  *
- * DEMO TENANT'I bellek kaynağını ve bellek depolarını kullanır — hazır veri
- * kümesi oradadır. GERÇEK TENANT Postgres'e bağlanır; henüz adaptörü olmayan
- * kanallar (banka, mesai, sevkiyat, WIP) boş döner, uydurma veri dönmez.
+ * DEMO TENANT'I DA TAM REGISTRY'Yİ ALIR. Önceden demo, bellek
+ * kaynağıyla kurulduğu için 114 tool'un 24'ünü gösteriyordu: muhasebe,
+ * MRP, e-Fatura, bakım, İK demoda yoktu ve ürünü ilk kez gören kişi
+ * olanın beşte birini görüyordu. Ayrım artık doğru yerde — yalnızca
+ * ADAPTÖRÜ OLMAYAN DIŞ KANALLAR (banka, sevkiyat, WIP, mesai) bellekten
+ * gelir; geri kalan her şey demo şemasının kendi Postgres verisinden
+ * okunur. Böylece demoda yazılan bir kayıt yine demoda okunur.
  *
- * Registry tenant başına önbelleklenir çünkü tool şemaları prompt önbelleğinin
- * ön ekindedir; her istekte yeniden kurmak sırayı bozup önbelleği ıskalatırdı.
+ * Registry tenant başına önbelleklenir çünkü tool şemaları prompt
+ * önbelleğinin ön ekindedir; her istekte yeniden kurmak sırayı bozup
+ * önbelleği ıskalatırdı.
  */
 function registryFor(tenant: TenantContext, isDemo: boolean): ToolRegistry {
   const cached = registryByTenant.get(tenant.tenantId);
   if (cached) return cached;
 
-  /**
-   * DEMO TENANT'INDA İÇE AKTARMA TOOL'LARI YOKTUR.
-   *
-   * Demo verisi bellekte sabit bir gösteri kümesidir. İçe aktarma gerçek
-   * şemaya yazardı; kullanıcı cari eklerdi ama `resolve_partner` bellekten
-   * okuduğu için onu BULAMAZDI. "Ekledim ama yok" hâli, tool'un hiç
-   * olmamasından çok daha kötüdür. Gerçek tenant'ta zincirin tamamı çalışır.
-   */
-  const registry = isDemo
-    ? buildRegistry(new InMemoryDataSource(tenant.tenantId), {
-        operations,
-        documents,
-        approvals,
-      })
-    : buildRegistryForTenant(tenant);
-
+  const registry = buildRegistryForTenant(tenant, isDemo);
   registryByTenant.set(tenant.tenantId, registry);
   return registry;
 }
 
-function buildRegistryForTenant(tenant: TenantContext): ToolRegistry {
+function buildRegistryForTenant(tenant: TenantContext, isDemo = false): ToolRegistry {
   const db = tenantClient(tenant.schema);
-  return buildRegistry(new PrismaDataSource(db), {
+  const real = new PrismaDataSource(db);
+  // Demoda dış kanallar gösteri kümesinden, geri kalan gerçek şemadan.
+  const source = isDemo
+    ? new DemoDataSource(new InMemoryDataSource(tenant.tenantId), real)
+    : real;
+  return buildRegistry(source, {
     operations: new PrismaOperationsRepository(db),
     documents: new PrismaDocumentsRepository(db),
     approvals: new PrismaApprovalRepository(db),
+    items: new PrismaItemRepository(db),
+    sales: new SalesRepository(db),
+    valuation: new ValuationRepository(db),
+    periods: new PeriodRepository(db),
+    batches: new BatchRepository(db),
+    procurement: new ProcurementRepository(db),
+    leave: new LeaveRepository(db),
+    changes: new ChangeLogRepository(db),
+    journal: new JournalRepository(db),
+    assets: new AssetRepository(db),
+    creditNotes: new CreditNoteRepository(db),
+    payroll: new PayrollRepository(db),
+    watches: new WatchRepository(db),
+    audit: auditFor(tenant),
+    stockCounts: new StockCountRepository(db),
+    mrp: new MrpRepository(db),
+    einvoice: new EInvoiceRepository(db),
+    costing: new CostingRepository(db),
+    quotations: new QuotationRepository(db),
+    maintenance: new MaintenanceRepository(db),
+    flow: new DocumentFlowRepository(db),
+    organization: new OrganizationRepository(db),
+    capacity: new CapacityRepository(db),
+    serials: new SerialRepository(db),
     imports: {
       uploads: new PrismaUploadStore(db),
       // Yazıcı, isteğin tenant'ına bağlı client ile kurulur; tool içinden
@@ -274,6 +351,22 @@ function buildRegistryForTenant(tenant: TenantContext): ToolRegistry {
       importerFor: (objectId) => importerFor(objectId, db),
     },
   });
+}
+
+/**
+ * Tenant başına onay deposu.
+ *
+ * Demo tenant'ta bellek içi karşılık kullanılır: demo verisi kalıcı
+ * değildir ve onay akışının kendisi aynı şekilde çalışır.
+ */
+const pendingByTenant = singleton("pending.byTenant", () => new Map<string, PendingStore>());
+
+function pendingFor(tenant: TenantContext, isDemo: boolean): PendingStore {
+  const cached = pendingByTenant.get(tenant.tenantId);
+  if (cached) return cached;
+  const store = isDemo ? new InMemoryPendingStore() : new PrismaPendingStore(tenantClient(tenant.schema));
+  pendingByTenant.set(tenant.tenantId, store);
+  return store;
 }
 
 let completerSingleton: Completer | null = null;
@@ -295,6 +388,20 @@ export interface RequestContext {
   /** Son kayıtları okumak için — arayüzdeki denetim izi paneli. */
   readonly recentAudit: (limit?: number) => Promise<readonly AuditEntry[]>;
   readonly conversations: ConversationRepository;
+  /**
+   * Onay bekleyen işlemler.
+   *
+   * Her istekte hazır olmalı: yazma tool'ları bunsuz çalışmaz ve
+   * "yapılandırılmamışsa onayı atla" davranışı kabul edilemez.
+   */
+  readonly pending: PendingStore;
+  /**
+   * Kullanıcı tanımlı izlemeler.
+   *
+   * Brifing motoruna verilir; her istekte hazır olmalı çünkü açılış
+   * ekranı bunsuz eksik çalışır ve kullanıcı kurduğu uyarıyı göremez.
+   */
+  readonly watches: WatchRepository;
   /** Kimliğin nereden geldiği — arayüzde ve denetim kaydında görünür. */
   readonly identitySource: "session" | "dev-header";
   /** Kullanıcının görünen adı. Artık sabit yazılı değil. */
@@ -347,7 +454,9 @@ export async function createContext(req: Request): Promise<RequestContext> {
       ...base,
       registry: registryFor(tenant, isDemo),
       conversations: conversationsFor(tenant, isDemo),
+      pending: pendingFor(tenant, isDemo),
       audit: auditFor(tenant),
+      watches: new WatchRepository(tenantClient(tenant.schema)),
       recentAudit: (limit) => auditFor(tenant).recent(tenant.tenantId, limit),
       tenant,
       principal: identity.principal,
@@ -366,7 +475,9 @@ export async function createContext(req: Request): Promise<RequestContext> {
     ...base,
     registry: registryFor(tenant, true),
     conversations: conversationsFor(tenant, true),
+    pending: pendingFor(tenant, true),
     audit: auditFor(tenant),
+    watches: new WatchRepository(tenantClient(tenant.schema)),
     recentAudit: (limit) => auditFor(tenant).recent(tenant.tenantId, limit),
     tenant,
     identitySource: "dev-header",

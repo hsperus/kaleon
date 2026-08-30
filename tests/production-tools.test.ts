@@ -11,6 +11,7 @@ import { buildRegistry } from "../src/app.js";
 import { InMemoryDataSource } from "../src/data/memory.js";
 import { InMemoryAuditSink } from "../src/kernel/audit.js";
 import { invokeTool } from "../src/kernel/invoke.js";
+import { invokeConfirmed } from "./helpers/confirm.js";
 import { createPrincipal } from "../src/kernel/rbac.js";
 import type { TenantContext } from "../src/kernel/types.js";
 import { InMemoryOperationsRepository } from "../src/modules/operations/repository.js";
@@ -52,7 +53,7 @@ beforeEach(async () => {
 });
 
 function call(tool: string, input: unknown, principal = uretim) {
-  return invokeTool(tool, input, {
+  return invokeConfirmed(tool, input, {
     registry: buildRegistry(new InMemoryDataSource("t1"), { operations: repo }),
     audit,
     principal,

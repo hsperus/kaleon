@@ -67,9 +67,16 @@ export function foldHeader(h: string): string {
 /**
  * Başlıkları alanlara eşler.
  *
- * Önce TAM eşleşme, sonra içerme aranır: "Tutar" tam eşleşirken
- * "Tutar (TL)" ancak içermeyle bulunur. Ters sırada yapılsaydı "Tutar"
- * başlığı "Tutar (TL)" alanına da uyar ve yanlış sütun seçilebilirdi.
+ * İKİ GEÇİŞ, ALAN BAZINDA DEĞİL DOSYA BAZINDA. Önce BÜTÜN alanlar için tam
+ * eşleşme aranır, sonra kalanlar için içerme. Tek geçişte yapılsaydı sırada
+ * önce gelen alan, sonraki bir alanın TAM eşleşmesini içermeyle kapardı:
+ * "Tedarik Süresi" başlığı, "tedarik" takma adı yüzünden tedarik türüne
+ * gider ve 21 günlük temin süresi sessizce kaybolurdu.
+ *
+ * İçerme geçişinde EN DAR uyan başlık seçilir: "Tutar" ve "Tutar (TL)"
+ * birlikteyken, takma adı başlığın ne kadarını kapladığına bakılır; böylece
+ * "Tutar" alanı "Tutar (TL)" başlığını kapıp gerçek "Tutar" sütununu
+ * boşta bırakmaz.
  */
 export function mapColumns(
   headers: readonly string[],
@@ -78,15 +85,43 @@ export function mapColumns(
   const folded = headers.map((raw) => ({ raw, key: foldHeader(raw) }));
   const used = new Set<string>();
   const out: Record<string, string | null> = {};
+  const aliasesOf = new Map<string, string[]>();
 
   for (const field of fields) {
-    const aliases = field.aliases.map(foldHeader);
-    const exact = folded.find((h) => !used.has(h.raw) && aliases.includes(h.key));
-    const partial =
-      exact ?? folded.find((h) => !used.has(h.raw) && aliases.some((a) => h.key.includes(a)));
-    if (partial) used.add(partial.raw);
-    out[field.key] = partial?.raw ?? null;
+    aliasesOf.set(field.key, field.aliases.map(foldHeader));
+    out[field.key] = null;
   }
+
+  // 1. geçiş — tam eşleşme. Kesin bilgi, tahmine karşı önceliklidir.
+  for (const field of fields) {
+    const aliases = aliasesOf.get(field.key)!;
+    const hit = folded.find((h) => !used.has(h.raw) && aliases.includes(h.key));
+    if (hit) {
+      used.add(hit.raw);
+      out[field.key] = hit.raw;
+    }
+  }
+
+  // 2. geçiş — içerme, en dar uyandan başlayarak.
+  for (const field of fields) {
+    if (out[field.key] !== null) continue;
+    const aliases = aliasesOf.get(field.key)!;
+    let best: { raw: string; fit: number } | null = null;
+    for (const h of folded) {
+      if (used.has(h.raw)) continue;
+      for (const a of aliases) {
+        if (!h.key.includes(a)) continue;
+        // Takma ad başlığın ne kadarını kaplıyor: 1'e yakın = dar uyum.
+        const fit = a.length / h.key.length;
+        if (!best || fit > best.fit) best = { raw: h.raw, fit };
+      }
+    }
+    if (best) {
+      used.add(best.raw);
+      out[field.key] = best.raw;
+    }
+  }
+
   return out;
 }
 

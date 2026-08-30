@@ -25,7 +25,13 @@ export interface AuditEntry {
   readonly correlationId: string;
   readonly toolName: string;
   readonly authority: AuthorityLevel;
-  readonly outcome: "success" | "denied" | "invalid" | "failed";
+  /**
+   * `pending`: işlem hazırlandı ama kullanıcı onayı bekleniyor; HENÜZ
+   * ÇALIŞMADI. Ayrı bir sonuç türü olması gerekir — "success" yazmak
+   * yapılmamış bir işi yapılmış göstermek, "failed" yazmak da hata olmayan
+   * bir adımı hata saymak olurdu.
+   */
+  readonly outcome: "success" | "denied" | "invalid" | "failed" | "pending";
   /** Girdi — hassas alanlar maskelenmiş hâliyle. */
   readonly input: unknown;
   /** Çıktı özeti; ham veri değil, boyut ve kaynak bilgisi. */

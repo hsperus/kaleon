@@ -44,7 +44,16 @@ export type ModuleId =
    * bir CFO, kullanıcı yönetimine erişmemelidir. Yetkiyi kendi kendine
    * yükseltebilen bir rol, rol sisteminin kendisini anlamsız kılar.
    */
-  | "admin";
+  | "admin"
+  /**
+   * Açılış brifingi ve kullanıcı tanımlı izlemeler.
+   *
+   * AYRI BİR MODÜL ÇÜNKÜ İZLEME BİR VERİ DEĞİL, DAVRANIŞTIR. İzlenen
+   * verinin izni ayrıca kontrol edilir (izleme sahibinin o tool'u
+   * çalıştırma yetkisi olmalıdır); buradaki izin, kişinin kendine
+   * kalıcı uyarı kurup kuramayacağını belirler.
+   */
+  | "briefing";
 
 /** `modul:kaynak.eylem` — örn. "finance:bank.read" */
 export type Permission = `${ModuleId}:${string}`;

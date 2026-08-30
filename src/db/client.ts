@@ -26,6 +26,7 @@ export function urlForSchema(baseUrl: string, schema: string): string {
   assertSafeSchemaName(schema);
   const url = new URL(baseUrl);
   url.searchParams.set("schema", schema);
+
   return url.toString();
 }
 

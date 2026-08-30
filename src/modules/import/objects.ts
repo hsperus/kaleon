@@ -321,6 +321,138 @@ export const ATTENDANCE_OBJECT: ImportObject<AttendanceRow> = {
   },
 };
 
+// ────────────────────────── Malzeme ──────────────────────────
+
+export interface ItemImportRow {
+  readonly code: string;
+  readonly name: string;
+  readonly normalized: string;
+  readonly type: string;
+  readonly baseUom: string;
+  readonly procurementType: string;
+  readonly batchManaged: boolean;
+  readonly leadTimeDays: number | null;
+  readonly altUom: { uom: string; factor: number } | null;
+}
+
+/** Dosyada yazılabilecek tür adları → sistem kodları. */
+const TYPE_ALIASES: Readonly<Record<string, string>> = {
+  hammadde: "hammadde", "ham madde": "hammadde", raw: "hammadde",
+  "yari mamul": "yari_mamul", yarimamul: "yari_mamul", "ara urun": "yari_mamul",
+  mamul: "mamul", "bitmis urun": "mamul", urun: "mamul",
+  "ticari mal": "ticari_mal", ticari: "ticari_mal", "alim satim": "ticari_mal",
+  hizmet: "hizmet", servis: "hizmet",
+  sarf: "sarf", "sarf malzeme": "sarf", tuketim: "sarf",
+};
+
+export const ITEM_OBJECT: ImportObject<ItemImportRow> = {
+  id: "items",
+  label: "Malzeme listesi",
+  requires: "master-data:item.write",
+  templateHeaders: [
+    "Malzeme Kodu", "Malzeme Adı", "Tür", "Birim",
+    "Tedarik", "Parti Takibi", "Tedarik Süresi", "Alt Birim", "Katsayı",
+  ],
+  fields: [
+    { key: "code", label: "Malzeme kodu", required: true, aliases: ["malzeme kodu", "stok kodu", "urun kodu"] },
+    { key: "name", label: "Malzeme adı", required: true, aliases: ["malzeme adi", "stok adi", "urun adi", "aciklama"] },
+    { key: "type", label: "Tür", aliases: ["malzeme turu", "tur", "grup"] },
+    { key: "baseUom", label: "Birim", required: true, aliases: ["olcu birimi", "temel birim", "birim", "uom"] },
+    { key: "procurement", label: "Tedarik", aliases: ["tedarik turu", "tedarik", "temin"] },
+    { key: "batch", label: "Parti takibi", aliases: ["parti takibi", "parti", "lot"] },
+    { key: "leadTime", label: "Tedarik süresi", aliases: ["tedarik suresi", "temin suresi"] },
+    { key: "altUom", label: "Alt birim", aliases: ["alt birim", "ikinci birim", "alternatif birim"] },
+    { key: "factor", label: "Katsayı", aliases: ["katsayi", "cevrim", "carpan", "faktor"] },
+  ],
+
+  parse(table, columns) {
+    const rows = rowReader(table, columns);
+    const valid: ItemImportRow[] = [];
+    const errors: RowError[] = [];
+    const seen = new Set<string>();
+
+    rows.forEach((get, i) => {
+      const line = i + 2;
+      const code = get("code");
+      const name = get("name");
+      if (!code || !name) {
+        errors.push({ line, field: "malzeme", message: "Malzeme kodu veya adı boş." });
+        return;
+      }
+      if (seen.has(code)) {
+        errors.push({ line, field: "malzeme kodu", message: `"${code}" bu dosyada tekrar ediyor.` });
+        return;
+      }
+      seen.add(code);
+
+      const baseUom = get("baseUom");
+      if (!baseUom) {
+        // TEMEL BİRİM VARSAYILMAZ. "adet kabul edelim" demek, kilogramla
+        // satılan bir hammaddeyi adetle stoklamaktır.
+        errors.push({ line, field: "birim", message: "Ölçü birimi boş; varsayılan atanmaz." });
+        return;
+      }
+
+      const rawType = normalizeName(get("type")).full;
+      const type = TYPE_ALIASES[rawType] ?? (rawType === "" ? "ticari_mal" : null);
+      if (!type) {
+        errors.push({
+          line,
+          field: "tür",
+          message: `"${get("type")}" tanınmadı. Yazılabilir: hammadde, yarı mamul, mamul, ticari mal, hizmet, sarf.`,
+        });
+        return;
+      }
+
+      const proc = normalizeName(get("procurement")).full;
+      const procurementType = proc.includes("uret")
+        ? "uretim"
+        : proc.includes("her") || proc.includes("ikisi")
+          ? "her_ikisi"
+          : "satin_alma";
+
+      const batchManaged = YES.has(normalizeName(get("batch")).full);
+      if (batchManaged && type === "hizmet") {
+        errors.push({ line, field: "parti takibi", message: "Hizmet stoklanmaz; parti takibi olamaz." });
+        return;
+      }
+
+      // Alt birim ve katsayı BİRLİKTE anlamlıdır: biri varsa diğeri de olmalı,
+      // yoksa çevrim yapılamaz ve yarım bir tanım kalır.
+      const altName = get("altUom");
+      const factor = parseTurkishNumber(get("factor"));
+      if (altName && (factor === null || factor <= 0)) {
+        errors.push({
+          line,
+          field: "katsayı",
+          message: `"${altName}" birimi için geçerli bir çevrim katsayısı yok.`,
+        });
+        return;
+      }
+      if (altName && altName === baseUom) {
+        errors.push({ line, field: "alt birim", message: "Alt birim temel birimle aynı olamaz." });
+        return;
+      }
+
+      const lead = parseTurkishNumber(get("leadTime"));
+
+      valid.push({
+        code,
+        name,
+        normalized: normalizeName(name).full,
+        type,
+        baseUom,
+        procurementType,
+        batchManaged,
+        leadTimeDays: lead === null ? null : Math.max(0, Math.round(lead)),
+        altUom: altName && factor ? { uom: altName, factor } : null,
+      });
+    });
+
+    return { valid, errors };
+  },
+};
+
 // ────────────────────────── Personel ──────────────────────────
 
 export interface EmployeeRow {
@@ -460,6 +592,7 @@ export const SALES_ORDER_OBJECT: ImportObject<SalesOrderRow> = {
  */
 export const IMPORT_OBJECTS: readonly ImportObject<unknown>[] = [
   PARTNER_OBJECT,
+  ITEM_OBJECT,
   EMPLOYEE_OBJECT,
   BANK_OBJECT,
   ATTENDANCE_OBJECT,

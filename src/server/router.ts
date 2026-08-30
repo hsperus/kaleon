@@ -8,7 +8,7 @@
 
 import { TRPCError } from "@trpc/server";
 import * as admin from "./admin.js";
-import { holds } from "../kernel/rbac.js";
+import { holds, missingPermissions } from "../kernel/rbac.js";
 
 /**
  * Yönetim hatalarını tRPC hatasına çevirir.
@@ -30,6 +30,8 @@ async function adminCall<T>(fn: () => Promise<T>): Promise<T> {
 import { z } from "zod";
 import { procedure, router } from "./trpc.js";
 import { runConversation } from "../ai/runner.js";
+import { confirmPendingAction } from "../kernel/invoke.js";
+import { TOOL_LABELS, actionLabel } from "../ai/tool-labels.js";
 import { MODEL_CONNECTED, ROLE_LABEL } from "./context.js";
 import { GOLDEN_QUESTIONS } from "../eval/golden.js";
 import { buildBriefing } from "../modules/briefing/engine.js";
@@ -50,6 +52,7 @@ export const appRouter = router({
       identitySource: ctx.identitySource,
       dataPlane: ctx.dataPlane,
       displayName: ctx.displayName,
+      companyName: ctx.companyName,
       // Arayüz yönetim düğmesini bu bayrağa göre gösterir. Yetki kontrolü
       // yine sunucuda; bayrak yalnızca gereksiz bir düğmeyi gizler.
       canManageUsers: holds(ctx.principal, "admin:user.manage"),
@@ -74,10 +77,91 @@ export const appRouter = router({
             roleLabel: ROLE_LABEL[ctx.principal.roles[0]!],
             companyName: "Orthaus",
           },
+          pending: ctx.pending,
         },
       );
       return result;
     }),
+
+  /**
+   * Onay bekleyen işlemler.
+   *
+   * Arayüz açılışta bunu okur: yarım kalmış bir onay, sayfa yenilendiğinde
+   * kaybolmamalıdır — kullanıcı hazırladığı faturayı bulamazsa baştan
+   * anlatmak zorunda kalır.
+   */
+  pendingActions: procedure.query(async ({ ctx }) => {
+    const rows = await ctx.pending.listPending(ctx.principal.userId, new Date());
+    return rows.map((r) => ({
+      id: r.id,
+      tool: r.toolName,
+      label: actionLabel(r.toolName),
+      input: r.input,
+      authority: r.authority,
+      expiresAt: r.expiresAt,
+      schema: ctx.registry.get(r.toolName)?.schema.input_schema ?? null,
+      description: ctx.registry.get(r.toolName)?.description.tr ?? null,
+    }));
+  }),
+
+  /**
+   * Bir tool'un girdi şeması — FORMUN KAYNAĞI.
+   *
+   * Ayrı bir form tanımı tutmuyoruz: tool'un zod şeması zaten alanları,
+   * tiplerini, zorunluluklarını ve Türkçe açıklamalarını içeriyor. İkinci
+   * bir tanım tutulsaydı, tool değişip form değişmediğinde kullanıcı
+   * olmayan bir alanı doldurmaya çalışırdı.
+   */
+  toolSchema: procedure
+    .input(z.object({ tool: z.string().min(1).max(64) }))
+    .query(({ ctx, input }) => {
+      const tool = ctx.registry.get(input.tool);
+      // YETKİSİ OLMAYAN ŞEMAYI DA GÖREMEZ: şema, sistemin ne yapabildiğini
+      // anlatır ve kullanıcının göremediği yeteneği ifşa etmemelidir.
+      if (!tool || missingPermissions(ctx.principal, tool.requires).length > 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Tool bulunamadı." });
+      }
+      return {
+        name: tool.name,
+        label: actionLabel(tool.name),
+        authority: tool.authority,
+        description: tool.description.tr,
+        schema: tool.schema.input_schema,
+      };
+    }),
+
+  /**
+   * Onaylanan işlemi çalıştırır.
+   *
+   * Girdi burada DEĞİŞTİRİLEBİLİR — form salt okunur olsaydı, modelin
+   * yanlış doldurduğu bir alanı düzeltmek için baştan anlatmak gerekirdi.
+   * Değiştirilen girdi yeniden şemadan geçer ve yeniden yetkilendirilir.
+   */
+  confirmAction: procedure
+    .input(z.object({ pendingId: z.string().uuid(), input: z.unknown() }))
+    .mutation(async ({ ctx, input }) => {
+      const result = await confirmPendingAction(input.pendingId, input.input, {
+        registry: ctx.registry,
+        audit: ctx.audit,
+        principal: ctx.principal,
+        tenant: ctx.tenant,
+        correlationId: crypto.randomUUID(),
+        channel: ctx.channel,
+        pending: ctx.pending,
+      });
+      return {
+        tool: result.toolName,
+        label: TOOL_LABELS[result.toolName] ?? result.toolName,
+        outcome: result.outcome,
+      };
+    }),
+
+  /** Onay bekleyen işlemi iptal eder — hiçbir kayıt oluşmaz. */
+  cancelAction: procedure
+    .input(z.object({ pendingId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => ({
+      cancelled: await ctx.pending.cancel(input.pendingId, ctx.principal.userId),
+    })),
 
   /**
    * Boss Mode brifingi.
@@ -88,7 +172,9 @@ export const appRouter = router({
    */
   briefing: procedure.query(async ({ ctx }) => {
     const b = await buildBriefing(
-      { registry: ctx.registry, audit: ctx.audit },
+      // İzleme deposu brifinge verilir: kullanıcının kendi kurduğu
+      // uyarılar yerleşik nöbetçilerle aynı ekranda çıkar.
+      { registry: ctx.registry, audit: ctx.audit, watches: ctx.watches },
       {
         principal: ctx.principal,
         tenant: ctx.tenant,
@@ -100,6 +186,8 @@ export const appRouter = router({
       level: b.level,
       signals: b.signals,
       ran: b.ran,
+      // ÇALIŞAMAYAN İZLEME SESSİZ KALMAZ.
+      brokenWatches: b.brokenWatches,
       skipped: b.skippedByPermission,
     };
   }),

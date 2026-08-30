@@ -31,6 +31,35 @@ const tl = (n: unknown): string => Number(n ?? 0).toLocaleString("tr-TR");
 
 const RULES: readonly Rule[] = [
   {
+    /**
+     * YAZMA AKIŞI DEMO'DA DA GÖRÜNMELİ.
+     *
+     * Demo modunda yalnızca okuma tool'ları çağrılsaydı, onay formu —
+     * yani sistemin insan onayını nasıl aldığı — hiç görünmezdi. Oysa
+     * ürünü değerlendiren biri için "veri nasıl giriliyor" sorusu, "rapor
+     * nasıl okunuyor" sorusundan önce gelir.
+     */
+    match: ["mal kabul", "stok girişi", "stoğa al", "giriş yap", "irsaliye", "sarf"],
+    tool: "post_stock_movement",
+    input: {
+      movementType: "101",
+      itemId: "FR-22",
+      locationId: "DEPO-1",
+      batchId: null,
+      quantity: 40,
+      referenceKind: "purchase_order",
+      referenceId: "SAT-2026-0188",
+      reason: null,
+    },
+    render: (d) => {
+      const m = d as { movementId?: string; newBalance?: number };
+      return (
+        `Stok hareketi kaydedildi${m.movementId ? ` (${m.movementId})` : ""}.` +
+        (m.newBalance !== undefined ? ` Yeni bakiye ${tl(m.newBalance)}.` : "")
+      );
+    },
+  },
+  {
     match: ["fabrika", "üretim", "şu an", "atölye", "darboğaz"],
     tool: "get_factory_wip",
     input: {},
@@ -225,12 +254,43 @@ export class ScriptedCompleter implements Completer {
       ? [...RULES].sort((a, b) => (a.inputFrom ? -1 : 0) - (b.inputFrom ? -1 : 0))
       : RULES;
     const rule = rules.find((r) => r.match.some((m) => question.includes(m)));
-    const available = new Set(req.tools.map((t) => t.name));
+    /*
+     * ÇAĞRI KAPALIYSA TOOL YOK SAYILIR.
+     *
+     * Runner, onay beklerken eskiden tool listesini BOŞALTIYORDU;
+     * betikli tamamlayıcı da bu yüzden kendiliğinden susuyordu. Artık
+     * liste dolu gönderiliyor ve çağrı `noToolCalls` ile kapatılıyor
+     * (sebebi gateway'de yazılı). Betikli tamamlayıcı bu bayrağı
+     * yok sayarsa testler gerçek davranıştan sapar: testte ikinci bir
+     * form açılmaz ama üretimde açılır.
+     */
+    const available = new Set(req.noToolCalls ? [] : req.tools.map((t) => t.name));
 
     // Zaten bir tool sonucu geldiyse: cevabı kur.
     const toolResult = lastToolResult(req.messages);
     if (toolResult) {
       const parsed = safeParse(toolResult);
+
+      // ONAY BEKLEYEN İŞLEM HATA DEĞİLDİR. Öyle sayılsaydı kullanıcı,
+      // önünde duran forma rağmen "işlem tamamlanamadı" cümlesini okurdu.
+      if (
+        parsed &&
+        typeof parsed === "object" &&
+        (parsed as { status?: string }).status === "onay_bekliyor"
+      ) {
+        return done(
+          message(
+            [
+              textBlock(
+                "İşlemi hazırladım; alanları kontrol edip onaylayın. Onaylayana kadar " +
+                  "hiçbir kayıt oluşmaz.",
+              ),
+            ],
+            "end_turn",
+          ),
+        );
+      }
+
       if (parsed && typeof parsed === "object" && "ok" in parsed) {
         const outcome = parsed as { ok: boolean; data?: unknown; message?: string; sources?: unknown[] };
         if (!outcome.ok) {

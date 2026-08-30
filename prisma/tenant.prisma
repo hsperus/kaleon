@@ -31,6 +31,23 @@ model Partner {
   isSupplier Boolean  @default(false) @map("is_supplier")
   isCustomer Boolean  @default(false) @map("is_customer")
   country    String   @default("TR")
+
+  /// e-Fatura ZORUNLU ALANLARI. Hepsi null olabilir çünkü mevcut cari
+  /// kayıtları bunlarsız açılmıştır; ama e-Fatura kesilirken eksikliği
+  /// AÇIKÇA reddedilir. Uydurma bir adresle geçersiz XML üretmek,
+  /// entegratörden dönen anlaşılmaz bir hatadan iyidir değil — kötüdür.
+  taxOffice   String? @map("tax_office")
+  addressLine String? @map("address_line")
+  district    String?
+  city        String?
+  postalCode  String? @map("postal_code")
+  email       String?
+  phone       String?
+  /// e-Fatura mükellefi mi? null = bilinmiyor, sorgulanmamış.
+  /// true → e-Fatura, false → e-Arşiv. Yanlış seçim belgeyi geçersiz kılar.
+  einvoiceUser Boolean? @map("einvoice_user")
+  /// Entegratörün posta kutusu etiketi (GB/PK).
+  einvoiceAlias String? @map("einvoice_alias")
   isActive   Boolean  @default(true) @map("is_active")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
@@ -126,6 +143,11 @@ model Employee {
   department   String
   position     String
   hiredAt      DateTime @map("hired_at") @db.Date
+  /// Doğum tarihi. 18 yaş altı ve 50 yaş üstü çalışana, kıdeminden
+  /// bağımsız olarak en az 20 gün yıllık izin verilir (İş Kanunu md.
+  /// 53/son). BİLİNMİYORSA null — tahmin edilmez, ama o zaman yaş
+  /// kademesi de uygulanamaz ve hak eksik hesaplanabilir.
+  birthDate    DateTime? @map("birth_date") @db.Date
   terminatedAt DateTime? @map("terminated_at") @db.Date
   grossSalary  Decimal? @map("gross_salary") @db.Decimal(14, 2)
   isActive     Boolean  @default(true) @map("is_active")
@@ -133,10 +155,14 @@ model Employee {
   updatedAt    DateTime @updatedAt @map("updated_at")
 
   attendance AttendanceDay[]
+  payrollLines PayrollLine[]
 
   @@index([normalized])
   @@index([department])
   @@map("employees")
+
+  leaveRequests    LeaveRequest[]
+  shiftAssignments ShiftAssignment[]
 }
 
 model Location {
@@ -249,6 +275,8 @@ model BomRevision {
   isActive  Boolean  @default(false) @map("is_active")
   createdAt DateTime @default(now()) @map("created_at")
 
+  lines BomLine[]
+
   @@unique([itemId, revision])
   @@index([itemId, isActive])
   @@map("bom_revisions")
@@ -272,6 +300,17 @@ model StockMovement {
   userId        String   @map("user_id") @db.Uuid
   reason        String?
   reversalOf    String?  @map("reversal_of") @db.Uuid
+
+  /// HAREKET ANINDAKİ BİRİM MALİYET — sonradan hesaplanmaz, o anda YAZILIR.
+  /// Sonradan hesaplansaydı, bugünkü ortalamayla geçmiş bir çıkış
+  /// değerlenir ve geçmiş raporlar her gün değişirdi.
+  /// Bilinmiyorsa null; sıfır maliyet "bedava" demektir.
+  unitCost      Decimal? @map("unit_cost") @db.Decimal(18, 4)
+  /// Hareketin toplam değeri (miktar × birim maliyet), TL.
+  value         Decimal? @db.Decimal(18, 2)
+  /// Yabancı para alımda özgün tutar ve kur — denetim izi.
+  sourceCurrency String? @map("source_currency")
+  exchangeRate   Decimal? @map("exchange_rate") @db.Decimal(18, 6)
 
   @@index([itemId, locationId, batchId])
   @@index([reversalOf])
@@ -606,12 +645,21 @@ model SalesOrder {
   /// hesaplanmazsa risk olduğundan büyük gösterilir.
   penaltyCap    Decimal? @map("penalty_cap") @db.Decimal(18, 2)
   currency      String   @default("TRY")
+  /// open | partially_delivered | delivered | partially_invoiced | completed | cancelled
+  ///
+  /// KALEMLERDEN TÜRETİLİR, elle yazılmaz. Elle yazılsaydı 200 adedi
+  /// sevk edilmemiş bir sipariş "tamamlandı" görünebilirdi.
   status        String   @default("open")
+  /// Aşırı sevkiyat toleransı, yüzde. VARSAYILANI SIFIRDIR: sessiz bir
+  /// tolerans, sözleşme dışı sevkiyatı onaysız geçirir.
+  overDeliveryTolerance Decimal @default(0) @map("over_delivery_tolerance") @db.Decimal(5, 2)
+  cancelledAt   DateTime? @map("cancelled_at")
   createdAt     DateTime @default(now()) @map("created_at")
   updatedAt     DateTime @updatedAt @map("updated_at")
 
-  partner Partner          @relation(fields: [partnerId], references: [id])
-  lines   SalesOrderLine[]
+  partner    Partner          @relation(fields: [partnerId], references: [id])
+  lines      SalesOrderLine[]
+  deliveries Delivery[]
 
   @@index([status, committedDate])
   @@index([partnerId])
@@ -624,6 +672,18 @@ model SalesOrderLine {
   lineNo       Int     @map("line_no")
   itemId       String  @map("item_id")
   quantity     Decimal @db.Decimal(18, 4)
+  /// Sipariş birimi — "koli" olabilir; miktar temel birime çevrilerek tutulur.
+  uom          String  @default("adet")
+  unitPrice    Decimal @default(0) @map("unit_price") @db.Decimal(18, 4)
+  discountPercent Decimal @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  vatRate      Int     @default(20) @map("vat_rate")
+
+  /// SEVK EDİLEN ve FATURALANAN miktar sipariş miktarından AYRI tutulur.
+  /// Tek bir durum alanına sıkıştırılsaydı kısmi sevkiyatta kalan miktar
+  /// kaybolurdu; imalatta kısmi sevkiyat istisna değil kuraldır.
+  deliveredQty Decimal @default(0) @map("delivered_qty") @db.Decimal(18, 4)
+  invoicedQty  Decimal @default(0) @map("invoiced_qty") @db.Decimal(18, 4)
+
   /// Bu kalemi üreten iş emri. Bağlanmamışsa sevkiyat tarihi bilinemez.
   workOrderId  String? @map("work_order_id")
 
@@ -684,6 +744,13 @@ model MachineStatusSnapshot {
   asOf      DateTime @map("as_of")
   /// running | idle | down
   state     String
+  /// Makinenin toplam çalışma saati (sayaç).
+  ///
+  /// SAYAÇ BAZLI BAKIM TARİHTEN DAHA DOĞRUDUR: "her 3 ayda bir" kuralı
+  /// az çalışan tezgâhı gereksiz durdurur, çok çalışanı geç yakalar.
+  /// BİLİNMİYORSA null — sıfır "hiç çalışmadı" demektir ve bakımı
+  /// sonsuza kadar erteler.
+  runningHours Decimal? @map("running_hours") @db.Decimal(12, 2)
   reason    String?
   createdAt DateTime @default(now()) @map("created_at")
 
@@ -746,4 +813,1268 @@ model FileUpload {
 
   @@index([expiresAt])
   @@map("file_uploads")
+}
+
+// ─────────────────── Malzeme ana verisi ───────────────────
+
+/// Malzeme kartı — sistemin en çok bağlanan nesnesi.
+///
+/// ÖNCESİNDE YOKTU: `itemId` her yerde çıplak bir metindi. Stok hareketi,
+/// iş emri, BOM, satın alma ve satış hep ona atıfta bulunuyordu ama arkasında
+/// hiçbir kayıt yoktu. Ölçü birimi, değerleme yöntemi, parti kuralı ve tedarik
+/// süresi buraya asılır; bu nesne olmadan hiçbiri yazılamaz.
+///
+/// SAP'nin material master'ı 20+ görünüme (view) bölünmüştür ve her modül
+/// kendi alanlarını görür. Burada tek nesne var; alan grupları rol bazlı
+/// maskelemeyle ayrılır (bkz. redact). Yirmi ayrı ekran, kullanıcının
+/// aradığını bulamaması demektir.
+model Item {
+  id         String   @id @default(uuid()) @db.Uuid
+  code       String   @unique
+  name       String
+  /// Türkçe-duyarlı normalize edilmiş ad — arama ve eşleştirme için.
+  normalized String
+
+  /// hammadde | yari_mamul | mamul | ticari_mal | hizmet | sarf
+  ///
+  /// Davranışı belirler: hizmet stoklanmaz, mamul üretilir, ticari mal
+  /// satın alınıp satılır. Tür yanlışsa stok bakiyesi anlamsızlaşır.
+  type       String
+
+  /// TEMEL ÖLÇÜ BİRİMİ. Stok bakiyesi HER ZAMAN bu birimdedir.
+  /// Sipariş "koli", üretim "kg" ile çalışabilir; hepsi buna çevrilir.
+  baseUom    String   @map("base_uom")
+
+  /// standart | hareketli_ortalama
+  ///
+  /// Standart maliyet: sabit, fark ayrı hesaba yazılır (üretimde yaygın).
+  /// Hareketli ortalama: her girişte yeniden hesaplanır (ticarette yaygın).
+  valuationMethod String @default("hareketli_ortalama") @map("valuation_method")
+  /// Standart maliyet yöntemi için sabit birim maliyet.
+  standardCost    Decimal? @map("standard_cost") @db.Decimal(18, 4)
+  /// Hareketli ortalama — stok hareketleriyle GÜNCELLENİR, elle girilmez.
+  movingAvgCost   Decimal? @map("moving_avg_cost") @db.Decimal(18, 4)
+  /// Maliyetin para birimi. Farklı para biriminde alım kura çevrilir.
+  costCurrency    String   @default("TRY") @map("cost_currency")
+
+  /// Parti (lot) takibi zorunlu mu? Gıda, ilaç, kimya için evet.
+  batchManaged  Boolean @default(false) @map("batch_managed")
+  /// Seri numarası takibi — makine, cihaz, garanti izlenen ürünler.
+  serialManaged Boolean @default(false) @map("serial_managed")
+  /// Raf ömrü (gün). Parti takibi varsa son kullanma tarihi bundan türer.
+  shelfLifeDays Int?    @map("shelf_life_days")
+
+  /// satin_alma | uretim | her_ikisi
+  procurementType String @default("satin_alma") @map("procurement_type")
+  /// Tedarik süresi (gün) — MRP ve termin hesabının girdisi.
+  leadTimeDays    Int?   @map("lead_time_days")
+  /// Sipariş noktası: bakiye bunun altına düşünce uyarı üretilir.
+  reorderPoint    Decimal? @map("reorder_point") @db.Decimal(18, 4)
+  /// Emniyet stoğu.
+  safetyStock     Decimal? @map("safety_stock") @db.Decimal(18, 4)
+
+  isActive  Boolean  @default(true) @map("is_active")
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  units    ItemUnit[]
+  bomLines BomLine[]  @relation("BomComponent")
+
+  @@index([normalized])
+  @@index([type, isActive])
+  @@map("items")
+}
+
+/// Alternatif ölçü birimi ve çevrim katsayısı.
+///
+/// ÇEVRİM OLMADAN MİKTARLAR SESSİZCE YANLIŞ TOPLANIR. Sipariş 10 koli,
+/// stok 240 adet; ikisini toplamak 250 verir ve kimse fark etmez.
+/// `factor`, 1 birim `uom`'un kaç TEMEL birim ettiğidir:
+/// koli için 24 ise, 10 koli = 240 adet.
+model ItemUnit {
+  id     String  @id @default(uuid()) @db.Uuid
+  itemId String  @map("item_id") @db.Uuid
+  uom    String
+  /// 1 `uom` = kaç temel birim. Sıfır veya negatif olamaz.
+  factor Decimal @db.Decimal(18, 6)
+
+  item Item @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, uom])
+  @@index([itemId])
+  @@map("item_units")
+}
+
+/// BOM bileşeni — ürün ağacının satırları.
+///
+/// `BomRevision` tablosu vardı ama İÇİNDE BİLEŞEN YOKTU: hangi üründen ne
+/// kadar gerektiğini kimse bilmiyordu. Ürün ağacı olmadan MRP, maliyet
+/// hesabı ve "bu partide hangi hammadde vardı" sorusu imkânsızdır.
+model BomLine {
+  id            String  @id @default(uuid()) @db.Uuid
+  bomRevisionId String  @map("bom_revision_id") @db.Uuid
+  lineNo        Int     @map("line_no")
+  /// Bileşen malzeme.
+  componentId   String  @map("component_id") @db.Uuid
+  quantity      Decimal @db.Decimal(18, 4)
+  /// Bileşenin ölçü birimi; malzemenin temel biriminden farklı olabilir.
+  uom           String
+  /// Fire oranı (%). 100 adet üretmek için 102 adet hammadde gerekebilir.
+  scrapPercent  Decimal @default(0) @map("scrap_percent") @db.Decimal(6, 3)
+
+  bomRevision BomRevision @relation(fields: [bomRevisionId], references: [id], onDelete: Cascade)
+  component   Item        @relation("BomComponent", fields: [componentId], references: [id])
+
+  @@unique([bomRevisionId, lineNo])
+  @@index([componentId])
+  @@map("bom_lines")
+}
+
+// ─────────────────── Satış zinciri: sipariş → sevkiyat → fatura ───────────────────
+
+/// Belge numarası sayacı.
+///
+/// SAYAÇ BELGEYLE AYNI İŞLEMDE ARTAR. Ayrı bir işlemde artırılsaydı, belge
+/// yazılamadığında numara boşa yanar ve seride delik kalır; Türk vergi
+/// mevzuatı kesintisiz seri ister ve delik incelemede "kaybolan belge"
+/// sorusunu doğurur.
+model DocumentNumberRange {
+  id        String   @id @default(uuid()) @db.Uuid
+  /// sales_order | delivery | sales_invoice | purchase_order | stock_count
+  kind      String
+  series    String
+  year      Int
+  /// Verilmiş SON numara. Bir sonraki belge bunun bir fazlasını alır.
+  lastNumber Int     @default(0) @map("last_number")
+  padding   Int      @default(6)
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([kind, series, year])
+  @@map("document_number_ranges")
+}
+
+/// Sevk irsaliyesi — malın depodan gerçekten çıktığı an.
+///
+/// FATURA BUNA DAYANIR. Sipariş bir taahhüttür, irsaliye bir olaydır;
+/// faturayı olaya bağlamak "gitmemiş malın faturası" hatasını yapısal
+/// olarak imkânsız kılar.
+model Delivery {
+  id           String   @id @default(uuid()) @db.Uuid
+  documentNo   String   @unique @map("document_no")
+  salesOrderId String   @map("sales_order_id") @db.Uuid
+  partnerId    String   @map("partner_id") @db.Uuid
+  /// Malın çıktığı depo.
+  locationId   String   @map("location_id")
+  shippedAt    DateTime @map("shipped_at")
+  /// draft | posted | cancelled
+  ///
+  /// TASLAK STOK DÜŞMEZ. Kaydedilene (posted) kadar depo bakiyesi değişmez;
+  /// yarım kalmış bir irsaliye stoğu eksik göstermez.
+  status       String   @default("draft")
+  /// Taşıyıcı ve plaka — e-İrsaliye'de zorunlu alanlardır.
+  carrierName  String?  @map("carrier_name")
+  plateNo      String?  @map("plate_no")
+  /// e-İrsaliye gönderim durumu: null | pending | sent | accepted | rejected
+  ettn         String?
+  edespatchStatus String? @map("edespatch_status")
+  /// Sürücü bilgisi — yol denetiminde sorulur, e-İrsaliyede taşınır.
+  driverName   String? @map("driver_name")
+  driverTckn   String? @map("driver_tckn")
+  /// Malın FİİLEN araca yüklendiği an. Sonradan girilen bir saat,
+  /// yol denetiminde belgeyi geçersiz kılar.
+  actualDespatchAt DateTime? @map("actual_despatch_at")
+  postedAt     DateTime? @map("posted_at")
+  postedBy     String?  @map("posted_by") @db.Uuid
+  cancelledAt  DateTime? @map("cancelled_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  salesOrder SalesOrder     @relation(fields: [salesOrderId], references: [id])
+  lines      DeliveryLine[]
+
+  @@index([salesOrderId])
+  @@index([partnerId, shippedAt])
+  @@index([status])
+  @@map("deliveries")
+}
+
+model DeliveryLine {
+  id             String  @id @default(uuid()) @db.Uuid
+  deliveryId     String  @map("delivery_id") @db.Uuid
+  lineNo         Int     @map("line_no")
+  /// Hangi sipariş kalemini karşılıyor — zincirin halkası.
+  orderLineNo    Int     @map("order_line_no")
+  itemId         String  @map("item_id")
+  /// Miktar HER ZAMAN temel birimdedir; girişte çevrilir.
+  quantity       Decimal @db.Decimal(18, 4)
+  uom            String
+  batchId        String? @map("batch_id")
+  /// Bu satırın doğurduğu stok hareketi — iptalde ters kayıt için.
+  movementId     String? @map("movement_id") @db.Uuid
+
+  delivery Delivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@unique([deliveryId, lineNo])
+  @@index([itemId])
+  @@map("delivery_lines")
+}
+
+/// Satış faturası.
+///
+/// Satın alma tarafındaki `Invoice`'dan AYRI bir tablodur. Orası gelen
+/// faturayı siparişle eşleştirir (3'lü mutabakat); burası bizim kestiğimiz
+/// belgedir ve mevzuat karşısında sorumluluğu farklıdır. Tek tabloda
+/// birleştirmek, iki farklı yaşam döngüsünü tek durum alanına sıkıştırırdı.
+model SalesInvoice {
+  id           String   @id @default(uuid()) @db.Uuid
+  documentNo   String   @unique @map("document_no")
+  partnerId    String   @map("partner_id") @db.Uuid
+  salesOrderId String?  @map("sales_order_id") @db.Uuid
+  issuedAt     DateTime @map("issued_at")
+  dueDate      DateTime? @map("due_date") @db.Date
+  currency     String   @default("TRY")
+  /// Yabancı para faturada TL karşılığı için kur — mevzuat gereği zorunlu.
+  /// TL faturada 1'dir. BİLİNMİYORSA fatura kesilemez.
+  exchangeRate Decimal  @default(1) @map("exchange_rate") @db.Decimal(18, 6)
+
+  netAmount      Decimal @map("net_amount") @db.Decimal(18, 2)
+  discountAmount Decimal @default(0) @map("discount_amount") @db.Decimal(18, 2)
+  vatAmount      Decimal @map("vat_amount") @db.Decimal(18, 2)
+  totalAmount    Decimal @map("total_amount") @db.Decimal(18, 2)
+
+  /// draft | issued | cancelled
+  status       String   @default("draft")
+  /// e-Fatura mı e-Arşiv mi — alıcının mükellefiyetine göre belirlenir.
+  /// null: kâğıt fatura.
+  einvoiceKind String?  @map("einvoice_kind")
+  ettn         String?
+  /// null | pending | sent | accepted | rejected
+  einvoiceStatus String? @map("einvoice_status")
+  issuedBy     String?  @map("issued_by") @db.Uuid
+  cancelledAt  DateTime? @map("cancelled_at")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  lines SalesInvoiceLine[]
+  creditNotes SalesCreditNote[]
+
+  @@index([partnerId, issuedAt])
+  @@index([salesOrderId])
+  @@index([status])
+  @@map("sales_invoices")
+}
+
+model SalesInvoiceLine {
+  id          String  @id @default(uuid()) @db.Uuid
+  invoiceId   String  @map("invoice_id") @db.Uuid
+  lineNo      Int     @map("line_no")
+  /// Hangi sevkiyattan geldi — zincirin son halkası.
+  deliveryId     String? @map("delivery_id") @db.Uuid
+  deliveryLineNo Int?    @map("delivery_line_no")
+  orderLineNo    Int?    @map("order_line_no")
+
+  itemId      String  @map("item_id")
+  description String
+  quantity    Decimal @db.Decimal(18, 4)
+  uom         String
+  unitPrice   Decimal @map("unit_price") @db.Decimal(18, 4)
+  discountPercent Decimal @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  vatRate     Int     @map("vat_rate")
+
+  netAmount   Decimal @map("net_amount") @db.Decimal(18, 2)
+  vatAmount   Decimal @map("vat_amount") @db.Decimal(18, 2)
+  totalAmount Decimal @map("total_amount") @db.Decimal(18, 2)
+
+  invoice SalesInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+
+  @@unique([invoiceId, lineNo])
+  @@index([deliveryId])
+  @@map("sales_invoice_lines")
+}
+
+// ─────────────────── Değerleme ve döviz kuru ───────────────────
+
+/// İlan edilmiş döviz kuru.
+///
+/// KUR TARİHLİDİR VE İLAN TARİHİYLE SAKLANIR. "Bugünkü kur" diye tek bir
+/// satır tutulsaydı, geçmişe dönük bir belge bugünkü kurla değerlenir ve
+/// kur farkı gizlenirdi.
+model ExchangeRate {
+  id        String   @id @default(uuid()) @db.Uuid
+  currency  String
+  /// 1 birim yabancı para kaç TL.
+  rate      Decimal  @db.Decimal(18, 6)
+  /// Kurun İLAN EDİLDİĞİ gün.
+  quotedAt  DateTime @map("quoted_at") @db.Date
+  /// TCMB | manuel | entegratör — kaynağı bilinmeyen kur denetlenemez.
+  source    String   @default("TCMB")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([currency, quotedAt])
+  @@index([currency, quotedAt])
+  @@map("exchange_rates")
+}
+
+/// Bir malzemenin bir andaki maliyet ve bakiye durumu.
+///
+/// HAREKET BAŞINA DEĞİL, MALZEME BAŞINA TEK SATIR. Her hareket bunu
+/// günceller ve güncel durum tek okumayla gelir; hareketleri baştan
+/// toplayarak maliyet hesaplamak, 200.000 hareketli bir malzemede her
+/// soruda saniyeler sürerdi.
+model ItemCostState {
+  id             String   @id @default(uuid()) @db.Uuid
+  itemId         String   @unique @map("item_id")
+  /// Eldeki miktar — temel birimde.
+  quantityOnHand Decimal  @default(0) @map("quantity_on_hand") @db.Decimal(18, 4)
+  /// Birim maliyet. BİLİNMİYORSA null — sıfır "bedava" demektir.
+  unitCost       Decimal? @map("unit_cost") @db.Decimal(18, 4)
+  /// Stok değeri = miktar × birim maliyet. Maliyet yoksa null.
+  totalValue     Decimal? @map("total_value") @db.Decimal(18, 2)
+  currency       String   @default("TRY")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@map("item_cost_states")
+}
+
+/// Muhasebe dönemi.
+///
+/// KAYIT YOKSA DÖNEM AÇIKTIR. Her ay için satır açmak zorunda kalmak,
+/// kurulumun ilk gününde sistemi kilitlerdi; kapama açık bir eylemdir.
+model AccountingPeriod {
+  id        String   @id @default(uuid()) @db.Uuid
+  year      Int
+  month     Int
+  /// open | closed | locked
+  status    String   @default("open")
+  closedAt  DateTime? @map("closed_at")
+  closedBy  String?  @map("closed_by") @db.Uuid
+  /// Yeniden açılmışsa sebebi — iz bırakmadan açılamaz.
+  reopenReason String? @map("reopen_reason")
+  reopenedAt   DateTime? @map("reopened_at")
+  reopenedBy   String?  @map("reopened_by") @db.Uuid
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  @@unique([year, month])
+  @@index([status])
+  @@map("accounting_periods")
+}
+
+// ─────────────────── Parti izleme ───────────────────
+
+/// Bir parti (lot).
+///
+/// PARTİ NUMARASI MALZEME İÇİNDE BENZERSİZDİR, GLOBAL DEĞİL. Tedarikçiler
+/// kendi numaralarını verir ve iki farklı malzemenin partisi aynı numarayı
+/// taşıyabilir; global benzersizlik dayatmak, gerçek dünyadaki numarayı
+/// değiştirmeye zorlar ve izlenebilirliği bozar.
+model Batch {
+  id        String   @id @default(uuid()) @db.Uuid
+  itemId    String   @map("item_id")
+  batchNo   String   @map("batch_no")
+  /// available | quarantine | blocked | consumed
+  status    String   @default("available")
+  /// satin_alma | uretim
+  origin    String
+  /// Üretim veya mal kabul tarihi.
+  producedAt DateTime @map("produced_at")
+  /// Raf ömründen hesaplanır. Raf ömrü yoksa null — "sonsuz" yazılmaz.
+  expiryDate DateTime? @map("expiry_date") @db.Date
+  /// Tedarikçinin kendi parti numarası — geri çağırmada onların tarafı.
+  supplierBatchNo String? @map("supplier_batch_no")
+  supplierId      String? @map("supplier_id")
+  /// Bu partiyi üreten iş emri.
+  workOrderId     String? @map("work_order_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  parents BatchGenealogy[] @relation("child")
+  children BatchGenealogy[] @relation("parent")
+
+  @@unique([itemId, batchNo])
+  @@index([status])
+  @@index([expiryDate])
+  @@map("batches")
+}
+
+/// Parti şecere bağı: hangi parti hangi partiden doğdu.
+///
+/// ÜRETİM ANINDA YAZILIR. Sonradan "o gün depoda hangi parti vardı" diye
+/// tahmin etmek, iki parti aynı anda açıkken imkânsızdır — ve tam da o
+/// durumda soruya cevap gerekir.
+model BatchGenealogy {
+  id            String  @id @default(uuid()) @db.Uuid
+  /// Tüketilen (girdi) parti.
+  inputBatchId  String  @map("input_batch_id") @db.Uuid
+  /// Üretilen (çıktı) parti.
+  outputBatchId String  @map("output_batch_id") @db.Uuid
+  quantity      Decimal @db.Decimal(18, 4)
+  workOrderId   String? @map("work_order_id")
+  at            DateTime
+
+  input  Batch @relation("parent", fields: [inputBatchId], references: [id], onDelete: Cascade)
+  output Batch @relation("child", fields: [outputBatchId], references: [id], onDelete: Cascade)
+
+  @@unique([inputBatchId, outputBatchId, workOrderId])
+  @@index([outputBatchId])
+  @@map("batch_genealogy")
+}
+
+// ─────────────────── Satın alma talebi ve ödeme ───────────────────
+
+/// Satın alma talebi.
+///
+/// TALEP VE SİPARİŞ AYRI BELGELERDİR: "isteyen" ile "satın alan" aynı kişi
+/// olamasın diye. Tek belge, kendi talebini kendi onaylayıp kendi
+/// tedarikçisine sipariş geçmeye açık kapı bırakır.
+model PurchaseRequisition {
+  id          String   @id @default(uuid()) @db.Uuid
+  documentNo  String   @unique @map("document_no")
+  /// draft | submitted | approved | rejected | ordered | cancelled
+  status      String   @default("draft")
+  requestedBy String   @map("requested_by") @db.Uuid
+  department  String?
+  justification String?
+  /// Tahmini toplam — onay eşiğini bu belirler.
+  estimatedTotal Decimal? @map("estimated_total") @db.Decimal(18, 2)
+  currency    String   @default("TRY")
+
+  approvedBy  String?  @map("approved_by") @db.Uuid
+  approvedAt  DateTime? @map("approved_at")
+  rejectedBy  String?  @map("rejected_by") @db.Uuid
+  rejectionReason String? @map("rejection_reason")
+  /// Bu talepten doğan sipariş.
+  purchaseOrderId String? @map("purchase_order_id")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  lines PurchaseRequisitionLine[]
+
+  @@index([status])
+  @@index([requestedBy])
+  @@map("purchase_requisitions")
+}
+
+model PurchaseRequisitionLine {
+  id            String  @id @default(uuid()) @db.Uuid
+  requisitionId String  @map("requisition_id") @db.Uuid
+  lineNo        Int     @map("line_no")
+  itemId        String  @map("item_id")
+  quantity      Decimal @db.Decimal(18, 4)
+  uom           String
+  /// Tahmini birim fiyat. BİLİNMİYORSA null — sıfır "bedava" demektir ve
+  /// onay eşiğini olduğundan düşük gösterir.
+  estimatedPrice Decimal? @map("estimated_price") @db.Decimal(18, 4)
+  neededBy      DateTime @map("needed_by") @db.Date
+
+  requisition PurchaseRequisition @relation(fields: [requisitionId], references: [id], onDelete: Cascade)
+
+  @@unique([requisitionId, lineNo])
+  @@map("purchase_requisition_lines")
+}
+
+/// Ödeme.
+///
+/// HER ÖDEME BİR FATURAYA BAĞLANIR. Bağlanmayan ödeme, cari hesapta
+/// "bakiye var ama hangi faturaya ait bilinmiyor" durumunu yaratır ve
+/// mutabakat imkânsızlaşır.
+model Payment {
+  id          String   @id @default(uuid()) @db.Uuid
+  documentNo  String   @unique @map("document_no")
+  /// outgoing (tedarikçiye) | incoming (müşteriden)
+  direction   String
+  partnerId   String   @map("partner_id")
+  amount      Decimal  @db.Decimal(18, 2)
+  currency    String   @default("TRY")
+  exchangeRate Decimal @default(1) @map("exchange_rate") @db.Decimal(18, 6)
+  /// havale | eft | cek | senet | nakit | kredi_karti
+  method      String
+  paidAt      DateTime @map("paid_at")
+  bankAccountId String? @map("bank_account_id")
+  reference   String?
+  createdBy   String   @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  allocations PaymentAllocation[]
+
+  @@index([partnerId, paidAt])
+  @@index([direction])
+  @@map("payments")
+}
+
+/// Ödemenin hangi faturaya ne kadarının gittiği.
+model PaymentAllocation {
+  id        String  @id @default(uuid()) @db.Uuid
+  paymentId String  @map("payment_id") @db.Uuid
+  /// Gelen fatura (tedarikçi) veya satış faturası belge numarası.
+  invoiceNo String  @map("invoice_no")
+  amount    Decimal @db.Decimal(18, 2)
+
+  payment Payment @relation(fields: [paymentId], references: [id], onDelete: Cascade)
+
+  @@unique([paymentId, invoiceNo])
+  @@index([invoiceNo])
+  @@map("payment_allocations")
+}
+
+// ─────────────────── İzin ve vardiya ───────────────────
+
+/// İzin talebi.
+///
+/// TALEP EDEN ONAYLAYAMAZ — satın alma talebindeki kuralın aynısı.
+model LeaveRequest {
+  id          String   @id @default(uuid()) @db.Uuid
+  employeeId  String   @map("employee_id") @db.Uuid
+  /// yillik | mazeret | hastalik | ucretsiz | dogum | babalik | evlilik | olum
+  type        String
+  startDate   DateTime @map("start_date") @db.Date
+  endDate     DateTime @map("end_date") @db.Date
+  /// İŞ GÜNÜ olarak; pazar ve resmî tatil düşülmüş hâli.
+  workingDays Decimal  @map("working_days") @db.Decimal(5, 1)
+  /// submitted | approved | rejected | cancelled
+  status      String   @default("submitted")
+  reason      String?
+  requestedBy String   @map("requested_by") @db.Uuid
+  approvedBy  String?  @map("approved_by") @db.Uuid
+  approvedAt  DateTime? @map("approved_at")
+  rejectionReason String? @map("rejection_reason")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([employeeId, startDate])
+  @@index([status])
+  @@map("leave_requests")
+}
+
+/// Devreden izin ve düzeltmeler.
+///
+/// HAK KANUNDAN HESAPLANIR, BURADA SAKLANMAZ. Burada yalnızca kanunun
+/// hesaplayamayacağı şey durur: geçen yıldan devreden gün ve elle yapılan
+/// düzeltmeler. Hakkın kendisi saklansaydı, kıdem yılı dolduğunda kimse
+/// güncellemeyi hatırlamaz ve çalışan eski hakkıyla kalırdı.
+model LeaveAdjustment {
+  id         String   @id @default(uuid()) @db.Uuid
+  employeeId String   @map("employee_id") @db.Uuid
+  year       Int
+  /// Devreden gün (+) veya düzeltme (−).
+  days       Decimal  @db.Decimal(5, 1)
+  reason     String
+  createdBy  String   @map("created_by") @db.Uuid
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  @@unique([employeeId, year, reason])
+  @@index([employeeId, year])
+  @@map("leave_adjustments")
+}
+
+/// Vardiya tanımı.
+model Shift {
+  id           String  @id @default(uuid()) @db.Uuid
+  code         String  @unique
+  name         String
+  /// "08:00" biçiminde.
+  startsAt     String  @map("starts_at")
+  endsAt       String  @map("ends_at")
+  /// Ara dinlenme, dakika (İş Kanunu md. 68).
+  breakMinutes Int     @map("break_minutes")
+  /// Gece vardiyası mı? İşaretlenmezse 7,5 saat sınırı uygulanmaz.
+  isNight      Boolean @default(false) @map("is_night")
+  isActive     Boolean @default(true) @map("is_active")
+
+  assignments ShiftAssignment[]
+
+  @@map("shifts")
+}
+
+/// Bir çalışanın bir güne vardiya ataması.
+model ShiftAssignment {
+  id         String   @id @default(uuid()) @db.Uuid
+  employeeId String   @map("employee_id") @db.Uuid
+  shiftId    String   @map("shift_id") @db.Uuid
+  workDate   DateTime @map("work_date") @db.Date
+
+  shift    Shift    @relation(fields: [shiftId], references: [id])
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  /// BİR KİŞİ AYNI GÜN İKİ VARDİYADA OLAMAZ. Olabilseydi mesai iki kez
+  /// hesaplanır ve bordro şişerdi.
+  @@unique([employeeId, workDate])
+  @@index([workDate])
+  @@map("shift_assignments")
+}
+
+/// Ana veri değişiklik belgesi (SAP'de CDHDR/CDPOS karşılığı).
+///
+/// KAYIT UYGULAMADA DEĞİL VERİTABANINDA ÜRETİLİR. Uygulamada üretilseydi,
+/// bir betik, bir düzeltme sorgusu ya da ileride yazılacak bir kod yolu
+/// onu atlar ve değişiklik izsiz kalırdı — üstelik izin var sanıldığı için
+/// kimse şüphelenmezdi.
+///
+/// AKTÖR BİLİNMİYORSA null YAZILIR, UYDURULMAZ. Uygulama işlem başında
+/// `kaelon.user_id` oturum değişkenini kurar; doğrudan SQL ile yapılan bir
+/// değişiklikte bu değişken yoktur ve kayıt "kim olduğu bilinmiyor" der.
+/// Bu, sessizce bir kullanıcıya yazmaktan iyidir.
+model MasterDataChange {
+  id         String   @id @default(uuid()) @db.Uuid
+  /// Yazma sırası. Zaman damgası sıralama için yetmez: aynı işlemdeki iki
+  /// değişiklik aynı damgayı alır ve "önce neydi" sorusunun cevabı
+  /// sorgudan sorguya değişirdi.
+  seq        BigInt   @default(autoincrement())
+  /// items | partners | employees
+  objectType String   @map("object_type")
+  objectId   String   @map("object_id")
+  /// İnsanın tanıdığı kod — kayıt silinse bile ne olduğu anlaşılsın.
+  objectCode String?  @map("object_code")
+  field      String
+  oldValue   String?  @map("old_value")
+  newValue   String?  @map("new_value")
+  /// insert | update | delete
+  operation  String
+  changedBy  String?  @map("changed_by") @db.Uuid
+  changedAt  DateTime @default(now()) @map("changed_at")
+
+  @@index([objectType, objectId, changedAt])
+  @@index([changedAt])
+  @@index([changedBy])
+  @@map("master_data_changes")
+}
+
+/// Onay bekleyen işlem.
+///
+/// Yazma tool'ları KULLANICI ONAYLAMADAN çalışmaz. Bu kural sistem
+/// promptunda değil burada durur: prompt modelin talimata uymasına bağlıdır,
+/// bu tablo ise invoker'ın çalışma şartıdır.
+model PendingAction {
+  id             String   @id @db.Uuid
+  toolName       String   @map("tool_name")
+  /// Modelin doldurduğu girdi; kullanıcı onay ekranında düzeltebilir.
+  input          Json
+  authority      Int
+  userId         String   @map("user_id") @db.Uuid
+  correlationId  String   @map("correlation_id")
+  conversationId String?  @map("conversation_id") @db.Uuid
+  /// pending | confirmed | cancelled | expired
+  status         String   @default("pending")
+  createdAt      DateTime @map("created_at")
+  expiresAt      DateTime @map("expires_at")
+  confirmedAt    DateTime? @map("confirmed_at")
+
+  @@index([userId, status, expiresAt])
+  @@index([status, expiresAt])
+  @@map("pending_actions")
+}
+
+// ─────────────────── Muhasebe: yevmiye ───────────────────
+
+/// Yevmiye fişi.
+///
+/// FİŞ BELGEDEN DOĞAR. `sourceKind`/`sourceId` hangi belgeden geldiğini
+/// söyler ve aynı belge için İKİNCİ FİŞ oluşmasını engeller — bir fatura
+/// iki kez muhasebeleşirse ciro iki katına çıkar ve kimse fark etmez.
+model JournalEntry {
+  id          String   @id @default(uuid()) @db.Uuid
+  documentNo  String   @unique @map("document_no")
+  entryDate   DateTime @map("entry_date") @db.Date
+  description String
+  /// sales_invoice | purchase_invoice | delivery | goods_receipt |
+  /// payment | stock_movement | manual | period_close
+  sourceKind  String   @map("source_kind")
+  sourceId    String?  @map("source_id")
+  /// draft | posted | reversed
+  status      String   @default("posted")
+  totalDebit  Decimal  @map("total_debit") @db.Decimal(18, 2)
+  totalCredit Decimal  @map("total_credit") @db.Decimal(18, 2)
+  /// Bu fişi iptal eden ters fiş.
+  reversedBy  String?  @map("reversed_by") @db.Uuid
+  /// Bu fiş hangi fişin tersi.
+  reversalOf  String?  @map("reversal_of") @db.Uuid
+  createdBy   String   @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  lines JournalLine[]
+
+  /// AYNI BELGEDEN İKİ FİŞ ÇIKAMAZ — veritabanı seviyesinde.
+  @@unique([sourceKind, sourceId])
+  @@index([entryDate])
+  @@index([status])
+  @@map("journal_entries")
+}
+
+model JournalLine {
+  id          String  @id @default(uuid()) @db.Uuid
+  entryId     String  @map("entry_id") @db.Uuid
+  lineNo      Int     @map("line_no")
+  accountCode String  @map("account_code")
+  debit       Decimal @default(0) @db.Decimal(18, 2)
+  credit      Decimal @default(0) @db.Decimal(18, 2)
+  description String
+  /// 120/320 gibi hesaplarda zorunlu — kimden alacaklı, kime borçlu.
+  partnerId   String? @map("partner_id")
+
+  entry JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
+
+  @@unique([entryId, lineNo])
+  @@index([accountCode, entryId])
+  @@index([partnerId])
+  @@map("journal_lines")
+}
+
+// ─────────────────── Stok sayımı ───────────────────
+
+/// Stok sayımı başlığı.
+///
+/// SİSTEM MİKTARI SAYIM AÇILIRKEN DONDURULUR. Dondurulmasaydı, sayım
+/// sürerken yapılan bir sevkiyat farkı kendiliğinden yaratır ve doğru
+/// sayan depocu hatalı görünürdü.
+model StockCount {
+  id         String   @id @default(uuid()) @db.Uuid
+  documentNo String   @unique @map("document_no")
+  locationId String   @map("location_id")
+  countDate  DateTime @map("count_date") @db.Date
+  /// open | counted | posted | cancelled
+  status     String   @default("open")
+  /// KÖR SAYIM: sayana sistemdeki miktar gösterilmez. Varsayılan AÇIK —
+  /// gösterilseydi yorgun bir vardiyanın sonunda o sayı kopyalanırdı.
+  blind      Boolean  @default(true)
+  countedBy  String?  @map("counted_by") @db.Uuid
+  postedAt   DateTime? @map("posted_at")
+  postedBy   String?  @map("posted_by") @db.Uuid
+  note       String?
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  lines StockCountLine[]
+
+  @@index([status])
+  @@index([locationId, countDate])
+  @@map("stock_counts")
+}
+
+model StockCountLine {
+  id         String   @id @default(uuid()) @db.Uuid
+  countId    String   @map("count_id") @db.Uuid
+  lineNo     Int      @map("line_no")
+  itemId     String   @map("item_id")
+  batchId    String?  @map("batch_id")
+  /// Sayım açılırken dondurulan sistem miktarı.
+  systemQty  Decimal  @map("system_qty") @db.Decimal(18, 4)
+  /// Sayılan miktar. Henüz sayılmadıysa null — SIFIR DEĞİL.
+  countedQty Decimal? @map("counted_qty") @db.Decimal(18, 4)
+  /// Dondurulan birim maliyet; fark değeri bundan çıkar.
+  unitCost   Decimal? @map("unit_cost") @db.Decimal(18, 4)
+  countedAt  DateTime? @map("counted_at")
+
+  count StockCount @relation(fields: [countId], references: [id], onDelete: Cascade)
+
+  @@unique([countId, lineNo])
+  @@index([itemId])
+  @@map("stock_count_lines")
+}
+
+/// Şirketin kendi kimliği — e-Fatura düzenleyeni.
+///
+/// TEK SATIRLIK TABLO. Ayarlar dosyasında tutulsaydı tenant başına
+/// değişemezdi; kontrol düzleminde tutulsaydı mali kimlik operasyon
+/// verisinden ayrı düşerdi. Fatura kesen kim sorusunun cevabı, faturanın
+/// yanında durmalıdır.
+model CompanyProfile {
+  id          String   @id @default("singleton")
+  legalName   String   @map("legal_name")
+  taxId       String   @map("tax_id")
+  taxOffice   String   @map("tax_office")
+  addressLine String   @map("address_line")
+  district    String
+  city        String
+  postalCode  String?  @map("postal_code")
+  country     String   @default("TR")
+  email       String?
+  phone       String?
+  /// Mersis ve ticaret sicil numarası — ticari faturada zorunludur.
+  mersisNo    String?  @map("mersis_no")
+  tradeRegistryNo String? @map("trade_registry_no")
+  /// Entegratörün bize verdiği posta kutusu etiketi.
+  einvoiceAlias String? @map("einvoice_alias")
+  updatedAt   DateTime @updatedAt @map("updated_at")
+
+  @@map("company_profile")
+}
+
+// ─────────────────── Teklif ve fiyat koşulları ───────────────────
+
+/// Fiyat/iskonto koşulu.
+///
+/// EN ÖZGÜL KOŞUL KAZANIR. "Bu müşteriye bu üründe 850 TL" kaydı,
+/// "bu üründe liste 900 TL" kaydını ezer. Sıralama kod tarafında
+/// tanımlıdır; aksi hâlde aynı sipariş iki kez hesaplandığında iki
+/// farklı fiyat çıkardı.
+model PriceCondition {
+  id           String   @id @default(uuid()) @db.Uuid
+  /// fiyat | iskonto_yuzde | iskonto_tutar | ek_ucret
+  kind         String
+  /// null = tüm müşteriler.
+  partnerId    String?  @map("partner_id")
+  /// null = tüm malzemeler.
+  itemCode     String?  @map("item_code")
+  partnerGroup String?  @map("partner_group")
+  /// Miktar kademesi: bu miktardan itibaren geçerli.
+  minQuantity  Decimal  @default(0) @map("min_quantity") @db.Decimal(18, 4)
+  currency     String   @default("TRY")
+  value        Decimal  @db.Decimal(18, 4)
+  validFrom    DateTime @map("valid_from") @db.Date
+  validTo      DateTime? @map("valid_to") @db.Date
+  priority     Int      @default(0)
+  isActive     Boolean  @default(true) @map("is_active")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  @@index([itemCode, isActive])
+  @@index([partnerId, isActive])
+  @@map("price_conditions")
+}
+
+/// Satış teklifi — siparişten ÖNCEKİ halka.
+///
+/// Teklif bir TAAHHÜT DEĞİL, bir öneridir; geçerlilik süresi biter ve
+/// kabul edilirse siparişe dönüşür. Teklif olmadan "kaç teklif verdik,
+/// kaçı siparişe döndü" sorusu — yani satışın dönüşüm oranı — hiçbir
+/// yerde yoktur.
+model SalesQuotation {
+  id            String   @id @default(uuid()) @db.Uuid
+  documentNo    String   @unique @map("document_no")
+  partnerId     String   @map("partner_id") @db.Uuid
+  quotedAt      DateTime @map("quoted_at") @db.Date
+  /// Teklifin geçerlilik son günü. Süresi geçen teklif siparişe dönüşemez.
+  validUntil    DateTime @map("valid_until") @db.Date
+  currency      String   @default("TRY")
+  /// draft | sent | accepted | rejected | expired | ordered
+  status        String   @default("draft")
+  /// Reddedildiyse sebebi — dönüşüm oranını iyileştiren tek veri budur.
+  rejectionReason String? @map("rejection_reason")
+  /// Kabul edilip siparişe dönüştüyse sipariş numarası.
+  salesOrderNo  String?  @map("sales_order_no")
+  note          String?
+  createdBy     String   @map("created_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @updatedAt @map("updated_at")
+
+  lines SalesQuotationLine[]
+
+  @@index([partnerId, quotedAt])
+  @@index([status])
+  @@map("sales_quotations")
+}
+
+model SalesQuotationLine {
+  id           String  @id @default(uuid()) @db.Uuid
+  quotationId  String  @map("quotation_id") @db.Uuid
+  lineNo       Int     @map("line_no")
+  itemId       String  @map("item_id")
+  quantity     Decimal @db.Decimal(18, 4)
+  uom          String
+  unitPrice    Decimal @map("unit_price") @db.Decimal(18, 4)
+  discountPercent Decimal @default(0) @map("discount_percent") @db.Decimal(5, 2)
+  vatRate      Int     @default(20) @map("vat_rate")
+
+  quotation SalesQuotation @relation(fields: [quotationId], references: [id], onDelete: Cascade)
+
+  @@unique([quotationId, lineNo])
+  @@map("sales_quotation_lines")
+}
+
+/// Satın alma teklif talebi (RFQ) ve tedarikçi teklifleri.
+///
+/// TEK TEKLİFLE SİPARİŞ VERMEK BİR KARAR DEĞİL, BİR ALIŞKANLIKTIR.
+/// En az iki teklif toplandığında fiyat farkı görünür hâle gelir ve
+/// "neden bu tedarikçi" sorusunun kayıtlı bir cevabı olur.
+model PurchaseRfq {
+  id            String   @id @default(uuid()) @db.Uuid
+  documentNo    String   @unique @map("document_no")
+  /// Hangi talepten doğdu.
+  requisitionNo String?  @map("requisition_no")
+  requestedAt   DateTime @map("requested_at") @db.Date
+  dueDate       DateTime @map("due_date") @db.Date
+  /// open | closed | awarded | cancelled
+  status        String   @default("open")
+  /// Kazanan teklif.
+  awardedQuoteId String? @map("awarded_quote_id") @db.Uuid
+  /// Neden bu tedarikçi seçildi — en ucuz değilse ZORUNLU.
+  awardReason   String?  @map("award_reason")
+  createdBy     String   @map("created_by") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  quotes SupplierQuote[]
+
+  @@index([status])
+  @@map("purchase_rfqs")
+}
+
+model SupplierQuote {
+  id          String   @id @default(uuid()) @db.Uuid
+  rfqId       String   @map("rfq_id") @db.Uuid
+  partnerId   String   @map("partner_id")
+  /// Teklif edilen toplam tutar.
+  totalAmount Decimal  @map("total_amount") @db.Decimal(18, 2)
+  currency    String   @default("TRY")
+  /// Teslim süresi (gün) — en ucuz her zaman en iyi değildir.
+  leadTimeDays Int?    @map("lead_time_days")
+  validUntil  DateTime? @map("valid_until") @db.Date
+  note        String?
+  receivedAt  DateTime @map("received_at")
+
+  rfq PurchaseRfq @relation(fields: [rfqId], references: [id], onDelete: Cascade)
+
+  @@unique([rfqId, partnerId])
+  @@map("supplier_quotes")
+}
+
+// ─────────────────── Bakım (PM/EAM) ───────────────────
+
+/// Bakım planı — takvim veya sayaç bazlı.
+///
+/// SAYAÇ TARİHTEN DAHA DOĞRUDUR: "her 3 ayda bir" kuralı az çalışan
+/// tezgâhı gereksiz durdurur, çok çalışanı geç yakalar. Çalışma saati
+/// bilinmiyorsa takvime düşülür ve bu söylenir.
+model MaintenancePlan {
+  id            String   @id @default(uuid()) @db.Uuid
+  machineCode   String   @map("machine_code")
+  description   String
+  /// planli | kestirimci
+  kind          String   @default("planli")
+  intervalDays  Int?     @map("interval_days")
+  /// Çalışma saati aralığı — sayaç bazlı bakım.
+  intervalHours Decimal? @map("interval_hours") @db.Decimal(12, 2)
+  lastDoneAt    DateTime? @map("last_done_at") @db.Date
+  lastDoneHours Decimal? @map("last_done_hours") @db.Decimal(12, 2)
+  isActive      Boolean  @default(true) @map("is_active")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  orders MaintenanceOrder[]
+
+  @@index([machineCode, isActive])
+  @@map("maintenance_plans")
+}
+
+/// Bakım iş emri — planlı ya da arıza kaynaklı.
+model MaintenanceOrder {
+  id           String   @id @default(uuid()) @db.Uuid
+  documentNo   String   @unique @map("document_no")
+  machineCode  String   @map("machine_code")
+  planId       String?  @map("plan_id") @db.Uuid
+  /// planli | ariza | kestirimci
+  kind         String
+  /// planned | released | in_progress | completed | cancelled
+  status       String   @default("planned")
+  description  String
+  scheduledFor DateTime? @map("scheduled_for") @db.Date
+  startedAt    DateTime? @map("started_at")
+  completedAt  DateTime? @map("completed_at")
+  /// Harcanan işçilik (saat).
+  laborHours   Decimal? @map("labor_hours") @db.Decimal(10, 2)
+  /// Kullanılan yedek parça maliyeti.
+  partsCost    Decimal? @map("parts_cost") @db.Decimal(18, 2)
+  /// Yapılan işin kaydı — sonraki arızada ilk bakılacak yer.
+  findings     String?
+  assignedTo   String?  @map("assigned_to") @db.Uuid
+  createdBy    String   @map("created_by") @db.Uuid
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  plan      MaintenancePlan? @relation(fields: [planId], references: [id])
+  breakdown Breakdown?
+
+  @@index([machineCode, status])
+  @@index([status])
+  @@map("maintenance_orders")
+}
+
+/// Arıza bildirimi.
+///
+/// ÖNCELİĞİ "ACİL" ETİKETİ DEĞİL ÜRETİME ETKİSİ BELİRLER. Herkes kendi
+/// arızasını acil işaretler; "hattı durdurdu mu" sorusunun cevabı ise
+/// tartışmasızdır.
+model Breakdown {
+  id          String   @id @default(uuid()) @db.Uuid
+  machineCode String   @map("machine_code")
+  reportedAt  DateTime @map("reported_at")
+  reportedBy  String   @map("reported_by") @db.Uuid
+  /// durdurdu | yavaslatti | etkilemedi
+  severity    String
+  description String
+  resolvedAt  DateTime? @map("resolved_at")
+  /// Bu arızadan doğan bakım iş emri.
+  orderId     String?  @unique @map("order_id") @db.Uuid
+  /// Kök neden — sonraki arızayı önleyen tek bilgi.
+  rootCause   String?  @map("root_cause")
+
+  order MaintenanceOrder? @relation(fields: [orderId], references: [id])
+
+  @@index([machineCode, reportedAt])
+  @@index([severity])
+  @@map("breakdowns")
+}
+
+/// Seri numarası — TEK BİR NESNEYİ izler.
+///
+/// Parti bir yığını izler ("bu partiden 500 kg"); seri tek bir ürünü
+/// ("bu makinenin garantisi ne zaman bitiyor, kime satıldı"). Makine ve
+/// cihazda parti izleme yetmez: müşteri "benim aldığım cihaz" der.
+model SerialNumber {
+  id          String   @id @default(uuid()) @db.Uuid
+  itemId      String   @map("item_id")
+  /// Normalize edilmiş seri numarası — boşluk ve harf farkı temizlenmiş.
+  serial      String
+  /// stokta | sevk_edildi | serviste | hurda
+  state       String   @default("stokta")
+  /// Hangi partiden çıktı — seri ve parti birbirini dışlamaz.
+  batchId     String?  @map("batch_id")
+  producedAt  DateTime? @map("produced_at")
+  /// Müşteriye sevk tarihi — garanti bu tarihten işler.
+  shippedAt   DateTime? @map("shipped_at")
+  /// Hangi irsaliyeyle gitti.
+  deliveryId  String?  @map("delivery_id") @db.Uuid
+  /// Kime satıldı.
+  partnerId   String?  @map("partner_id")
+  /// Garanti süresi (ay). Tanımsızsa kapsam belirlenemez.
+  warrantyMonths Int?  @map("warranty_months")
+  note        String?
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  /// SERİ NUMARASI MALZEME İÇİNDE TEKTİR VE TEKRAR KULLANILMAZ.
+  @@unique([itemId, serial])
+  @@index([serial])
+  @@index([state])
+  @@index([partnerId])
+  @@map("serial_numbers")
+}
+
+/// Sabit kıymet.
+///
+/// SAP'de Asset Accounting ayrı bir modüldür ve kurulumu haftalar
+/// sürer; burada Türk mevzuatının kuralları hazır gelir. Amortisman
+/// vergi matrahını doğrudan değiştirdiği için hesabın kendisi
+/// `src/modules/assets/depreciation.ts` içinde ve test edilmiş
+/// durumda — burada yalnızca girdileri saklanır.
+model FixedAsset {
+  id       String @id @default(uuid()) @db.Uuid
+  code     String @unique
+  name     String
+  /// makine | tasit | demirbas | bilgisayar | bina | diger
+  category String
+
+  acquiredAt      DateTime @map("acquired_at") @db.Date
+  /// Amortismana esas bedel: KDV hariç, montaj/nakliye dahil.
+  cost            Decimal  @db.Decimal(18, 2)
+  usefulLifeYears Int      @map("useful_life_years")
+  /// normal | azalan
+  method          String   @default("normal")
+  /// Kıst amortisman (VUK 320) — YALNIZCA binek otomobilde true.
+  /// Makineye uygulanırsa amortisman eksik ayrılır.
+  prorated        Boolean  @default(false)
+
+  /// Kıymetin kaydedildiği hesap: 253 makine, 254 taşıt, 255 demirbaş.
+  assetAccount        String @map("asset_account")
+  depreciationAccount String @default("257") @map("depreciation_account")
+  /// Gider hesabı kıymete göre değişir: üretim makinesi 730, ofis 770.
+  expenseAccount      String @map("expense_account")
+
+  /// aktif | tam_amorti | elden_cikarildi
+  status           String    @default("aktif")
+  disposedAt       DateTime? @map("disposed_at") @db.Date
+  disposalProceeds Decimal?  @map("disposal_proceeds") @db.Decimal(18, 2)
+
+  locationId String? @map("location_id") @db.Uuid
+  serial     String?
+  note       String?
+
+  createdAt DateTime @default(now()) @map("created_at")
+  updatedAt DateTime @updatedAt @map("updated_at")
+
+  runs DepreciationRun[]
+
+  @@index([status])
+  @@map("fixed_assets")
+}
+
+/// Bir yılın ayrılmış amortismanı.
+///
+/// BİR YIL İKİ KEZ AYRILAMAZ — benzersizlik veritabanındadır, uygulama
+/// iki kez çağrılsa bile ikincisi reddedilir. Çift ayrılan amortisman
+/// matrahı yarı yarıya düşürür.
+model DepreciationRun {
+  id          String  @id @default(uuid()) @db.Uuid
+  assetId     String  @map("asset_id") @db.Uuid
+  year        Int
+  amount      Decimal @db.Decimal(18, 2)
+  accumulated Decimal @db.Decimal(18, 2)
+  bookValue   Decimal @map("book_value") @db.Decimal(18, 2)
+  months      Int
+
+  journalDocumentNo String?   @map("journal_document_no")
+  postedAt          DateTime  @default(now()) @map("posted_at")
+  postedBy          String?   @map("posted_by") @db.Uuid
+
+  asset FixedAsset @relation(fields: [assetId], references: [id], onDelete: Restrict)
+
+  @@unique([assetId, year])
+  @@index([year])
+  @@map("depreciation_runs")
+}
+
+/// Satış iadesi ve dekontlar.
+///
+/// KESİLMİŞ FATURA İPTAL EDİLMEZ, İADE EDİLİR. İkisi denetimde aynı
+/// şey değildir: iptal "bu satış hiç olmadı" der, iade "oldu ve geri
+/// döndü" der. Stok, KDV ve cari bakiyesi bu ikisinde farklı davranır.
+model SalesCreditNote {
+  id         String @id @default(uuid()) @db.Uuid
+  documentNo String @unique @map("document_no")
+  /// iade | alacak_dekontu | borc_dekontu
+  kind       String
+  partnerId  String @map("partner_id") @db.Uuid
+  /// İade her zaman bir faturaya bağlanır; dekont bağlanmayabilir.
+  invoiceId  String? @map("invoice_id") @db.Uuid
+
+  issuedAt     DateTime @map("issued_at")
+  currency     String   @default("TRY")
+  exchangeRate Decimal  @default(1) @map("exchange_rate") @db.Decimal(18, 6)
+
+  netAmount   Decimal @map("net_amount") @db.Decimal(18, 2)
+  vatAmount   Decimal @map("vat_amount") @db.Decimal(18, 2)
+  totalAmount Decimal @map("total_amount") @db.Decimal(18, 2)
+
+  /// Mal geri geldi mi — geldiyse stok hareketi de yazılır.
+  withGoods  Boolean @default(false) @map("with_goods")
+  /// Depo KODU ("DEPO-1"), kimliği değil — sevkiyatla aynı biçim.
+  locationId String? @map("location_id")
+
+  reason String
+  status String  @default("issued")
+  ettn   String?
+  einvoiceKind   String? @map("einvoice_kind")
+  einvoiceStatus String? @map("einvoice_status")
+  issuedBy       String? @map("issued_by") @db.Uuid
+  journalDocumentNo String? @map("journal_document_no")
+  createdAt      DateTime @default(now()) @map("created_at")
+
+  invoice SalesInvoice? @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  lines   SalesCreditNoteLine[]
+
+  @@index([partnerId])
+  @@index([invoiceId])
+  @@map("sales_credit_notes")
+}
+
+model SalesCreditNoteLine {
+  id     String @id @default(uuid()) @db.Uuid
+  noteId String @map("note_id") @db.Uuid
+  lineNo Int    @map("line_no")
+  /// Hangi fatura satırından iade edildi — aşırı iadeyi engeller.
+  invoiceLineNo Int?    @map("invoice_line_no")
+  itemId        String? @map("item_id")
+  description   String
+  quantity      Decimal @db.Decimal(18, 4)
+  uom           String  @default("adet")
+  unitPrice     Decimal @map("unit_price") @db.Decimal(18, 4)
+  netAmount     Decimal @map("net_amount") @db.Decimal(18, 2)
+  vatRate       Int     @default(20) @map("vat_rate")
+  vatAmount     Decimal @map("vat_amount") @db.Decimal(18, 2)
+  totalAmount   Decimal @map("total_amount") @db.Decimal(18, 2)
+  movementId    String? @map("movement_id") @db.Uuid
+
+  note SalesCreditNote @relation(fields: [noteId], references: [id], onDelete: Cascade)
+
+  @@unique([noteId, lineNo])
+  @@map("sales_credit_note_lines")
+}
+
+/// Bir ayın bordro koşusu.
+///
+/// BİR DÖNEM İKİ KEZ ÇALIŞTIRILAMAZ. Çift bordro, çift SGK bildirimi
+/// ve çift ödeme demektir; benzersizlik veritabanındadır.
+model PayrollRun {
+  id             String   @id @default(uuid()) @db.Uuid
+  /// Dönem: ayın ilk günü.
+  period         DateTime @unique @db.Date
+  status         String   @default("posted")
+  employeeCount  Int      @map("employee_count")
+  totalGross     Decimal  @map("total_gross") @db.Decimal(18, 2)
+  totalNet       Decimal  @map("total_net") @db.Decimal(18, 2)
+  totalEmployerCost Decimal @map("total_employer_cost") @db.Decimal(18, 2)
+  journalDocumentNo String? @map("journal_document_no")
+  /// Hangi yılın parametreleriyle hesaplandı — denetim izi.
+  parameterYear  Int      @map("parameter_year")
+  runAt          DateTime @default(now()) @map("run_at")
+  runBy          String?  @map("run_by") @db.Uuid
+
+  lines PayrollLine[]
+
+  @@map("payroll_runs")
+}
+
+/// Bir çalışanın bir aylık bordrosu.
+///
+/// KÜMÜLATİF MATRAH DONAR. Her bordroda geçmiş aylar yeniden
+/// hesaplansaydı, geçmişte düzeltilmiş bir kalem bugünkü vergiyi
+/// değiştirir ve ödenmiş bordrolar geriye dönük tutarsızlaşırdı.
+model PayrollLine {
+  id         String   @id @default(uuid()) @db.Uuid
+  runId      String   @map("run_id") @db.Uuid
+  employeeId String   @map("employee_id") @db.Uuid
+  period     DateTime @db.Date
+
+  grossSalary          Decimal @map("gross_salary") @db.Decimal(18, 2)
+  bonus                Decimal @default(0) @db.Decimal(18, 2)
+  totalGross           Decimal @map("total_gross") @db.Decimal(18, 2)
+  sgkBase              Decimal @map("sgk_base") @db.Decimal(18, 2)
+  employeeSgk          Decimal @map("employee_sgk") @db.Decimal(18, 2)
+  employeeUnemployment Decimal @map("employee_unemployment") @db.Decimal(18, 2)
+  taxBase              Decimal @map("tax_base") @db.Decimal(18, 2)
+  cumulativeBefore     Decimal @map("cumulative_before") @db.Decimal(18, 2)
+  cumulativeAfter      Decimal @map("cumulative_after") @db.Decimal(18, 2)
+  grossIncomeTax       Decimal @map("gross_income_tax") @db.Decimal(18, 2)
+  incomeTaxExemption   Decimal @map("income_tax_exemption") @db.Decimal(18, 2)
+  incomeTax            Decimal @map("income_tax") @db.Decimal(18, 2)
+  stampDuty            Decimal @map("stamp_duty") @db.Decimal(18, 2)
+  totalDeductions      Decimal @map("total_deductions") @db.Decimal(18, 2)
+  netSalary            Decimal @map("net_salary") @db.Decimal(18, 2)
+  employerSgk          Decimal @map("employer_sgk") @db.Decimal(18, 2)
+  employerUnemployment Decimal @map("employer_unemployment") @db.Decimal(18, 2)
+  employerCost         Decimal @map("employer_cost") @db.Decimal(18, 2)
+
+  run      PayrollRun @relation(fields: [runId], references: [id], onDelete: Cascade)
+  employee Employee   @relation(fields: [employeeId], references: [id], onDelete: Restrict)
+
+  @@unique([period, employeeId])
+  @@index([employeeId])
+  @@map("payroll_lines")
+}
+
+/// Kullanıcı tanımlı izleme.
+///
+/// İZLEME SAHİBİNİN YETKİSİYLE KOŞAR — `ownerUserId` bir etiket değil,
+/// çalışma kimliğidir. Aksi hâlde izleme, yetki duvarında delik olurdu.
+model Watch {
+  id       String @id @default(uuid()) @db.Uuid
+  name     String
+  /// YALNIZCA OKUMA TOOL'U izlenebilir; yazan bir tool'u izlemeye
+  /// bağlamak, arka planda kendiliğinden çalışan bir yazma demektir.
+  tool     String
+  input    Json   @default("{}")
+  path     String
+  /// gt | gte | lt | lte | eq | neq | changed
+  operator String
+  threshold Float?
+  level    Int    @default(1)
+  message  String
+
+  ownerUserId String  @map("owner_user_id") @db.Uuid
+  isActive    Boolean @default(true) @map("is_active")
+
+  lastValue     Float?    @map("last_value")
+  lastCheckedAt DateTime? @map("last_checked_at")
+  lastFiredAt   DateTime? @map("last_fired_at")
+  fireCount     Int       @default(0) @map("fire_count")
+
+  createdBy String?  @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@unique([ownerUserId, name])
+  @@index([isActive])
+  @@index([ownerUserId])
+  @@map("watches")
 }

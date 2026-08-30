@@ -159,3 +159,91 @@ describe("sinyal sıralaması ve dayanıklılık", () => {
     expect(audit.entries.every((e) => e.channel === "job")).toBe(true);
   });
 });
+
+describe("mali nöbetçiler", () => {
+  /**
+   * NÖBETÇİLER BEŞ TANEYDİ VE HEPSİ ÜRETİM TARAFINDAYDI. Muhasebe,
+   * bordro ve sabit kıymet hiç izlenmiyordu; bilanço denk olmasa
+   * sistem tek kelime etmiyordu. Bu testler yeni nöbetçilerin
+   * kurallarını koruyor.
+   */
+  const bySentinel = (id: string) => {
+    const s = SENTINELS.find((x) => x.id === id);
+    if (!s) throw new Error(`nöbetçi yok: ${id}`);
+    return s;
+  };
+
+  it("DENK OLMAYAN BİLANÇO HER ZAMAN KRİTİKTİR", () => {
+    // Tutarın büyüklüğüne bakılmaz: sorun tutar değil güvendir.
+    const s = bySentinel("balance-sheet-integrity");
+    const signals = s.evaluate({ balanced: false, difference: 12.5 }, DEFAULT_THRESHOLDS);
+    expect(signals).toHaveLength(1);
+    expect(signals[0]!.level).toBe(2);
+  });
+
+  it("denk bilanço sinyal üretmez", () => {
+    const s = bySentinel("balance-sheet-integrity");
+    expect(s.evaluate({ balanced: true, difference: 0 }, DEFAULT_THRESHOLDS)).toHaveLength(0);
+  });
+
+  it("BİLANÇO GİRDİSİ TARİHE BAĞLIDIR — sabit değil", () => {
+    /*
+     * Sabit yazılsaydı nöbetçi bir ay sonra yanlış tarihi kontrol
+     * eder ve kimse fark etmezdi.
+     */
+    const s = bySentinel("balance-sheet-integrity");
+    expect(typeof s.input).toBe("function");
+    const input = (s.input as (n: Date) => { asOf: string })(new Date("2026-08-30T00:00:00Z"));
+    expect(input.asOf).toBe("2026-08-30");
+  });
+
+  it("BORDRO NÖBETÇİSİ GEÇEN AYA BAKAR", () => {
+    // Ayın 3'ünde "bu ayın bordrosu yok" demek gürültüdür.
+    const s = bySentinel("payroll-missing");
+    const input = (s.input as (n: Date) => { period: string })(new Date("2026-08-03T00:00:00Z"));
+    expect(input.period.slice(0, 7)).toBe("2026-07");
+  });
+
+  it("bordro yoksa kritik sinyal üretir", () => {
+    const s = bySentinel("payroll-missing");
+    expect(s.evaluate(null, DEFAULT_THRESHOLDS)).toHaveLength(1);
+    expect(s.evaluate({ employeeCount: 5 }, DEFAULT_THRESHOLDS)).toHaveLength(0);
+  });
+
+  it("sabit kıymet ayrışması bildirilir", () => {
+    const s = bySentinel("fixed-asset-reconciliation");
+    const signals = s.evaluate(
+      { reconciliation: { matched: false, costDifference: 1_670_000, accumulatedDifference: 0 } },
+      DEFAULT_THRESHOLDS,
+    );
+    expect(signals).toHaveLength(1);
+    expect(signals[0]!.level).toBe(2);
+  });
+
+  it("mutabık kıymet listesi sessizdir", () => {
+    const s = bySentinel("fixed-asset-reconciliation");
+    expect(
+      s.evaluate({ reconciliation: { matched: true } }, DEFAULT_THRESHOLDS),
+    ).toHaveLength(0);
+  });
+
+  it("BOZUK VERİ NÖBETÇİYİ PATLATMAZ", () => {
+    // Bir nöbetçinin patlaması brifingin tamamını düşürmemeli.
+    for (const id of [
+      "balance-sheet-integrity",
+      "fixed-asset-reconciliation",
+      "payroll-missing",
+      "einvoice-queue",
+    ]) {
+      const s = bySentinel(id);
+      expect(() => s.evaluate(null, DEFAULT_THRESHOLDS)).not.toThrow();
+      expect(() => s.evaluate({}, DEFAULT_THRESHOLDS)).not.toThrow();
+      expect(() => s.evaluate("bozuk", DEFAULT_THRESHOLDS)).not.toThrow();
+    }
+  });
+
+  it("boş e-Fatura kuyruğu sessizdir", () => {
+    const s = bySentinel("einvoice-queue");
+    expect(s.evaluate({ invoices: [], total: 0 }, DEFAULT_THRESHOLDS)).toHaveLength(0);
+  });
+});

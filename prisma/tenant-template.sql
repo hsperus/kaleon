@@ -490,6 +490,55 @@ CREATE TABLE "file_uploads" (
     CONSTRAINT "file_uploads_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "items" (
+    "id" UUID NOT NULL,
+    "code" TEXT NOT NULL,
+    "name" TEXT NOT NULL,
+    "normalized" TEXT NOT NULL,
+    "type" TEXT NOT NULL,
+    "base_uom" TEXT NOT NULL,
+    "valuation_method" TEXT NOT NULL DEFAULT 'hareketli_ortalama',
+    "standard_cost" DECIMAL(18,4),
+    "moving_avg_cost" DECIMAL(18,4),
+    "cost_currency" TEXT NOT NULL DEFAULT 'TRY',
+    "batch_managed" BOOLEAN NOT NULL DEFAULT false,
+    "serial_managed" BOOLEAN NOT NULL DEFAULT false,
+    "shelf_life_days" INTEGER,
+    "procurement_type" TEXT NOT NULL DEFAULT 'satin_alma',
+    "lead_time_days" INTEGER,
+    "reorder_point" DECIMAL(18,4),
+    "safety_stock" DECIMAL(18,4),
+    "is_active" BOOLEAN NOT NULL DEFAULT true,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "updated_at" TIMESTAMP(3) NOT NULL,
+
+    CONSTRAINT "items_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "item_units" (
+    "id" UUID NOT NULL,
+    "item_id" UUID NOT NULL,
+    "uom" TEXT NOT NULL,
+    "factor" DECIMAL(18,6) NOT NULL,
+
+    CONSTRAINT "item_units_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "bom_lines" (
+    "id" UUID NOT NULL,
+    "bom_revision_id" UUID NOT NULL,
+    "line_no" INTEGER NOT NULL,
+    "component_id" UUID NOT NULL,
+    "quantity" DECIMAL(18,4) NOT NULL,
+    "uom" TEXT NOT NULL,
+    "scrap_percent" DECIMAL(6,3) NOT NULL DEFAULT 0,
+
+    CONSTRAINT "bom_lines_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "partners_code_key" ON "partners"("code");
 
@@ -676,6 +725,27 @@ CREATE UNIQUE INDEX "conversation_messages_conversation_id_seq_key" ON "conversa
 -- CreateIndex
 CREATE INDEX "file_uploads_expires_at_idx" ON "file_uploads"("expires_at");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "items_code_key" ON "items"("code");
+
+-- CreateIndex
+CREATE INDEX "items_normalized_idx" ON "items"("normalized");
+
+-- CreateIndex
+CREATE INDEX "items_type_is_active_idx" ON "items"("type", "is_active");
+
+-- CreateIndex
+CREATE INDEX "item_units_item_id_idx" ON "item_units"("item_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "item_units_item_id_uom_key" ON "item_units"("item_id", "uom");
+
+-- CreateIndex
+CREATE INDEX "bom_lines_component_id_idx" ON "bom_lines"("component_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "bom_lines_bom_revision_id_line_no_key" ON "bom_lines"("bom_revision_id", "line_no");
+
 -- AddForeignKey
 ALTER TABLE "partner_aliases" ADD CONSTRAINT "partner_aliases_partner_id_fkey" FOREIGN KEY ("partner_id") REFERENCES "partners"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -726,4 +796,13 @@ ALTER TABLE "machine_status_snapshots" ADD CONSTRAINT "machine_status_snapshots_
 
 -- AddForeignKey
 ALTER TABLE "conversation_messages" ADD CONSTRAINT "conversation_messages_conversation_id_fkey" FOREIGN KEY ("conversation_id") REFERENCES "conversations"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "item_units" ADD CONSTRAINT "item_units_item_id_fkey" FOREIGN KEY ("item_id") REFERENCES "items"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "bom_lines" ADD CONSTRAINT "bom_lines_bom_revision_id_fkey" FOREIGN KEY ("bom_revision_id") REFERENCES "bom_revisions"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "bom_lines" ADD CONSTRAINT "bom_lines_component_id_fkey" FOREIGN KEY ("component_id") REFERENCES "items"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 

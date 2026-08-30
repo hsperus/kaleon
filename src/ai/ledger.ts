@@ -62,14 +62,47 @@ export class InMemoryLedger implements UsageLedger {
   }
 }
 
+/**
+ * Bütçe politikası — İKİ KADEMELİ.
+ *
+ * TEK KADEMELİ BİR TAVAN YA ÇOK ERKEN KAPATIR YA HİÇ KAPATMAZ. Önceki
+ * hâlinde tavan yalnızca "lookup olmayan" işler için geçerliydi ve
+ * sohbetin tamamı lookup olarak gittiği için TAVAN HİÇ DEVREYE GİRMİYORDU:
+ * koruma vardı ama çalışmıyordu, üstelik kod okununca çalışıyor gibi
+ * duruyordu.
+ *
+ *   softCapUsd — pahalı işler (strateji, taslak) durur, okuma sürer
+ *   capUsd     — HER ŞEY durur; para gerçekten bitmiştir
+ */
 export interface BudgetPolicy {
   /** Uyarı eşiği (USD / kullanıcı / ay). */
   readonly warnUsd: number;
   /** Sert kapatma eşiği. */
+  /** Pahalı işlerin durduğu eşik. Okuma bu eşikten sonra da sürer. */
+  readonly softCapUsd: number;
+  /** Mutlak tavan: aşıldığında hiçbir model çağrısı yapılmaz. */
   readonly capUsd: number;
 }
 
-export const DEFAULT_BUDGET: BudgetPolicy = { warnUsd: 1.5, capUsd: 2.0 };
+/** Ortamdan okunan sayı; geçersizse varsayılan kullanılır. */
+function envUsd(key: string, fallback: number): number {
+  const raw = process.env[key];
+  if (!raw) return fallback;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : fallback;
+}
+
+/**
+ * Varsayılan bütçe — kullanıcı başına, aylık.
+ *
+ * Ortam değişkenleriyle ayarlanabilir: kredisi sınırlı bir kurulumda
+ * tavanı düşürmek, kodu değiştirmeyi gerektirmemelidir.
+ */
+export const DEFAULT_BUDGET: BudgetPolicy = {
+  warnUsd: envUsd("KAELON_AI_WARN_USD", 1.5),
+  softCapUsd: envUsd("KAELON_AI_SOFT_CAP_USD", 2.0),
+  capUsd: envUsd("KAELON_AI_CAP_USD", 5.0),
+};
 
 export class BudgetExceededError extends Error {
   readonly code = "budget_exceeded";
@@ -79,5 +112,61 @@ export class BudgetExceededError extends Error {
         `Operasyonel sorgular çalışmaya devam eder; premium analiz kapatıldı.`,
     );
     this.name = "BudgetExceededError";
+  }
+}
+
+/**
+ * Kalıcı defter — kontrol düzlemindeki `ai_usage` tablosuna yazar.
+ *
+ * BELLEKTE TUTULAN BİR DEFTER BÜTÇEYİ KORUMAZ. Sunucu her yeniden
+ * başladığında harcama sıfırlanır; geliştirme sırasında bu dakikada bir
+ * olur ve tavan hiçbir zaman dolmaz. Tablo zaten vardı ama kimse
+ * yazmıyordu — koruma görünüyor, çalışmıyordu.
+ */
+/**
+ * Defterin ihtiyaç duyduğu asgari veritabanı yüzeyi.
+ *
+ * Prisma istemcisinin tamamını istemek yerine yalnızca kullanılan iki
+ * metodu istemek, bu sınıfı test edilebilir ve şema değişikliklerine
+ * dayanıklı kılar.
+ */
+export interface UsageDb {
+  aiUsage: {
+    create(args: { data: Record<string, unknown> }): Promise<unknown>;
+    aggregate(args: never): Promise<{ _sum: { costUsd: unknown } }>;
+  };
+}
+
+export class PostgresLedger implements UsageLedger {
+  readonly #db: UsageDb;
+
+  constructor(db: UsageDb) {
+    this.#db = db;
+  }
+
+  async record(entry: LedgerEntry): Promise<void> {
+    await this.#db.aiUsage.create({
+      data: {
+        tenantId: entry.tenantId,
+        userId: entry.userId,
+        correlationId: entry.correlationId,
+        model: entry.model,
+        inputTokens: entry.inputTokens,
+        outputTokens: entry.outputTokens,
+        cacheReadTokens: entry.cacheReadTokens,
+        cacheWriteTokens: entry.cacheWriteTokens,
+        costUsd: entry.costUsd,
+      },
+    });
+  }
+
+  async monthToDate(tenantId: string, userId: string): Promise<number> {
+    const now = new Date();
+    const from = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const agg = await this.#db.aiUsage.aggregate({
+      where: { tenantId, userId, createdAt: { gte: from } },
+      _sum: { costUsd: true },
+    } as never);
+    return Number(agg._sum.costUsd ?? 0);
   }
 }

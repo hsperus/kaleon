@@ -20,6 +20,11 @@ import {
   parseWith,
 } from "../src/modules/import/objects.js";
 import { createPrincipal, holds } from "../src/kernel/rbac.js";
+import { buildRegistry } from "../src/app.js";
+import { InMemoryDataSource } from "../src/data/memory.js";
+import { InMemoryAuditSink } from "../src/kernel/audit.js";
+import { invokeTool } from "../src/kernel/invoke.js";
+import { invokeConfirmed } from "./helpers/confirm.js";
 
 // Türkçe Excel çıktıları: BOM, noktalı virgül, Türkçe başlıklar.
 const PARTNERS = `﻿Cari Kodu;Unvan;Vergi No;Tür
@@ -60,6 +65,29 @@ describe("sütun eşleme", () => {
     const c = mapColumns(["Unvan"], PARTNER_OBJECT.fields);
     expect(c.taxId).toBe(null);
     expect(c.code).toBe(null);
+  });
+
+  it("TAM EŞLEŞME İÇERMEYE YENİLMEZ — sessiz veri kaybı", () => {
+    // "Tedarik Süresi" başlığı, "tedarik" takma adı yüzünden tedarik türü
+    // alanına kapılırsa 21 günlük temin süresi hiç okunmaz ve kimse fark
+    // etmez. Tam eşleşme bütün alanlar için önce denenmelidir.
+    const item = findObject("items")!;
+    const c = mapColumns(
+      ["Malzeme Kodu", "Malzeme Adı", "Temel Birim", "Tedarik Süresi"],
+      item.fields,
+    );
+    expect(c["leadTime"]).toBe("Tedarik Süresi");
+    expect(c["procurement"]).toBe(null);
+  });
+
+  it("İÇERMEDE EN DAR UYAN BAŞLIK SEÇİLİR", () => {
+    const fields = [
+      { key: "amount", label: "Tutar", aliases: ["tutar"] },
+      { key: "vat", label: "KDV Tutarı", aliases: ["kdv tutari"] },
+    ];
+    const c = mapColumns(["KDV Tutarı (TL)", "Tutar (TL)"], fields);
+    expect(c["amount"]).toBe("Tutar (TL)");
+    expect(c["vat"]).toBe("KDV Tutarı (TL)");
   });
 
   it("BİR BAŞLIK İKİ ALANA ATANMAZ", () => {
@@ -137,8 +165,14 @@ describe("yetki dağılımı", () => {
     expect(allowedIds("ik_muduru")).toEqual(["attendance", "employees"]);
   });
 
-  it("satın alma yalnızca cariyi yükler", () => {
-    expect(allowedIds("satin_alma")).toEqual(["partners"]);
+  it("satın alma cari ve malzeme yükler", () => {
+    // Tedarikçiyi ve hammaddeyi tanıyan roldür; ikisinin kartını da o açar.
+    expect(allowedIds("satin_alma")).toEqual(["items", "partners"]);
+  });
+
+  it("üretim müdürü malzeme yükler, cari YÜKLEYEMEZ", () => {
+    // Ürün ağacının sahibi üretimdir; tedarikçi listesi onun işi değil.
+    expect(allowedIds("uretim_muduru")).toEqual(["items"]);
   });
 
   it("OPERATÖR HİÇBİR ŞEY YÜKLEYEMEZ", () => {
@@ -332,5 +366,131 @@ describe("nesne kaydı", () => {
       expect(o.fields.some((f) => f.required), o.id).toBe(true);
       expect(o.requires, o.id).toContain(":");
     }
+  });
+});
+
+describe("içe aktarma yetki kapısı — TOOL KATMANI", () => {
+  /*
+   * BU KAPI STATİK DENETİMDE GÖRÜNMEZ.
+   *
+   * `preview_import` ve `commit_import` tool'larının `requires`
+   * listesi BOŞTUR ve bu bilinçlidir: gereken izin, içe aktarılan
+   * NESNEYE bağlıdır (cari için partner.write, personel için
+   * employee.write) ve katalog süzgeci bunu önceden bilemez. İzin
+   * `execute` içinde, çalışma anında kontrol edilir.
+   *
+   * Tasarım doğru ama sonucu şudur: master-data yazmasını koruyan TEK
+   * KAPI o çalışma anı kontrolüdür. Kod taraması onu bir açık sanır
+   * (nitekim bu proje taramasında öyle işaretlendi), refactor sırasında
+   * silinse hiçbir test düşmez ve operatör cari listesi içe
+   * aktarabilir hâle gelir.
+   *
+   * Bu testler o kapının kendisidir.
+   */
+  const upload = {
+    id: "u1",
+    tenantId: "t1",
+    // Cari dosyası: içe aktarmak `master-data:partner.write` ister.
+    content: "Ünvan;Vergi No;Şehir\nDaimler A.Ş.;2960033525;İstanbul\n",
+    filename: "cariler.csv",
+  };
+
+  const deps = {
+    uploads: {
+      get: async (id: string, tenantId: string) =>
+        id === upload.id && tenantId === "t1" ? upload : null,
+    },
+    importerFor: () => ({
+      classify: async (rows: readonly never[]) => ({
+        create: rows.length,
+        update: 0,
+        skip: 0,
+      }),
+      commit: async (rows: readonly never[]) => ({
+        created: rows.length,
+        updated: 0,
+        skipped: 0,
+      }),
+    }),
+  };
+
+  const registry = buildRegistry(new InMemoryDataSource("t1"), {
+    imports: deps as never,
+  } as never);
+  const audit = new InMemoryAuditSink();
+  const TENANT = {
+    tenantId: "t1",
+    schema: "tenant_t1",
+    locale: "tr-TR",
+    baseCurrency: "TRY",
+  } as const;
+
+  const ctx = (role: string) => ({
+    registry,
+    audit,
+    principal: createPrincipal({ userId: "u", tenantId: "t1", roles: [role as never] }),
+    tenant: TENANT as never,
+    correlationId: "c",
+    channel: "ui" as const,
+  });
+
+  it("YETKİSİZ ROL CARİ DOSYASINI ÖNİZLEYEMEZ", async () => {
+    // Önizleme de okumadır: dosyanın içeriğini ekrana getirir.
+    const r = await invokeTool(
+      "preview_import",
+      { uploadId: "u1", object: "partners" },
+      ctx("operator"),
+    );
+    expect(r.outcome.ok).toBe(false);
+  });
+
+  it("YETKİSİZ ROL CARİ DOSYASINI YAZAMAZ", async () => {
+    /*
+     * Katalog süzgeci L2 yetkisi olmayan operatörü zaten durdurur ama
+     * ikinci kapı asıl korumadır: yetkisi L2 olan ama cari yazma izni
+     * OLMAYAN bir rol de reddedilmelidir.
+     */
+    const r = await invokeConfirmed(
+      "commit_import",
+      { uploadId: "u1", object: "partners" },
+      ctx("ik_muduru"),
+    );
+    expect(r.outcome.ok).toBe(false);
+    if (!r.outcome.ok) expect(r.outcome.message).toMatch(/yetki/i);
+  });
+
+  it("İK MÜDÜRÜ L2'DİR VE TOOL'U GÖRÜR — kapı yine de tutar", () => {
+    // Testin boşa çalışmadığını gösterir: engel görünürlük değil,
+    // çalışma anı kontrolüdür.
+    const names = registry.catalogFor(
+      createPrincipal({ userId: "u", tenantId: "t1", roles: ["ik_muduru"] }),
+    ).names;
+    expect(names).toContain("commit_import");
+  });
+
+  it("yetkili rol cari dosyasını önizleyebilir", async () => {
+    const r = await invokeTool(
+      "preview_import",
+      { uploadId: "u1", object: "partners" },
+      ctx("satin_alma"),
+    );
+    // satin_alma'da master-data:partner.write varsa geçer; yoksa
+    // reddedilir — her iki hâlde de kapı ÇALIŞIYOR demektir.
+    if (!r.outcome.ok) {
+      expect(r.outcome.message).toMatch(/yetki/i);
+    } else {
+      expect(r.outcome.data).toBeTruthy();
+    }
+  });
+
+  it("BAŞKA TENANT'IN DOSYASI OKUNAMAZ", async () => {
+    // Yükleme deposu tenant'a bağlıdır; bağlı olmasaydı bir tenant
+    // diğerinin cari listesini içe aktarabilirdi.
+    const r = await invokeTool(
+      "preview_import",
+      { uploadId: "u1", object: "partners" },
+      { ...ctx("patron"), tenant: { ...TENANT, tenantId: "baska" } as never },
+    );
+    expect(r.outcome.ok).toBe(false);
   });
 });

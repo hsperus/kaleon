@@ -22,7 +22,10 @@
     "user": "node --env-file-if-exists=.env --import tsx src/scripts/user.ts",
     "tenant": "node --env-file-if-exists=.env --import tsx src/scripts/tenant.ts",
     "verify:full": "npm run typecheck && npm test && npm run build",
-    "audit": "node --env-file-if-exists=.env --import tsx src/scripts/audit.ts"
+    "audit": "node --env-file-if-exists=.env --import tsx src/scripts/audit.ts",
+    "usage": "node --env-file-if-exists=.env --import tsx src/scripts/usage.ts",
+    "demo:data": "node --env-file-if-exists=.env --import tsx src/scripts/demo-data.ts",
+    "smoke": "node --env-file-if-exists=.env --import tsx src/scripts/smoke.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",

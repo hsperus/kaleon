@@ -214,3 +214,140 @@ describe("Tool şeması", () => {
     expect(() => r.register(t as unknown as Tool<never, unknown>)).toThrow(/çakışması/);
   });
 });
+
+describe("tool şeması sağlayıcı kısıtlarına uyar", () => {
+  /**
+   * GERÇEK MODELLE ORTAYA ÇIKAN HATA. zod, `.int().positive()` için
+   * `exclusiveMinimum`, `.max(12)` için `maximum` üretiyor; sağlayıcı
+   * `strict: true` tool şemasında bunları reddediyor ve İSTEK TÜMDEN
+   * BAŞARISIZ OLUYOR — yani tek bir tool'daki bir aralık kısıtı, o
+   * istekteki bütün tool'ları kullanılamaz hâle getiriyor.
+   *
+   * Birim testleri bunu yakalayamamıştı çünkü şema yalnızca üretiliyor,
+   * sağlayıcıya gönderilmiyordu.
+   */
+  const BANNED = ["minimum", "maximum", "exclusiveMinimum", "exclusiveMaximum", "multipleOf"];
+
+  function scanNumericKeys(node: unknown, path: string, hits: string[]): void {
+    if (Array.isArray(node)) {
+      node.forEach((n, i) => scanNumericKeys(n, `${path}[${i}]`, hits));
+      return;
+    }
+    if (node === null || typeof node !== "object") return;
+    const o = node as Record<string, unknown>;
+    const numeric = o["type"] === "integer" || o["type"] === "number";
+    for (const [k, v] of Object.entries(o)) {
+      if (numeric && BANNED.includes(k)) hits.push(`${path}.${k}`);
+      scanNumericKeys(v, `${path}.${k}`, hits);
+    }
+  }
+
+  it("SAYISAL ARALIK ANAHTARLARI ŞEMADA KALMAZ", () => {
+    const numeric = defineTool({
+      name: "range_probe",
+      module: "operations",
+      authority: 0,
+      description: { tr: "test", en: "test" },
+      input: z.strictObject({
+        count: z.number().int().positive().max(12),
+        ratio: z.number().min(0.5),
+      }),
+      requires: [],
+      async execute() {
+        return {
+          ok: true as const,
+          data: {},
+          sources: [{ system: "t", kind: "module" as const, syncedAt: "2026-01-01" }],
+        };
+      },
+    });
+
+    const hits: string[] = [];
+    scanNumericKeys(numeric.schema.input_schema, "range_probe", hits);
+    expect(hits).toEqual([]);
+  });
+
+  it("KISIT KAYBOLMAZ — açıklamaya taşınır", () => {
+    // Anahtarı atmak kısıtı silmek değildir: model sınırı yine bilmeli.
+    const numeric = defineTool({
+      name: "range_probe_two",
+      module: "operations",
+      authority: 0,
+      description: { tr: "test", en: "test" },
+      input: z.strictObject({ count: z.number().int().positive().max(12) }),
+      requires: [],
+      async execute() {
+        return {
+          ok: true as const,
+          data: {},
+          sources: [{ system: "t", kind: "module" as const, syncedAt: "2026-01-01" }],
+        };
+      },
+    });
+
+    const props = (numeric.schema.input_schema as { properties: Record<string, { description?: string }> })
+      .properties;
+    expect(props["count"]!.description).toContain("en fazla 12");
+  });
+
+  /**
+   * AYNI HATANIN İKİNCİ HÂLİ. Sayısal aralıklar düzeltildikten sonra,
+   * demo tenant'ı 24 tool yerine 118 tool görmeye başlayınca ortaya
+   * çıktı: sağlayıcı, dizi şemasında 0 ve 1 dışında `minItems`
+   * kabul etmiyor ve reddettiğinde yine İSTEĞİN TAMAMI düşüyor.
+   */
+  it("DİZİ UZUNLUK KISITI ŞEMADA KALMAZ", () => {
+    const arr = defineTool({
+      name: "items_probe",
+      module: "operations",
+      authority: 0,
+      description: { tr: "test", en: "test" },
+      input: z.strictObject({
+        ids: z.array(z.string()).min(2).max(5).describe("Kimlikler."),
+      }),
+      requires: [],
+      async execute() {
+        return {
+          ok: true as const,
+          data: {},
+          sources: [{ system: "t", kind: "module" as const, syncedAt: "2026-01-01" }],
+        };
+      },
+    });
+
+    const props = (
+      arr.schema.input_schema as {
+        properties: Record<string, Record<string, unknown>>;
+      }
+    ).properties;
+    expect(props["ids"]!["minItems"]).toBeUndefined();
+    expect(props["ids"]!["maxItems"]).toBeUndefined();
+    // Kısıt kaybolmaz: model sınırı açıklamadan okur.
+    expect(props["ids"]!["description"]).toContain("en az 2");
+    expect(props["ids"]!["description"]).toContain("en fazla 5");
+  });
+
+  it("minItems 1 OLDUĞU GİBİ KALIR — sağlayıcı bunu kabul ediyor", () => {
+    // Desteklenen kısıtı atmak, modelden boş dizi gelmesine kapı açardı.
+    const arr = defineTool({
+      name: "items_probe_two",
+      module: "operations",
+      authority: 0,
+      description: { tr: "test", en: "test" },
+      input: z.strictObject({ ids: z.array(z.string()).min(1) }),
+      requires: [],
+      async execute() {
+        return {
+          ok: true as const,
+          data: {},
+          sources: [{ system: "t", kind: "module" as const, syncedAt: "2026-01-01" }],
+        };
+      },
+    });
+
+    const props = (
+      arr.schema.input_schema as { properties: Record<string, Record<string, unknown>> }
+    ).properties;
+    expect(props["ids"]!["minItems"]).toBe(1);
+  });
+});

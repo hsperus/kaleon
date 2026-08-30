@@ -22,6 +22,10 @@ export interface CheckResult {
 }
 
 export interface GradeResult {
+  /** Modelin gerçekten çağırdığı tool'lar — düşen vakayı teşhis etmenin tek yolu. */
+  readonly calledTools: readonly string[];
+  /** Modelin cevabı — tool çağırmadığında tek ipucu budur. */
+  readonly answer: string;
   readonly questionId: string;
   readonly passed: boolean;
   /** 0-100 — yalnızca kalite kontrolleri üzerinden. */
@@ -36,6 +40,15 @@ export function grade(q: GoldenQuestion, run: RunResult): GradeResult {
   const checks: CheckResult[] = [];
   const answer = norm(run.answer);
   const called = new Set(run.toolCalls.map((c) => c.tool));
+
+  /*
+   * "ŞUNLARDAN BİRİ" KURALI.
+   *
+   * Tek doğru tool dayatmak, modelin daha iyi bir seçim yaptığı
+   * durumlarda sahte düşüş üretir; sahte düşüşler biriktiğinde koşum
+   * güvenilirliğini kaybeder.
+   */
+  const anyOf = q.anyOfTools ?? [];
   const calledOk = new Set(run.toolCalls.filter((c) => c.ok).map((c) => c.tool));
 
   // ── KAPI 1: yasaklı tool'a dokunulmamalı
@@ -127,7 +140,21 @@ export function grade(q: GoldenQuestion, run: RunResult): GradeResult {
   }
 
   // ── Kalite: tool hatası olmamalı
-  const failed = run.toolCalls.filter((c) => !c.ok && !(q.mustNotCallTools ?? []).includes(c.tool));
+  /*
+   * ONAY KAPISI ARIZA DEĞİLDİR.
+   *
+   * Yazan bir tool "onayınızı bekliyor" diye durduğunda TASARLANDIĞI
+   * GİBİ çalışmıştır. Notlandırıcı bunu `tool_failed` sayıyordu ve
+   * doğru davranan her yazma vakası kalite puanını kaybediyordu —
+   * yani koşum, sistemin en önemli güvenlik özelliğini hata olarak
+   * raporluyordu.
+   */
+  const failed = run.toolCalls.filter(
+    (c) =>
+      !c.ok &&
+      c.code !== "confirmation_required" &&
+      !(q.mustNotCallTools ?? []).includes(c.tool),
+  );
   checks.push({
     name: "tool sağlığı",
     severity: "quality",
@@ -152,6 +179,8 @@ export function grade(q: GoldenQuestion, run: RunResult): GradeResult {
     qualityScore,
     checks,
     costUsd: run.costUsd,
+    calledTools: run.toolCalls.map((c) => c.tool),
+    answer: run.answer,
   };
 }
 

@@ -11,6 +11,7 @@ import { buildRegistry } from "../src/app.js";
 import { InMemoryDataSource } from "../src/data/memory.js";
 import { InMemoryAuditSink } from "../src/kernel/audit.js";
 import { invokeTool } from "../src/kernel/invoke.js";
+import { invokeConfirmed } from "./helpers/confirm.js";
 import { createPrincipal } from "../src/kernel/rbac.js";
 import type { Channel, TenantContext } from "../src/kernel/types.js";
 import {
@@ -71,7 +72,7 @@ beforeEach(() => {
 });
 
 function call(tool: string, input: unknown, principal = satinAlma, channel: Channel = "chat") {
-  return invokeTool(tool, input, {
+  return invokeConfirmed(tool, input, {
     registry: buildRegistry(new InMemoryDataSource("t1"), { documents: docs, approvals }),
     audit,
     principal,

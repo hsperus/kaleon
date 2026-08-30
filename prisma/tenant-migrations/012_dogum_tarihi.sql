@@ -1,0 +1,11 @@
+-- 012 — Personel doğum tarihi.
+--
+-- İş Kanunu md. 53/son: 18 yaşından küçük ve 50 yaşından büyük çalışana,
+-- KIDEMİNDEN BAĞIMSIZ olarak en az 20 gün yıllık izin verilir. Doğum
+-- tarihi olmadan bu kademe uygulanamaz ve 52 yaşındaki bir çalışana 14
+-- gün gösterilir — kanunen 20 gün olan hakkın eksik gösterilmesi.
+--
+-- ALAN NULL OLABİLİR ÇÜNKÜ VERİ GERÇEKTEN EKSİK OLABİLİR. Zorunlu
+-- yapılsaydı mevcut personel kayıtları göç edemez, uydurma bir tarihle
+-- doldurulur ve o tarih sonsuza kadar yanlış kalırdı.
+ALTER TABLE "employees" ADD COLUMN "birth_date" DATE;

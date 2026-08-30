@@ -13,6 +13,7 @@
  */
 
 import { z } from "zod";
+import { BusinessRuleError } from "../../kernel/errors.js";
 import { defineTool } from "../../kernel/tool.js";
 import type { SourceRef, ToolOk } from "../../kernel/types.js";
 import type { OperationsRepository } from "./repository.js";
@@ -221,7 +222,15 @@ export function productionTools(repo: OperationsRepository) {
     requires: ["operations:workorder.write"],
     async execute(input, ctx) {
       const existing = await repo.getWorkOrder(ctx.tenant.tenantId, input.workOrderId);
-      if (!existing) throw new Error(`İş emri bulunamadı: ${input.workOrderId}`);
+      // KULLANICIYA GÖRÜNÜR HATA. Düz `Error` ekranda "Tool
+      // çalıştırılamadı" olarak çıkar ve kişi yanlış numara mı yazdığını
+      // yoksa sistemin mi bozuk olduğunu anlayamaz.
+      if (!existing) {
+        throw new BusinessRuleError(
+          `İş emri bulunamadı: ${input.workOrderId}`,
+          "work_order_missing",
+        );
+      }
       const activeBomRevision = await repo.activeBomRevision(ctx.tenant.tenantId, existing.itemId);
 
       const wo = await repo.mutateWorkOrder(ctx.tenant.tenantId, input.workOrderId, (current) =>
@@ -514,7 +523,12 @@ export function productionTools(repo: OperationsRepository) {
     async execute(input, ctx): Promise<ToolOk<unknown>> {
       const all = await repo.movements(ctx.tenant.tenantId, {});
       const original = all.find((m) => m.id === input.originalMovementId);
-      if (!original) throw new Error(`Hareket bulunamadı: ${input.originalMovementId}`);
+      if (!original) {
+        throw new BusinessRuleError(
+          `Hareket bulunamadı: ${input.originalMovementId}`,
+          "movement_missing",
+        );
+      }
 
       const movement = await repo.postMovement(
         ctx.tenant.tenantId,

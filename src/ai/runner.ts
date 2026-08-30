@@ -40,6 +40,7 @@ import type { ToolRegistry } from "../kernel/registry.js";
 import type { AuditSink } from "../kernel/audit.js";
 import type { Channel, Principal, TenantContext } from "../kernel/types.js";
 import { invokeTool } from "../kernel/invoke.js";
+import { isConfirmationRequired, type PendingStore } from "../kernel/pending.js";
 import { AuditWriteError } from "../kernel/errors.js";
 
 /** Tek tool çağrısı için üst sınır. */
@@ -78,6 +79,14 @@ export interface RunRequest {
    * Model bilgiye yine ihtiyaç duyarsa tool'u TEKRAR çağırır ve güncelini alır.
    */
   readonly history?: readonly ConversationTurn[];
+  /**
+   * Onay bekleyen işlem deposu.
+   *
+   * Yazma tool'ları bunsuz çalışmaz — insan onayı yapılandırmaya bağlı
+   * bir seçenek değil, sistemin çalışma şartıdır.
+   */
+  readonly pending?: PendingStore;
+  readonly conversationId?: string | null;
 }
 
 export interface ConversationTurn {
@@ -116,6 +125,21 @@ export type RunEvent =
       readonly risks?: readonly { severity: string; message: string }[];
     }
   | { readonly type: "text"; readonly text: string }
+  /**
+   * Bir yazma işlemi hazırlandı ve ONAY BEKLİYOR — henüz çalışmadı.
+   *
+   * Arayüz bunu alınca formu açar. `tool_end` olarak yayınlansaydı
+   * arayüz onu başarısız bir çağrı sanar ve kullanıcıya hata gösterirdi;
+   * oysa bu akışın normal bir adımıdır.
+   */
+  | {
+      readonly type: "pending";
+      readonly tool: string;
+      readonly pendingId: string;
+      readonly input: unknown;
+      readonly authority: number;
+      readonly expiresAt: string;
+    }
   | { readonly type: "done"; readonly result: RunResult };
 
 export interface RunResult {
@@ -176,6 +200,13 @@ export async function runConversation(
   const toolCalls: ToolCallRecord[] = [];
   let costUsd = 0;
   let budgetWarning: string | undefined;
+  /**
+   * Bir işlem onay bekliyor mu.
+   *
+   * Bir kez true olunca turun geri kalanında tool listesi BOŞ gönderilir:
+   * kullanıcı karar verene kadar sistem yeni bir şey hazırlamaz.
+   */
+  let awaitingConfirmation = false;
   let iterations = 0;
 
   while (iterations < MAX_TOOL_ITERATIONS) {
@@ -205,9 +236,25 @@ export async function runConversation(
       });
     }
 
+    // ONAY BEKLENİYORSA MODEL ARTIK TOOL ÇAĞIRAMAZ.
+    //
+    // Çağırabilseydi — ki betikli tamamlayıcıda ve gerçek modelde de olur —
+    // aynı işlem için ikinci, üçüncü form açılırdı: kullanıcının önüne
+    // birbirinin aynı beş fatura onayı çıkar ve hangisinin gerçek olduğu
+    // anlaşılmazdı. Konuşma kullanıcıya kilitlenmiştir; modelin yapacağı
+    // tek şey ne hazırladığını anlatmaktır.
     const { message, costUsd: turnCost, budgetWarning: warn } = await deps.gateway.complete({
       messages,
+      /*
+       * ONAY BEKLERKEN LİSTE BOŞALTILMAZ, ÇAĞRI KAPATILIR.
+       *
+       * Boşaltmak, geçmişteki deferred tool referanslarını geçersiz
+       * kılıyor ve sağlayıcı isteğin tamamını reddediyordu; kullanıcı
+       * onay formunu görüyor ama arkasından "İstek tamamlanamadı"
+       * yazısı geliyordu.
+       */
       tools: catalog.all,
+      noToolCalls: awaitingConfirmation,
       task: req.task,
       tenantId: req.tenant.tenantId,
       userId: req.principal.userId,
@@ -270,6 +317,10 @@ export async function runConversation(
             correlationId: req.correlationId,
             channel: req.channel,
             now,
+            ...(req.pending ? { pending: req.pending } : {}),
+            ...(req.conversationId !== undefined
+              ? { conversationId: req.conversationId }
+              : {}),
             aiContext: {
               model: CONVERSATION_MODEL,
               promptVersion: PROMPT_VERSION,
@@ -284,24 +335,60 @@ export async function runConversation(
           durationMs: invoked.durationMs,
           ...(invoked.outcome.ok ? {} : { code: invoked.outcome.code }),
         });
-        req.onEvent?.({
-          type: "tool_end",
-          tool: use.name,
-          ok: invoked.outcome.ok,
-          durationMs: invoked.durationMs,
-          ...(invoked.outcome.ok
-            ? {
-                data: invoked.outcome.data,
-                sources: invoked.outcome.sources,
-                ...(invoked.outcome.risks ? { risks: invoked.outcome.risks } : {}),
-              }
-            : { code: invoked.outcome.code }),
-        });
+
+        // ONAY BEKLEYEN İŞLEM HATA DEĞİLDİR. `is_error` işaretlenseydi model
+        // "işlem başarısız" diye özür dilerdi; oysa işlem hazırlandı ve
+        // kullanıcının önünde duruyor.
+        const awaiting = isConfirmationRequired(invoked.outcome);
+
+        if (awaiting) {
+          awaitingConfirmation = true;
+          const p = invoked.outcome as unknown as {
+            pendingId: string;
+            input: unknown;
+            authority: number;
+            expiresAt: string;
+          };
+          req.onEvent?.({
+            type: "pending",
+            tool: use.name,
+            pendingId: p.pendingId,
+            input: p.input,
+            authority: p.authority,
+            expiresAt: p.expiresAt,
+          });
+        } else {
+          req.onEvent?.({
+            type: "tool_end",
+            tool: use.name,
+            ok: invoked.outcome.ok,
+            durationMs: invoked.durationMs,
+            ...(invoked.outcome.ok
+              ? {
+                  data: invoked.outcome.data,
+                  sources: invoked.outcome.sources,
+                  ...(invoked.outcome.risks ? { risks: invoked.outcome.risks } : {}),
+                }
+              : { code: invoked.outcome.code }),
+          });
+        }
+
         const block: Anthropic.Beta.BetaToolResultBlockParam = {
           type: "tool_result",
           tool_use_id: use.id,
-          content: JSON.stringify(invoked.outcome),
-          ...(invoked.outcome.ok ? {} : { is_error: true }),
+          content: awaiting
+            ? JSON.stringify({
+                status: "onay_bekliyor",
+                message:
+                  "İşlem hazırlandı ve kullanıcının önüne ONAY FORMU olarak kondu. " +
+                  "HENÜZ ÇALIŞMADI. Kullanıcıya ne hazırladığını rakamlarla bir " +
+                  "cümlede özetle ve onayını beklediğini söyle. Aynı işlemi TEKRAR " +
+                  "ÇAĞIRMA — ikinci bir form açılır.",
+                tool: use.name,
+                input: (invoked.outcome as unknown as { input: unknown }).input,
+              })
+            : JSON.stringify(invoked.outcome),
+          ...(invoked.outcome.ok || awaiting ? {} : { is_error: true }),
         };
         return block;
       }),

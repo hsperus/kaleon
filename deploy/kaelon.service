@@ -1,0 +1,59 @@
+# KAELON uygulama servisi.
+#
+# ÇÖKERSE YENİDEN BAŞLAR AMA SONSUZ DÖNMEZ: `StartLimitBurst` ile
+# ardışık çökmeler durdurulur. Sonsuz yeniden başlatma, bozuk bir
+# yapılandırmayı saatlerce gizler ve log'u boğar.
+
+[Unit]
+Description=KAELON — AI-Native Operasyonel İşletim Sistemi
+#
+# VERİTABANI BİRİMİ ZORUNLU TUTULMAZ. Postgres yerel bir servis de
+# olabilir, bir Docker kapsayıcısı da; `Requires=postgresql.service`
+# yazmak, kapsayıcıda çalışan bir kurulumda servisi HİÇ BAŞLATMAZ
+# ("Unit postgresql.service not found") ve hata dağıtımın en sonunda,
+# her şey hazırken ortaya çıkar.
+#
+# `After=` sıralama için yeterlidir ve olmayan birimi sessizce geçer.
+# Veritabanı gerçekten kapalıysa uygulama yine açılır ve bunu SAĞLIK
+# UCUNDA söyler — çalışmayan bir servisten, "neden başlamadı" diye
+# aranan bir servis daha iyidir.
+After=network-online.target docker.service postgresql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=kaelon
+Group=kaelon
+WorkingDirectory=/opt/kaelon
+EnvironmentFile=/opt/kaelon/.env
+ExecStart=/usr/bin/node node_modules/.bin/next start -p 4310
+Restart=on-failure
+RestartSec=5
+StartLimitBurst=5
+StartLimitIntervalSec=120
+
+# Kapanırken açık isteklerin bitmesine izin ver.
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+# ─── Sıkılaştırma ───
+# Uygulamanın ihtiyacı olmayan her yetki kapatılır: bir açık, sunucunun
+# tamamına değil yalnızca uygulama dizinine erişim vermelidir.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/kaelon/.next /opt/kaelon/node_modules/.prisma
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+LockPersonality=true
+MemoryDenyWriteExecute=false
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=kaelon
+
+[Install]
+WantedBy=multi-user.target
