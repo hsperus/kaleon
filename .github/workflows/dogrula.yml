@@ -1,0 +1,84 @@
+# KAELON sürekli entegrasyon.
+#
+# NEDEN VAR: testler bugüne kadar yalnızca elde koşuyordu. "Koştum,
+# geçti" ile "her değişiklikte koşuyor, geçiyor" arasındaki fark, üç ay
+# sonra kimsenin hatırlamadığı bir regresyondur.
+#
+# İKİNCİ SEBEP KAYIT. SOC 2 ve ISO 27001 denetimi "her üretim
+# değişikliği için istek, gözden geçirme, test sonucu ve dağıtım kaydı"
+# ister. Bu dosya o kaydı otomatik üretir; elle tutulan bir tablo
+# denetimde kanıt sayılmaz.
+#
+# VERİTABANI GERÇEKTİR, SAHTE DEĞİL. Kalıcılık testleri şema kurup
+# düşürüyor; bellek içi bir taklit bu davranışı test edemez. Postgres
+# servis konteyneri olarak koşar ve testler ona bağlanır.
+
+name: Doğrula
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Aynı dala arka arkaya push gelirse eskisi iptal edilir; sıradaki
+# koşu zaten aynı sonucu verecek.
+concurrency:
+  group: dogrula-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  dogrula:
+    name: Tip kontrolü, testler ve derleme
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: kaelon
+          POSTGRES_PASSWORD: kaelon
+          POSTGRES_DB: kaelon_ci
+        ports:
+          - 5432:5432
+        # Testler başlamadan önce Postgres'in gerçekten hazır olması
+        # gerekiyor; "başladı" ile "bağlantı kabul ediyor" aynı an değil.
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    env:
+      SHARED_DATABASE_URL: postgresql://kaelon:kaelon@127.0.0.1:5432/kaelon_ci?schema=shared
+      TENANT_DATABASE_URL: postgresql://kaelon:kaelon@127.0.0.1:5432/kaelon_ci?schema=tenant_template
+      # ANAHTAR YOK — KASITLI. Testler gerçek modeli hiç çağırmamalı.
+      # Anahtar tanımlı olsaydı, sahte ağ geçidini atlayan tek bir test
+      # sessizce para harcar ve bunu kimse fark etmezdi.
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Bağımlılıklar
+        run: npm ci --no-audit --no-fund
+
+      - name: Prisma istemcileri
+        run: npm run db:generate
+
+      - name: Şema
+        run: npm run db:push
+
+      - name: Tip kontrolü
+        run: npm run typecheck
+
+      - name: Testler
+        run: npm test
+
+      - name: Üretim derlemesi
+        run: npm run build
