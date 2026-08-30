@@ -1,13 +1,9 @@
-import type { Metadata } from "next";
-import { Law } from "../../marketing/law.js";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Mevzuat · KAELON",
-  description:
-    "Tek Düzen Hesap Planı, VUK amortismanı, 2026 bordrosu, e-Fatura. " +
-    "Ayar değil, kodun içinde ve testli.",
-};
-
-export default function Page() {
-  return <Law />;
+/**
+ * Bölümler tek akışa döndü; eski adres kendi çapasına götürür.
+ * Paylaşılmış linkler kırılmasın diye burada duruyor.
+ */
+export default function Page(): never {
+  redirect("/#mevzuat");
 }

@@ -233,6 +233,21 @@ export default function Page() {
     { id: string; title: string; updatedAt: string }[] | null
   >(null);
   const [showAdmin, setShowAdmin] = useState(false);
+  /*
+   * GENİŞ EKRANDA GEÇMİŞ ÖRTÜ DEĞİL, SÜTUNDUR.
+   *
+   * Konuşma listesi bir çekmecedeyken kimse açmıyordu; açmak için önce
+   * var olduğunu bilmek gerekiyordu. Yer varken sürekli dursun.
+   * Dar ekranda yer yok — orada eski davranış, örtü olarak kalır.
+   */
+  const [wide, setWide] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(min-width: 1100px)");
+    const sync = () => setWide(mq.matches);
+    sync();
+    mq.addEventListener("change", sync);
+    return () => mq.removeEventListener("change", sync);
+  }, []);
 
   useEffect(() => {
     const c = client(role);
@@ -522,6 +537,11 @@ export default function Page() {
     }
   }, [role]);
 
+  // Sütun hâlindeyken liste boş duramaz; açılışta bir kez yüklenir.
+  useEffect(() => {
+    if (wide) void openHistory();
+  }, [wide, openHistory]);
+
   /** Bir konuşmayı geri yükler. */
   const loadConversation = useCallback(
     async (id: string) => {
@@ -613,10 +633,19 @@ export default function Page() {
   return (
     <div className="shell" style={{ position: "relative" }}>
       <header className="topbar">
+        {/* Üst çubuk tam genişlikte olduğu için marka soldaki sütunun
+            tam üstüne denk gelir; kenar çubuğuna ikinci bir başlık
+            koymaya gerek yok. Kimlik ise oraya, ayak kısmına taşındı. */}
         <div className="brand">KAELON</div>
-        <div className="who">
-          {session?.displayName ?? "…"} · <b>{session?.roleLabel ?? "…"}</b>
-        </div>
+        {!wide && (
+          <div className="who">
+            {session?.displayName ?? "…"} · <b>{session?.roleLabel ?? "…"}</b>
+          </div>
+        )}
+        <span className="audit" title="Her işlem değiştirilemez bir kayda yazılır">
+          <i />
+          DENETİM KAYDI AÇIK
+        </span>
         <div className="spacer" />
         {/* TEK SESSİZ DURUM İŞARETİ.
             Üst çubukta iki amber hap duruyordu ve ekranı bir demo sayfasına
@@ -639,6 +668,12 @@ export default function Page() {
 
         {/* Konuşma sürüyorsa yeni konuşma açılabilsin; sürmüyorsa buton
             gereksiz gürültüdür. */}
+        {/* Geniş ekranda geçmiş zaten sütun hâlinde duruyor; açıp
+            kapatacak bir şey yok. `hidden` niteliği YETMEZ: `.icon-btn`
+            kuralı `display: flex` diyor ve tarayıcının `[hidden]`
+            varsayılanını eziyor — düğme gizlenmiş sanılırken tıklanabilir
+            kalıyordu. */}
+        {!wide && (
         <button
           className="icon-btn"
           type="button"
@@ -655,6 +690,7 @@ export default function Page() {
             />
           </svg>
         </button>
+        )}
         {session?.canManageUsers && (
           <button
             className="icon-btn"
@@ -744,30 +780,54 @@ export default function Page() {
 
       {history !== null && (
         <>
-          {/* Dışına tıklayınca kapanır: her panelin bir X'i olması gerekmez. */}
-          <div className="scrim" onClick={() => setHistory(null)} aria-hidden />
+          {/* Dışına tıklayınca kapanır: her panelin bir X'i olması gerekmez.
+              Sütun hâlindeyken kapanacak bir şey yok, örtü de yok. */}
+          {!wide && <div className="scrim" onClick={() => setHistory(null)} aria-hidden />}
           <aside className="history" aria-label="Geçmiş konuşmalar">
-            <div className="history-head">Konuşmalar</div>
+            <div className="history-new">
+              <button type="button" onClick={newConversation}>
+                <span aria-hidden>+</span> Yeni sohbet
+              </button>
+            </div>
             {history.length === 0 ? (
-              <p className="history-empty">Henüz konuşma yok.</p>
+              <>
+                <div className="history-head">KONUŞMALAR</div>
+                <p className="history-empty">Henüz konuşma yok.</p>
+              </>
             ) : (
               <div className="history-list">
-                {history.map((c) => (
-                  <button
-                    key={c.id}
-                    type="button"
-                    className={`history-item${c.id === conversationId ? " on" : ""}`}
-                    onClick={() => void loadConversation(c.id)}
-                  >
-                    <span className="t">{c.title}</span>
-                    <span className="d">
-                      {new Date(c.updatedAt).toLocaleDateString("tr-TR", {
-                        day: "numeric",
-                        month: "short",
-                      })}
-                    </span>
-                  </button>
+                {/* Her satırda tarih yazmak yerine gün başlıkları.
+                    Aynı güne ait yirmi satırda yirmi kez "29 Ağu" okumak
+                    bilgi değil gürültüdür; başlık bir kez söyler. */}
+                {groupByDay(history).map((g) => (
+                  <div key={g.label}>
+                    <div className="history-head">{g.label}</div>
+                    {g.items.map((c) => (
+                      <button
+                        key={c.id}
+                        type="button"
+                        className={`history-item${c.id === conversationId ? " on" : ""}`}
+                        onClick={() => void loadConversation(c.id)}
+                      >
+                        <span className="t">{c.title}</span>
+                      </button>
+                    ))}
+                  </div>
                 ))}
+              </div>
+            )}
+            {wide && session && (
+              <div className="history-foot">
+                <span className="av" aria-hidden>
+                  {initials(session.displayName)}
+                </span>
+                <span className="id">
+                  <b>{session.displayName}</b>
+                  <span>
+                    {session.roleLabel}
+                    {session.companyName ? ` · ${session.companyName}` : ""}
+                  </span>
+                </span>
               </div>
             )}
           </aside>
@@ -1178,6 +1238,60 @@ export function asAttachedDoc(data: unknown): AttachedDoc | null {
   }
 
   return null;
+}
+
+/**
+ * Konuşmaları güne göre gruplar.
+ *
+ * Sıra korunur: liste sunucudan zaten yeniden eskiye gelir, burada
+ * yalnızca ardışık aynı-gün satırları tek başlık altında toplanır.
+ * Yeniden sıralamak, sunucunun sıralamasını sessizce ezmek olurdu.
+ */
+function groupByDay(
+  rows: readonly { id: string; title: string; updatedAt: string }[],
+): { label: string; items: typeof rows }[] {
+  const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+  const today = dayStart(new Date());
+  const DAY = 86_400_000;
+
+  const out: { label: string; items: { id: string; title: string; updatedAt: string }[] }[] = [];
+  for (const row of rows) {
+    const at = new Date(row.updatedAt);
+    const diff = today - dayStart(at);
+    const label =
+      diff <= 0
+        ? "BUGÜN"
+        : diff === DAY
+          ? "DÜN"
+          : at
+              .toLocaleDateString("tr-TR", { day: "numeric", month: "long" })
+              .toLocaleUpperCase("tr-TR");
+    const last = out[out.length - 1];
+    if (last && last.label === label) last.items.push(row);
+    else out.push({ label, items: [row] });
+  }
+  return out;
+}
+
+/**
+ * Kenar çubuğu rozeti için baş harfler.
+ *
+ * İki kelimeden fazlasına bakmaz: "Ali Rıza Kara Ahmetoğlu" için dört
+ * harf 30 piksellik daireye sığmaz. Tek kelimelik adda ilk iki harf.
+ *
+ * HARFLE BAŞLAMAYAN PARÇALAR ATILIR. Demo oturumunda ad
+ * "Cebrail Karaarslan (demo)" biçiminde geliyor ve son kelimenin ilk
+ * karakteri parantez — rozette "C(" yazıyordu. Ünvan, parantez içi not
+ * ya da numara gibi ekler baş harf değildir.
+ */
+function initials(name: string): string {
+  const words = name
+    .trim()
+    .split(/\s+/)
+    .filter((w) => /^\p{L}/u.test(w));
+  if (words.length === 0) return "?";
+  if (words.length === 1) return words[0]!.slice(0, 2).toLocaleUpperCase("tr-TR");
+  return (words[0]![0]! + words[words.length - 1]![0]!).toLocaleUpperCase("tr-TR");
 }
 
 function visibleRisks(risks: readonly TurnRisk[], answer: string | null): readonly TurnRisk[] {

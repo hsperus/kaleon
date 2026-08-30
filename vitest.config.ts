@@ -23,6 +23,21 @@ import { defineConfig } from "vitest/config";
  * SAYISINI sınırlamak. 4 dosya × (paylaşılan + tenant client) ×
  * varsayılan havuz ≈ Postgres sınırının altında kalır ve tek bir
  * testin ihtiyaç duyduğu eşzamanlı bağlantı kısıtlanmaz.
+ *
+ * ÜÇÜNCÜ BİR SEBEP SONRADAN ÇIKTI ve buraya yazılıyor çünkü aynı
+ * hata mesajını üretiyor: testler değil, AÇIK DURAN GELİŞTİRME
+ * SUNUCUSU bağlantıları tüketebiliyordu. `src/db/client.ts` istemcileri
+ * modül seviyesinde tutuyordu; Next.js her sıcak yeniden yüklemede
+ * modülü atıp yeniden değerlendirince eski havuz sahipsiz ve açık
+ * kalıyordu. Bir saatlik geliştirme oturumu Postgres'i doldurmaya
+ * yetiyordu ve test koşusu "too many clients" ile ya düşüyor ya da
+ * dakikalarca asılıyordu.
+ *
+ * Bu yüzden: "too many clients" görünce önce testlere değil, AÇIK
+ * NEXT SUNUCUSUNA bakın. Havuzlar artık `globalThis` üzerinde tutuluyor
+ * ve sızıntı kapandı — düzeltmeden sonra tüm paket 24 saniyede
+ * tamamlandı, öncesinde 591 saniye sürüp üç test zaman aşımına
+ * uğruyordu.
  */
 export default defineConfig({
   test: {

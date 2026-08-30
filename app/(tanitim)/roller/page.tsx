@@ -1,13 +1,9 @@
-import type { Metadata } from "next";
-import { Roles } from "../../marketing/roles.js";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Roller · KAELON",
-  description:
-    "Yetki bir ekran gizleme ayarı değil: rolün göremediği araç modele hiç " +
-    "gönderilmez.",
-};
-
-export default function Page() {
-  return <Roles />;
+/**
+ * Bölümler tek akışa döndü; eski adres kendi çapasına götürür.
+ * Paylaşılmış linkler kırılmasın diye burada duruyor.
+ */
+export default function Page(): never {
+  redirect("/#roller");
 }

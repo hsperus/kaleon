@@ -1,13 +1,9 @@
-import type { Metadata } from "next";
-import { Capabilities } from "../../marketing/capabilities.js";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = {
-  title: "Ne yapar · KAELON",
-  description:
-    "Bilanço, amortisman, bordro, izleme. Her soru kendi biçiminde cevaplanır: " +
-    "belge, tablo, grafik ya da onay formu.",
-};
-
-export default function Page() {
-  return <Capabilities />;
+/**
+ * Bölümler tek akışa döndü; eski adres kendi çapasına götürür.
+ * Paylaşılmış linkler kırılmasın diye burada duruyor.
+ */
+export default function Page(): never {
+  redirect("/#ne-yapar");
 }

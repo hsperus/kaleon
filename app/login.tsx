@@ -226,6 +226,9 @@ export function LoginScreen({ onSuccess }: { readonly onSuccess: () => void }) {
         <div className="login-head">
           <span className="login-brand">KAELON</span>
           <span className="login-title">Giriş yapın</span>
+          {/* Kim hesap açar sorusu başlığın hemen altında duruyor;
+              formun dibinde kimse okumuyordu. */}
+          <span className="login-note">Hesabınızı yöneticiniz tanımlar.</span>
         </div>
 
         <div className="login-fields">
@@ -288,7 +291,9 @@ export function LoginScreen({ onSuccess }: { readonly onSuccess: () => void }) {
           Parolamı unuttum
         </button>
 
-        <p className="login-note">Hesabınızı yöneticiniz tanımlar.</p>
+        <a className="login-link" href="/">
+          Tanıtıma dön
+        </a>
       </form>
     </div>
   );

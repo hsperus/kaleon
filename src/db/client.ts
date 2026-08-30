@@ -14,11 +14,33 @@ import { assertSafeSchemaName } from "./provision.js";
 export type SharedDb = SharedPrisma;
 export type TenantDb = TenantPrisma;
 
-let sharedSingleton: SharedPrisma | null = null;
+/*
+ * HAVUZLAR `globalThis` ÜZERİNDE TUTULUR.
+ *
+ * Modül seviyesindeki bir değişken "tekil" değildir: Next.js geliştirme
+ * modunda her sıcak yeniden yüklemede modülü atıp yeniden değerlendirir.
+ * Değişken sıfırlanır ama ESKİ istemcinin bağlantı havuzu açık kalır —
+ * kimse kapatmaz, çünkü ona ulaşan referans kalmamıştır.
+ *
+ * Elli altı dakikalık bir geliştirme oturumunda bu, Postgres'in
+ * `max_connections` sınırını doldurdu ve uygulama "sorry, too many
+ * clients already" ile tamamen durdu.
+ *
+ * `globalThis` yeniden değerlendirmeyi atlatır; aynı süreçte ikinci bir
+ * havuz açılmaz. Üretimde modül zaten bir kez değerlendirilir, dolayısıyla
+ * bu ek katman orada bir şey değiştirmez — zararı da yoktur.
+ */
+interface PrismaGlobals {
+  shared?: SharedPrisma;
+  tenants?: Map<string, TenantPrisma>;
+}
+const g = globalThis as typeof globalThis & { __kaelonPrisma?: PrismaGlobals };
+g.__kaelonPrisma ??= {};
+const pools = g.__kaelonPrisma;
 
 export function sharedClient(): SharedPrisma {
-  sharedSingleton ??= new SharedPrisma();
-  return sharedSingleton;
+  pools.shared ??= new SharedPrisma();
+  return pools.shared;
 }
 
 /** Bağlantı dizesinin `schema` parametresini hedef şemayla değiştirir. */
@@ -30,7 +52,8 @@ export function urlForSchema(baseUrl: string, schema: string): string {
   return url.toString();
 }
 
-const tenantPool = new Map<string, TenantPrisma>();
+pools.tenants ??= new Map<string, TenantPrisma>();
+const tenantPool = pools.tenants;
 
 /**
  * Tenant client'ı — şema başına havuzlanır.
@@ -58,8 +81,8 @@ export function tenantClient(schema: string, baseUrl = process.env["TENANT_DATAB
 export async function disconnectAll(): Promise<void> {
   await Promise.all([...tenantPool.values()].map((c) => c.$disconnect()));
   tenantPool.clear();
-  if (sharedSingleton) {
-    await sharedSingleton.$disconnect();
-    sharedSingleton = null;
+  if (pools.shared) {
+    await pools.shared.$disconnect();
+    delete pools.shared;
   }
 }

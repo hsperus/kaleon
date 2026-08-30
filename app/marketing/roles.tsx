@@ -1,84 +1,67 @@
-"use client";
-
 /**
- * Roller sayfası.
+ * Roller — aynı soru, farklı cevaplar.
  *
- * YETKİ BİR EKRAN GİZLEME AYARI DEĞİLDİR. Rolün göremediği araç
- * modele hiç gönderilmez; yapay zekânın uydurabileceği bir şey
- * kalmaz. Sayfanın tamamı bu tek cümleyi kanıtlıyor — çubuklar
- * gerçek sayılardan geliyor.
+ * ÇUBUK BİR SÜS DEĞİL, ÖLÇÜ. Genişlik rolün erişebildiği araç sayısının
+ * patrona oranı: operatör 15/139 → %11. Ürünün en sert iddiası bu
+ * bölümde ve grafik onu doğruluyor.
+ *
+ * "GÖREMEDİĞİNİZ VERİYİ YAPAY ZEKÂ DA GÖREMEZ" cümlesi mimariyi
+ * anlatıyor: yetkisiz araç modele hiç gönderilmiyor. Ekran gizleme
+ * değil, katalog filtresi — uydurabileceği bir şey kalmıyor.
  */
 
-import { PageHead, Reveal, useReveal } from "./shell.js";
-
 const ROLES = [
-  { r: "Patron", n: 139, d: "Her şey. Gelir tablosu, bilanço, nakit, bordro, üretim." },
-  { r: "CFO", n: 81, d: "Mali tarafın tamamı; üretim tezgâhının detayı değil." },
-  { r: "Üretim Müdürü", n: 74, d: "Fabrika, iş emri, kapasite, kalite. Nakit ve maaş yok." },
-  { r: "Satın Alma", n: 47, d: "Talep, teklif, sipariş, fatura eşleştirme." },
-  { r: "Depo Sorumlusu", n: 36, d: "Mal kabul, sevkiyat, sayım, stok. Fiyat ve maliyet yok." },
-  { r: "İK Müdürü", n: 27, d: "İzin, vardiya, bordro okuma. Bordroyu çalıştıramaz." },
-  { r: "Operatör", n: 15, d: "Kendi tezgâhı, kendi iş emri, kendi izni." },
+  { name: "Patron", n: 139, w: 100, d: "Her şey. Gelir tablosu, bilanço, nakit, bordro, üretim." },
+  { name: "CFO", n: 81, w: 58, d: "Mali tarafın tamamı; üretim tezgâhının detayı değil." },
+  { name: "Üretim Müdürü", n: 74, w: 53, d: "Fabrika, iş emri, kapasite, kalite. Nakit ve maaş yok." },
+  { name: "Depo Sorumlusu", n: 36, w: 26, d: "Mal kabul, sevkiyat, sayım, stok. Fiyat ve maliyet yok." },
+  { name: "Operatör", n: 15, w: 11, d: "Kendi tezgâhı, kendi iş emri, kendi izni." },
 ];
 
-function Bar({ n, max }: { n: number; max: number }) {
-  const { ref, shown } = useReveal<HTMLDivElement>();
-  return (
-    <div ref={ref} className="rl-bar">
-      <i style={{ width: shown ? `${(n / max) * 100}%` : "0%" }} />
-    </div>
-  );
-}
-
 export function Roles() {
-  const max = ROLES[0]!.n;
   return (
-    <main className="mk-page">
-      <PageHead
-        eyebrow="Roller"
-        title={
-          <>
-            Aynı soru.
-            <br />
-            <span className="mk-dim">Farklı cevaplar.</span>
-          </>
-        }
-        lede="Depo sorumlusu 'bu ay kâr ettik mi' diye soramaz. Cevabı gizlendiği için değil — o soruyu cevaplayacak araç ona hiç gönderilmediği için."
-      />
+    <>
+      <section className="mk-sec">
+        <span className="mk-anchor" id="roller" />
+        <p className="mk-eyebrow k-rise-sm">Roller</p>
+        <h2 className="mk-h2 k-rise">
+          Aynı soru.
+          <br />
+          <span className="dim">Farklı cevaplar.</span>
+        </h2>
+        <p className="mk-sub k-rise-sm">
+          Göremediğiniz veriyi yapay zekâ da göremez. Yetkisi olmayan araç
+          modele hiç gönderilmez — uydurabileceği bir şey kalmaz.
+        </p>
 
-      <div className="rl-list">
-        {ROLES.map((r, i) => (
-          <Reveal key={r.r} delay={i * 55}>
-            <article className="rl-row">
-              <div className="rl-meta">
-                <span className="rl-name">{r.r}</span>
-                <span className="rl-n">{r.n}</span>
-              </div>
-              <Bar n={r.n} max={max} />
-              <p className="rl-d">{r.d}</p>
-            </article>
-          </Reveal>
-        ))}
-      </div>
-
-      <Reveal>
-        <div className="rl-rule">
-          <h2>Yazan her işlem önünüze gelir.</h2>
-          <p>
-            Fatura kesmek, bordro çalıştırmak, amortisman ayırmak — hepsi alanları
-            doldurulmuş bir onay formuyla gelir. Siz göndermeden hiçbir kayıt
-            oluşmaz. Yapay zekâ hazırlar, sistem doğrular, insan onaylar.
-          </p>
+        <div className="mk-roles">
+          {ROLES.map((r) => (
+            <div className="mk-role" key={r.name}>
+              <span className="mk-role-name">
+                {r.name}
+                <b>{r.n}</b>
+              </span>
+              <span className="mk-role-bar" style={{ width: `${r.w}%` }} />
+              <span className="mk-role-d">{r.d}</span>
+            </div>
+          ))}
         </div>
-      </Reveal>
+      </section>
 
-      <Reveal>
-        <div className="mk-end">
-          <a className="mk-cta" href="/uygulama">
+      <section className="mk-end">
+        <h2 className="k-rise">
+          Yapay zekâ hazırlar.
+          <br />
+          Sistem doğrular.
+          <br />
+          <span className="dim">İnsan onaylar.</span>
+        </h2>
+        <div className="mk-acts k-rise-sm" style={{ marginTop: 40 }}>
+          <a className="mk-pill-lg mk-pill-blue" href="/uygulama">
             Sisteme gir
           </a>
         </div>
-      </Reveal>
-    </main>
+      </section>
+    </>
   );
 }
