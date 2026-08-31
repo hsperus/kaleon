@@ -23,6 +23,7 @@ import { PayslipBody, payslipSheets, type PayslipView } from "../payslip-doc.js"
 import type { DespatchView, InvoiceView } from "../../src/db/einvoice-repository.js";
 import { ActionForm, type PendingAction } from "../action-form.js";
 import { RichText } from "../rich-text.js";
+import type { Letterhead } from "../../src/modules/documents/letterhead.js";
 import { LoginScreen } from "../login.js";
 import { AdminPanel } from "../admin.js";
 import type { RunEvent } from "../../src/ai/runner.js";
@@ -63,8 +64,10 @@ interface Session {
   readonly identitySource: "session" | "dev-header";
   readonly dataPlane: "demo" | "postgres";
   readonly displayName: string;
-  /** Belge antedinde görünür. */
+  /** Kısa ad — üst çubukta ve dosya adında. */
   readonly companyName: string;
+  /** Şirketin hukuki kimliği — dışarı çıkan belgelerin antedi. */
+  readonly letterhead: Letterhead | null;
   readonly canManageUsers: boolean;
 }
 
@@ -1237,6 +1240,7 @@ export default function Page() {
                     <RichText
                       text={t.answer}
                       org={session?.companyName ?? "İşletme"}
+                      letterhead={session?.letterhead ?? null}
                       question={t.question}
                     />
                     {visibleRisks(t.risks, t.answer).map((r, k) => (

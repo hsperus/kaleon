@@ -137,8 +137,16 @@ export async function POST(req: Request): Promise<Response> {
   });
 
   const bicim = parsed.data.format;
+  /*
+   * ANTET SUNUCUDAN GELİR, İSTEMCİDEN DEĞİL.
+   *
+   * İstemci de gönderebilirdi ama o zaman gönderen taraf belgenin
+   * üstündeki vergi numarasını belirlerdi. Antet bir kimlik beyanıdır;
+   * kaynağı oturumun bağlı olduğu kiracı olmalı.
+   */
+  const antet = await ctx.letterhead();
   const file =
-    bicim === "doc" ? buildWord(parsed.data.title, sheets) : buildXlsx(sheets);
+    bicim === "doc" ? buildWord(parsed.data.title, sheets, antet) : buildXlsx(sheets);
   const totalRows = parsed.data.sheets.reduce((n, s) => n + s.rows.length, 0);
 
   log.info("dosya dışa aktarıldı", {

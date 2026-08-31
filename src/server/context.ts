@@ -19,6 +19,7 @@ import type { Channel, Principal, RoleId, TenantContext } from "../kernel/types.
 import { InMemoryAuditSink, type AuditEntry, type AuditSink } from "../kernel/audit.js";
 import { PostgresAuditSink } from "../db/audit-sink.js";
 import { InMemoryDataSource } from "../data/memory.js";
+import { letterheadFrom, type Letterhead } from "../modules/documents/letterhead.js";
 import { buildRegistry } from "../app.js";
 import type { ToolRegistry } from "../kernel/registry.js";
 import Anthropic from "@anthropic-ai/sdk";
@@ -419,6 +420,15 @@ export interface RequestContext {
   readonly displayName: string;
   /** Şirketin görünen adı — kimliği değil. */
   readonly companyName: string;
+  /**
+   * Belge anteti — şirketin HUKUKİ kimliği.
+   *
+   * `companyName`den ayrı duruyor çünkü ikisi farklı işler yapıyor:
+   * ad arayüzde "hangi şirkettesiniz" der, antet dışarı çıkan bir
+   * kâğıdın üstünde "bu belge kimden geldi" der. Birincisi kısaltma
+   * olabilir, ikincisi ticari unvan olmak zorundadır.
+   */
+  readonly letterhead: () => Promise<Letterhead>;
   /*
    * ŞİRKET PROFİLİ — AJANIN NEYE DİKKAT EDECEĞİ.
    *
@@ -461,6 +471,20 @@ function devRole(req: Request): RoleId {
   return VALID_ROLES.find((r) => r === raw) ?? "patron";
 }
 
+/**
+ * Kiracının antedi — şirket profilinden.
+ *
+ * Profil satırı tek kayıttır (`singleton`) ve olmayabilir: yeni
+ * kurulmuş bir kiracıda henüz doldurulmamıştır. O durumda ad dışında
+ * her şey boş döner ve belge kimliğinin eksik olduğunu KENDİSİ
+ * gösterir — sessizce yer tutucu basmaz.
+ */
+async function letterheadFor(tenant: TenantContext, fallbackName: string): Promise<Letterhead> {
+  const db = tenantClient(tenant.schema);
+  const p = await db.companyProfile.findUnique({ where: { id: "singleton" } });
+  return letterheadFrom(p, fallbackName);
+}
+
 export async function createContext(req: Request): Promise<RequestContext> {
   // Bakım işi ilk istekte başlar. `instrumentation.ts` içinden başlatmak,
   // Prisma'yı edge paketine sürükleyip uygulamayı açılmaz hâle getiriyordu.
@@ -493,6 +517,7 @@ export async function createContext(req: Request): Promise<RequestContext> {
       identitySource: "session",
       displayName: identity.displayName,
       companyName: found.name,
+      letterhead: () => letterheadFor(tenant, found.name),
       sector: found.sector,
       goals: found.goals,
       glossary: sectorProfile(found.sector).glossary ?? null,
@@ -516,6 +541,7 @@ export async function createContext(req: Request): Promise<RequestContext> {
     identitySource: "dev-header",
     displayName: "Cebrail Karaarslan (demo)",
     companyName: DEMO_COMPANY_NAME,
+    letterhead: () => letterheadFor(tenant, DEMO_COMPANY_NAME),
     sector: "Makina imalatı",
     goals: null,
     glossary: null,

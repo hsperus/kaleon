@@ -54,6 +54,9 @@ export const appRouter = router({
       dataPlane: ctx.dataPlane,
       displayName: ctx.displayName,
       companyName: ctx.companyName,
+      // Antet belgeye basılır; oturumla birlikte gelir ki belge
+      // açıldığında ayrı bir istek beklemesin.
+      letterhead: await ctx.letterhead(),
       // Arayüz yönetim düğmesini bu bayrağa göre gösterir. Yetki kontrolü
       // yine sunucuda; bayrak yalnızca gereksiz bir düğmeyi gizler.
       canManageUsers: holds(ctx.principal, "admin:user.manage"),

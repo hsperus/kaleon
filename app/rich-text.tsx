@@ -15,6 +15,7 @@
 import { Fragment, useState } from "react";
 import { parseBlocks, parseInline, type Block, type InlineToken } from "../src/ui/markdown.js";
 import { ChartPanel } from "./chart-panel.js";
+import type { Letterhead } from "../src/modules/documents/letterhead.js";
 import {
   DocumentSheet,
   FileCard,
@@ -86,12 +87,15 @@ export function RichText({
   text,
   animate = true,
   org = "İşletme",
+  letterhead = null,
   question = "",
 }: {
   text: string;
   animate?: boolean;
-  /** Antette görünen şirket adı. */
+  /** Dosya adında ve antet yokken kullanılan kısa ad. */
   org?: string;
+  /** Şirketin hukuki kimliği — belgenin antedi. */
+  letterhead?: Letterhead | null;
   /** Belgeyi doğuran soru — belgenin altında kaydı kalır. */
   question?: string;
 }) {
@@ -160,7 +164,7 @@ export function RichText({
             <TableBlock
               key={i}
               table={b}
-              meta={{ title: titleFor(blocks, i, question), org, question }}
+              meta={{ title: titleFor(blocks, i, question), org, question, letterhead }}
               onOpen={setOpen}
             />
           );

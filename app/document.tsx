@@ -19,6 +19,7 @@
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { legalFooter, type Letterhead } from "../src/modules/documents/letterhead.js";
 import { parseInline } from "../src/ui/markdown.js";
 
 export interface DocTable {
@@ -30,10 +31,18 @@ export interface DocTable {
 export interface DocMeta {
   /** Belgenin başlığı — cevaptaki en yakın başlıktan gelir. */
   readonly title: string;
-  /** Şirket adı; antet. */
+  /** Şirketin görünen adı; dosya adında kullanılır. */
   readonly org: string;
   /** Belgeyi doğuran soru — belgenin neyi yanıtladığını kaydeder. */
   readonly question: string;
+  /**
+   * Antet — şirketin hukuki kimliği.
+   *
+   * İsteğe bağlı: oturum henüz yüklenmediyse ya da profil
+   * kurulmadıysa gelmez ve belge yalnızca adla basılır. Yer tutucu
+   * uydurmaktansa eksik göstermek doğru olan.
+   */
+  readonly letterhead?: Letterhead | null;
 }
 
 /** Tarayıcıda tarih; sunucuda üretilse hidrasyon uyuşmazlığı olurdu. */
@@ -205,6 +214,7 @@ export function DocumentSheet({
   const [when] = useState(stamp);
   const [tab, setTab] = useState<"doc" | "chart">("doc");
   const closeRef = useRef<HTMLButtonElement>(null);
+  const lh = meta.letterhead ?? null;
 
   useEffect(() => {
     closeRef.current?.focus();
@@ -300,10 +310,39 @@ export function DocumentSheet({
 
         <div className="doc-scroll">
           <article className="doc-page">
+            {/*
+              ANTET — belgeyi alan kişi için.
+              Bu kâğıtlar dışarı çıkıyor: mali müşavire, tedarikçiye,
+              bankaya. Üzerinde yalnızca kısa ad yazan bir tablo, alan
+              kişi için kaynağı belirsiz bir kâğıttır. Ticari unvan,
+              adres, vergi dairesi ve numara belgenin kimliğidir.
+
+              Olmayan alan BASILMAZ. "Vergi No: —" yazmak eksikliği
+              gizler; hiç yazmamak gösterir ve profili doldurmaya iter.
+            */}
             <header className="doc-head">
-              <div className="doc-org">{meta.org}</div>
-              <div className="doc-stamp">{when}</div>
+              <div className="doc-head-org">
+                <div className="doc-org">{lh?.legalName ?? meta.org}</div>
+                {lh?.address && <div className="doc-org-line">{lh.address}</div>}
+                {(lh?.phone || lh?.email) && (
+                  <div className="doc-org-line">
+                    {[lh.phone, lh.email].filter(Boolean).join(" · ")}
+                  </div>
+                )}
+                {(lh?.taxOffice || lh?.taxId) && (
+                  <div className="doc-org-line">
+                    {lh.taxOffice && lh.taxId
+                      ? `${lh.taxOffice} V.D. ${lh.taxId}`
+                      : (lh.taxId ?? lh.taxOffice)}
+                  </div>
+                )}
+              </div>
+              <div className="doc-head-meta">
+                <div className="doc-doctitle">{meta.title}</div>
+                <div className="doc-stamp">{when}</div>
+              </div>
             </header>
+            <div className="doc-rule" aria-hidden />
 
             {/* İkisi de DOM'da kalır: yazdırma her zaman BELGEYİ basar,
                 hangi sekme açık olursa olsun. Grafik ekran içindir;
@@ -315,8 +354,17 @@ export function DocumentSheet({
 
             <footer className="doc-foot">
               {/* Belgenin kaynağı BELGENİN ÜZERİNDE durur: eline geçen
-                  kişi rakamın nereden geldiğini sormak zorunda kalmasın. */}
-              KAELON · {meta.org} · {when} · Bu belge işletmenin kendi kayıtlarından üretilmiştir.
+                  kişi rakamın nereden geldiğini sormak zorunda kalmasın.
+
+                  Vergi kimliği burada TEKRAR eder: belge çok sayfalıysa
+                  ve yalnızca bir sayfası fotokopilenirse, o sayfa da
+                  kime ait olduğunu söylemelidir. */}
+              <span className="doc-foot-legal">
+                {lh ? legalFooter(lh) : meta.org}
+              </span>
+              <span className="doc-foot-src">
+                {when} · Bu belge işletmenin kendi kayıtlarından üretilmiştir · KAELON
+              </span>
             </footer>
           </article>
         </div>

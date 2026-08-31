@@ -1468,26 +1468,89 @@ button.role, select.role {
   --ok: #1f7a52;
 
   color: var(--paper-ink);
-  max-width: 760px;
+
+  /*
+   * ── ÖNİZLEME GERÇEK A4 ──
+   *
+   * 760px'lik serbest bir kutuydu ve yazdırılan kâğıtla hiçbir ilgisi
+   * yoktu: ekranda rahat duran bir tablo kâğıtta taşıyor, ekranda
+   * taşan bir tablo kâğıtta sığıyordu. Kullanıcı "yazdır"a basmadan
+   * hangisinin olacağını bilemiyordu.
+   *
+   * Genişlik artık MİLİMETRE: 210mm eksi kenar boşlukları. Tarayıcı
+   * mm'yi 96dpi'a çevirir, yani önizleme ile kâğıt aynı ölçüdedir.
+   * Kenar boşlukları `@page` kuralındakilerle BİREBİR aynı olmalı —
+   * biri değişip diğeri kalırsa önizleme yine yalan söyler.
+   */
+  --a4-genislik: 210mm;
+  --a4-yan: 16mm;
+  --a4-ust: 18mm;
+
+  width: 100%;
+  max-width: var(--a4-genislik);
+  min-height: 297mm;
   margin: 0 auto;
-  padding: 44px 48px 36px;
+  padding: var(--a4-ust) var(--a4-yan);
   background: var(--paper);
   border: 1px solid var(--paper-line);
   border-radius: 8px;
   box-shadow: var(--sh-m);
+  /* Kâğıt sabit genişliktedir; içindeki uzun tablo kâğıdı esnetemez,
+     kendi içinde kaydırılır. Aksi hâlde önizleme A4 olmaktan çıkardı. */
+  overflow-wrap: break-word;
 }
 
+/*
+ * A4 ölçüsü SAYFA AKIŞINI da belirler: belge içeriği kâğıdın
+ * altına ulaşınca ikinci sayfaya taşar. Önizlemede bu tek uzun
+ * kâğıt olarak görünür; yazdırmada tarayıcı böler.
+ */
+.doc-page > * { max-width: 100% }
+
+/*
+ * ── ANTET ──
+ *
+ * Solda kim gönderiyor, sağda ne gönderiyor. Bu, ticari yazışmanın
+ * yüzyıllık düzeni ve okuyan kişi onu aramadan bulur.
+ *
+ * Şirket bloğu kimlikten okunabilirliğe doğru küçülür: unvan koyu ve
+ * büyük, adres ve vergi bilgisi küçük. Hepsi aynı boyutta olsaydı
+ * antet, altındaki belgeden daha baskın görünürdü — antet imzadır,
+ * içerik değil.
+ */
 .doc-head {
   display: flex;
-  align-items: baseline;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 16px;
-  padding-bottom: 12px;
-  border-bottom: 1.5px solid var(--paper-ink);
+  gap: 24px;
+}
+.doc-head-org { min-width: 0 }
+.doc-head-meta { text-align: right; flex: 0 0 auto }
+
+.doc-org {
+  font-size: 15px; font-weight: 640; letter-spacing: -.014em;
+  color: var(--paper-ink); line-height: 1.3;
+}
+.doc-org-line {
+  font-size: 10.5px; line-height: 1.55; color: var(--paper-muted);
+  margin-top: 2px;
+}
+.doc-doctitle {
+  font-size: 12.5px; font-weight: 620; letter-spacing: -.008em;
+  color: var(--paper-ink-2);
+}
+.doc-stamp {
+  font-size: 10.5px; color: var(--paper-muted);
+  font-variant-numeric: tabular-nums; white-space: nowrap; margin-top: 3px;
 }
 
-.doc-org { font-size: 14px; font-weight: 640; letter-spacing: -.01em; color: var(--paper-ink) }
-.doc-stamp { font-size: 11.5px; color: var(--paper-muted); font-variant-numeric: tabular-nums; white-space: nowrap }
+/* Antedi içerikten ayıran çizgi. `border-bottom` yerine ayrı bir öğe:
+   antet iki sütun ve farklı yükseklikte: çizgi başlığa değil KÂĞIDA
+   ait, ikisinin de altından geçmeli. */
+.doc-rule {
+  height: 1.5px; background: var(--paper-ink);
+  margin: 12px 0 0;
+}
 
 .doc-title {
   margin: 22px 0 4px;
@@ -1522,12 +1585,20 @@ button.role, select.role {
 .doc-table .num { text-align: right; white-space: nowrap }
 .doc-foot {
   margin-top: 26px;
-  padding-top: 12px;
+  padding-top: 10px;
   border-top: 1px solid var(--paper-line);
-  font-size: 10.5px;
+  font-size: 9.5px;
   line-height: 1.6;
   color: var(--paper-muted);
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  flex-wrap: wrap;
 }
+/* Hukuki kimlik solda ve DAHA KOYU: dipnotun asıl işi o satır,
+   "KAELON ile üretildi" ise yalnızca bir not. */
+.doc-foot-legal { color: var(--paper-ink-2); font-weight: 500 }
+.doc-foot-src { text-align: right }
 
 /* Hareketi azaltma tercihi: belge yine açılır, ama sıçramaz. */
 @media (prefers-reduced-motion: reduce) {
@@ -1572,6 +1643,7 @@ button.role, select.role {
 
   .doc-page {
     max-width: none;
+    min-height: 0;
     margin: 0;
     padding: 0;
     border: 0;
@@ -1587,7 +1659,15 @@ button.role, select.role {
   .doc-table thead { display: table-header-group }
   .doc-table tr { break-inside: avoid }
 
-  @page { size: A4; margin: 18mm 16mm }
+  /*
+   * HER ZAMAN A4 DİKEY.
+   *
+   * `size: A4` yönü belirtmiyordu ve tarayıcı yazdırma iletişim
+   * kutusundaki son seçimi hatırlıyor: bir kez yatay basan kullanıcı,
+   * sonraki bütün belgeleri yatay basıyordu. Yön belgenin kararıdır,
+   * yazıcı iletişim kutusunun hafızası değil.
+   */
+  @page { size: A4 portrait; margin: 18mm 16mm }
 }
 
 /* Kâğıt her iki temada da beyaz olduğu için yazdırma için ayrı bir
