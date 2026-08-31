@@ -23,6 +23,8 @@ import { creditTools } from "./modules/sales/credit-tools.js";
 import { CreditRepository } from "./db/credit-repository.js";
 import { inspectionTools } from "./modules/quality/inspection-tools.js";
 import { QualityRepository } from "./db/quality-repository.js";
+import { supplierTools } from "./modules/procurement/supplier-tools.js";
+import { SupplierRepository } from "./db/supplier-repository.js";
 import { batchTools } from "./modules/inventory/batch-tools.js";
 import { procurementTools } from "./modules/procurement/procurement-tools.js";
 import { leaveTools } from "./modules/hr/leave-tools.js";
@@ -225,6 +227,12 @@ export function buildRegistry(db: DataSource, repos: Repositories = {}): ToolReg
      * tutulmuyordu.
      */
     ...(repos.tenantDb ? inspectionTools(new QualityRepository(repos.tenantDb)) : []),
+    /*
+     * ÇERÇEVE SÖZLEŞME VE TEDARİKÇİ KARNESİ. Teklif toplama vardı ama
+     * seçimin SONUCU ölçülmüyordu: geciktiren tedarikçi bir sonraki
+     * turda aynı puanla yarışıyordu.
+     */
+    ...(repos.tenantDb ? supplierTools(new SupplierRepository(repos.tenantDb)) : []),
     // Kur değerlemesi HEM defteri HEM kur tablosunu okur; ikisi de
     // yoksa tool hiç kurulmaz — yarım bir değerleme yanlış sayı üretir.
     ...(repos.revaluation && repos.valuation

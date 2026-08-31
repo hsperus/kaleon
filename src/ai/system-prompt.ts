@@ -207,6 +207,9 @@ export function sessionContext(input: {
     `  kontrol planı, tolerans, muayene → inspection (get_inspection_plan)`,
     `  uygunsuzluk, DÖF, hurda → nonconformance (list_open_nonconformances)`,
     `  sertifika, analiz raporu → certificate (build_certificate_of_analysis)`,
+    `  çerçeve sözleşme, yıllık anlaşma → contract (list_purchase_contracts)`,
+    `  tedarikçi performansı, kim geciktiriyor → scorecard (get_supplier_scorecard)`,
+    `  fiyat geçmişi, kaça almıştık → price history (get_price_history)`,
   );
 
   if (input.glossary && input.glossary.length > 0) {

@@ -2410,3 +2410,69 @@ model Nonconformance {
   @@index([itemId, openedAt])
   @@map("nonconformances")
 }
+
+/// Çerçeve sözleşme — yıllık anlaşma ve ondan çekilen siparişler.
+model PurchaseContract {
+  id              String   @id @default(uuid()) @db.Uuid
+  documentNo      String   @unique @map("document_no")
+  partnerId       String   @map("partner_id") @db.Uuid
+  itemId          String?  @map("item_id")
+  description     String
+  validFrom       DateTime @map("valid_from") @db.Date
+  validTo         DateTime @map("valid_to") @db.Date
+  /// Tavan tutar ve/veya miktar. İkisi de null: açık uçlu anlaşma,
+  /// yalnızca fiyatı sabitler.
+  ceilingAmount   Decimal? @map("ceiling_amount") @db.Decimal(18, 2)
+  ceilingQuantity Decimal? @map("ceiling_quantity") @db.Decimal(18, 4)
+  unitPrice       Decimal? @map("unit_price") @db.Decimal(18, 4)
+  currency        String   @default("TRY")
+  /// active | expired | cancelled
+  status          String   @default("active")
+  createdBy       String   @map("created_by") @db.Uuid
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  releases ContractRelease[]
+
+  @@index([partnerId, status])
+  @@index([itemId, status])
+  @@map("purchase_contracts")
+}
+
+/// Sözleşmeden çekilen sipariş.
+///
+/// Tavan kullanımı BURADAN toplanır: sözleşmede bir sayaç tutulsaydı
+/// iptal edilen bir çekiliş sayacı düşürmez ve tavan sonsuza kadar
+/// dolu görünürdü.
+model ContractRelease {
+  id         String   @id @default(uuid()) @db.Uuid
+  contractId String   @map("contract_id") @db.Uuid
+  poId       String   @map("po_id")
+  quantity   Decimal  @db.Decimal(18, 4)
+  amount     Decimal  @db.Decimal(18, 2)
+  releasedAt DateTime @map("released_at") @db.Date
+  releasedBy String   @map("released_by") @db.Uuid
+
+  contract PurchaseContract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@unique([contractId, poId])
+  @@map("contract_releases")
+}
+
+/// Fiyat kaydı — tedarikçi × malzeme son fiyat ve gerçekleşen temin süresi.
+model PurchaseInfoRecord {
+  id             String   @id @default(uuid()) @db.Uuid
+  partnerId      String   @map("partner_id") @db.Uuid
+  itemId         String   @map("item_id")
+  lastPrice      Decimal  @map("last_price") @db.Decimal(18, 4)
+  currency       String   @default("TRY")
+  lastOrderedAt  DateTime @map("last_ordered_at") @db.Date
+  lastPoId       String?  @map("last_po_id")
+  /// GERÇEKLEŞEN temin süresi — malzeme kartındaki planlanandan farklı
+  /// olabilir ve fark tam olarak ölçülmek istenen şeydir.
+  actualLeadDays Int?     @map("actual_lead_days")
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  @@unique([partnerId, itemId, currency])
+  @@index([itemId])
+  @@map("purchase_info_records")
+}
