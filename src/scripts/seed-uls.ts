@@ -21,7 +21,23 @@ async function main(): Promise<void> {
     return;
   }
 
-  const r = await seedUls(tenantClient(tenant.schemaName) as never);
+  /*
+   * İzlemelerin sahibi: bu kiracının ilk aktif kullanıcısı.
+   *
+   * Yer tutucu bir kimlikle açılan izleme hiç koşmaz — zamanlanmış
+   * koşu onu "sahibi aktif değil" diye atlar ve kural kurulmuş
+   * görünürken çalışmaz.
+   */
+  const uyelik = await db.membership.findFirst({
+    where: { tenantId: tenant.id, isActive: true },
+    select: { userId: true },
+    orderBy: { createdAt: "asc" },
+  });
+  if (!uyelik) {
+    console.warn("  ! Bu kiracının aktif kullanıcısı yok; izleme kuralları açılmayacak.");
+  }
+
+  const r = await seedUls(tenantClient(tenant.schemaName) as never, uyelik?.userId ?? null);
 
   console.log(`\n═══ ${tenant.name} · hava kargo verisi ═══`);
   for (const line of r.done) console.log(`  ✓ ${line}`);

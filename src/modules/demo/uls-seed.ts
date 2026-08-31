@@ -190,7 +190,11 @@ export interface UlsResult {
   readonly failed: readonly { adim: string; sebep: string }[];
 }
 
-export async function seedUls(db: TenantDb): Promise<UlsResult> {
+export async function seedUls(
+  db: TenantDb,
+  /** İzlemelerin sahibi — kiracının gerçek kullanıcısı. */
+  watchOwnerUserId: string | null = null,
+): Promise<UlsResult> {
   const done: string[] = [];
   const failed: { adim: string; sebep: string }[] = [];
 
@@ -705,9 +709,25 @@ export async function seedUls(db: TenantDb): Promise<UlsResult> {
   });
 
   // ── 17. İzlemeler ── havacılığın kendi eşikleri.
+  /*
+   * İZLEME SAHİBİ GERÇEK BİR KULLANICI OLMALI.
+   *
+   * Kurallar `SEED_USER` ile açılıyordu — o bir yer tutucu, gerçek
+   * bir üyelik değil. Sonucu şuydu: zamanlanmış koşu her saat
+   * "sahibi bu şirkette aktif değil" diyerek ikisini de atlıyordu.
+   * Yani nöbetçi kuruluydu ve hiç nöbete çıkmıyordu.
+   *
+   * Sahip parametre olarak geliyor; çağıran, kiracının gerçek
+   * kullanıcısını verir. Bulunamazsa kurallar HİÇ AÇILMAZ —
+   * sahipsiz bir izleme, kurulmuş görünen ama çalışmayan bir
+   * korumadır ve o, hiç kurulmamış olandan kötüdür.
+   */
   await step("izleme", async () => {
     const w = new WatchRepository(db as never);
-    const mevcut = new Set((await w.listFor(SEED_USER)).map((x) => x.name));
+    if (watchOwnerUserId === null) {
+      return "izleme: kiracının kullanıcısı yok, kural açılmadı";
+    }
+    const mevcut = new Set((await w.listFor(watchOwnerUserId)).map((x) => x.name));
     const kurallar = [
       {
         name: "Banka bakiyesi kritik", tool: "get_bank_balance", toolInput: {},
@@ -723,7 +743,7 @@ export async function seedUls(db: TenantDb): Promise<UlsResult> {
     let kurulan = 0;
     for (const k of kurallar) {
       if (mevcut.has(k.name)) continue;
-      await w.create({ ...k, ownerUserId: SEED_USER });
+      await w.create({ ...k, ownerUserId: watchOwnerUserId });
       kurulan += 1;
     }
     return `izleme: ${kurallar.length} kural (${kurulan} yeni)`;
