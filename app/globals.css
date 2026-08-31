@@ -2308,6 +2308,49 @@ button.role, select.role {
 .mk-law h3 { margin: 12px 0 6px; font-size: 15px; font-weight: 620; letter-spacing: -.014em }
 .mk-law p { margin: 0; font-size: 13px; line-height: 1.5; color: var(--fg-4) }
 
+/* ── Geçiş ──
+   Üç adım YATAY akar: bir süreç anlatılıyor, bir liste değil. Aradaki
+   oklar CSS'ten geliyor; işaretlemede ok karakteri olsaydı ekran
+   okuyucu onları da okurdu. */
+.mg { margin-top: 52px }
+.mg-flow {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1px; background: var(--hair);
+  border: 1px solid var(--hair); border-radius: 20px; overflow: hidden;
+}
+.mg-step { position: relative; background: var(--panel); padding: 26px }
+.mg-n {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 26px; height: 26px; border-radius: 50%;
+  background: rgba(90, 162, 255, .14); color: var(--blue-soft);
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px; font-weight: 600;
+}
+.mg-step h3 { margin: 14px 0 6px; font-size: 16px; font-weight: 620; letter-spacing: -.016em }
+.mg-step p { margin: 0; font-size: 13.5px; line-height: 1.55; color: var(--fg-4) }
+
+/* Ölçülebilir iddialar. "Kolayca aktarın" cümlesine kimse inanmaz;
+   sayı iddianın sınanabilir olduğunu söyler. */
+.mg-facts {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(215px, 1fr));
+  gap: 22px; margin-top: 30px;
+}
+.mg-facts > div { display: flex; flex-direction: column; gap: 7px }
+.mg-facts b {
+  font-size: 30px; font-weight: 660; letter-spacing: -.035em; color: var(--blue);
+  font-variant-numeric: tabular-nums; line-height: 1;
+}
+.mg-slash { font-size: 17px; font-weight: 500; color: var(--fg-5); letter-spacing: -.02em }
+.mg-facts span { font-size: 13px; line-height: 1.5; color: var(--fg-4) }
+
+.mg-note {
+  margin: 30px 0 0; padding: 17px 20px;
+  border: 1px solid var(--hair); border-left: 2px solid var(--green);
+  border-radius: 12px; background: rgba(91, 191, 147, .04);
+  font-size: 13.5px; line-height: 1.6; color: var(--fg-3); max-width: 720px;
+}
+.mg-note strong { color: var(--fg); font-weight: 620 }
+
 /* ── Roller ── */
 .mk-roles {
   display: flex; flex-direction: column; gap: 1px; margin-top: 52px;

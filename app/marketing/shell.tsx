@@ -18,6 +18,7 @@ import { useEffect, type ReactNode } from "react";
 
 const LINKS = [
   { href: "#ne-yapar", label: "Ne yapar" },
+  { href: "#gecis", label: "Geçiş" },
   { href: "#mevzuat", label: "Mevzuat" },
   { href: "#roller", label: "Roller" },
 ];

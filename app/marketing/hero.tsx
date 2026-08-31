@@ -17,15 +17,17 @@ export function Hero() {
       <section className="mk-hero">
         <h1 className="mk-h1">
           <span className="k-rise" style={{ animationDelay: ".05s" }}>
-            Soruyorsunuz.
+            Her şeyi bilin.
           </span>
           <span className="dim k-rise" style={{ animationDelay: ".18s" }}>
-            Cevap geliyor.
+            Hiçbir şey öğrenmeyin.
           </span>
         </h1>
         <p className="mk-lede k-rise" style={{ animationDelay: ".32s" }}>
-          Menü yok, modül yok, danışman yok. Türkçe sorun; bilanço, bordro,
-          amortisman ya da üretim tarafından ne gerekiyorsa o gelsin.
+          SAP’yi kullanmak aylarca eğitim ve bir danışman ister. Burada
+          öğrenilecek menü, ezberlenecek kod yok — Türkçe sorarsınız.
+          Üretimden nakde, bordrodan mevzuata şirketin her santimi bir cümle
+          uzağınızda.
         </p>
         <div className="mk-acts k-rise" style={{ animationDelay: ".44s" }}>
           <a className="mk-pill-lg" href="/deneyin">

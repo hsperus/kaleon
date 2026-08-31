@@ -372,9 +372,9 @@ export function DemoForm() {
               ))}
             </div>
             <em>
-              Ajan cevabını buna göre çevirir: SAP&apos;den geçen birine
-              &ldquo;bunun SAP&apos;deki karşılığı&rdquo; demek işe yarar,
-              Excel&apos;den gelene aynı cümle bir şey ifade etmez.
+              Ajan cevabını buna göre çevirir: SAP’den geçen birine
+              &ldquo;bunun SAP’deki karşılığı&rdquo; demek işe yarar,
+              Excel’den gelene aynı cümle bir şey ifade etmez.
             </em>
           </div>
 
