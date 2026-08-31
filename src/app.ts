@@ -12,6 +12,7 @@ import { periodTools } from "./modules/finance/period-tools.js";
 import { revaluationTools } from "./modules/finance/revaluation-tools.js";
 import { rosterTools } from "./modules/hr/roster-tools.js";
 import { discoveryTools } from "./modules/discovery/tools.js";
+import { masterDataCrudTools } from "./modules/master-data/crud-tools.js";
 import { batchTools } from "./modules/inventory/batch-tools.js";
 import { procurementTools } from "./modules/procurement/procurement-tools.js";
 import { leaveTools } from "./modules/hr/leave-tools.js";
@@ -178,6 +179,12 @@ export function buildRegistry(db: DataSource, repos: Repositories = {}): ToolReg
      * ajan "belge numarasını verir misiniz" diyordu.
      */
     ...(repos.tenantDb ? discoveryTools(repos.tenantDb) : []),
+    /*
+     * ANA VERİ OLUŞTURMA VE GÜNCELLEME. 151 tool içinde tek bir
+     * `update_*` yoktu: kullanıcı yeni müşteri ekleyemiyor, adres
+     * düzeltemiyor, ücret değiştiremiyordu.
+     */
+    ...(repos.tenantDb ? masterDataCrudTools(repos.tenantDb) : []),
     // Kur değerlemesi HEM defteri HEM kur tablosunu okur; ikisi de
     // yoksa tool hiç kurulmaz — yarım bir değerleme yanlış sayı üretir.
     ...(repos.revaluation && repos.valuation
