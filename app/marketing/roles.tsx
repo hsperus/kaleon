@@ -2,7 +2,7 @@
  * Roller — aynı soru, farklı cevaplar.
  *
  * ÇUBUK BİR SÜS DEĞİL, ÖLÇÜ. Genişlik rolün erişebildiği araç sayısının
- * patrona oranı: operatör 15/139 → %11. Ürünün en sert iddiası bu
+ * patrona oranı: operatör 15/159 → %9. Ürünün en sert iddiası bu
  * bölümde ve grafik onu doğruluyor.
  *
  * "GÖREMEDİĞİNİZ VERİYİ YAPAY ZEKÂ DA GÖREMEZ" cümlesi mimariyi
@@ -11,11 +11,11 @@
  */
 
 const ROLES = [
-  { name: "Patron", n: 139, w: 100, d: "Her şey. Gelir tablosu, bilanço, nakit, bordro, üretim." },
-  { name: "CFO", n: 81, w: 58, d: "Mali tarafın tamamı; üretim tezgâhının detayı değil." },
-  { name: "Üretim Müdürü", n: 74, w: 53, d: "Fabrika, iş emri, kapasite, kalite. Nakit ve maaş yok." },
-  { name: "Depo Sorumlusu", n: 36, w: 26, d: "Mal kabul, sevkiyat, sayım, stok. Fiyat ve maliyet yok." },
-  { name: "Operatör", n: 15, w: 11, d: "Kendi tezgâhı, kendi iş emri, kendi izni." },
+  { name: "Patron", n: 159, w: 100, d: "Her şey. Gelir tablosu, bilanço, nakit, bordro, üretim." },
+  { name: "CFO", n: 95, w: 60, d: "Mali tarafın tamamı; üretim tezgâhının detayı değil." },
+  { name: "Üretim Müdürü", n: 82, w: 52, d: "Fabrika, iş emri, kapasite, kalite. Nakit ve maaş yok." },
+  { name: "Depo Sorumlusu", n: 40, w: 25, d: "Mal kabul, sevkiyat, sayım, stok. Fiyat ve maliyet yok." },
+  { name: "Operatör", n: 15, w: 9, d: "Kendi tezgâhı, kendi iş emri, kendi izni." },
 ];
 
 export function Roles() {

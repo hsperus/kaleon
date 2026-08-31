@@ -1,119 +1,91 @@
 /**
- * "Ne yapar" — üç çıktı biçimi, üçü de gerçek örnekle.
+ * "Her soru, kendi biçiminde cevaplanır."
  *
- * TOOL ADI GEÇMİYOR. `create_watch`, `list_watchable_fields` gibi iç
- * isimler ziyaretçiye hiçbir şey anlatmaz; onların gördüğü şey çıktının
- * kendisidir. Kartlar bu yüzden BELGE / GRAFİK / ONAY FORMU diye
- * ayrılıyor — sistemin iç yapısına göre değil, ekranda beliren şeye göre.
+ * NEDEN ÜÇ KART VE NEDEN BUNLAR: bir ERP'nin cevabı her zaman metin
+ * değildir. Mali müşavir belge ister, patron eğilim arar, yazan bir
+ * işlem onay ister. Üçü ayrı ekranlar olsaydı kullanıcı hangi ekrana
+ * gideceğini bilmek zorunda kalırdı — ürünün tamamı zaten bunu
+ * ortadan kaldırmak için var.
  *
- * GRAFİK ÇUBUKLARI GERÇEK ORANDA. Ocak 100.974 ₺, Aralık 86.120 ₺ →
- * son çubuk ilkinin %85'i. Tasarımda %64'e iniyordu; o eğim daha
- * gösterişliydi ama sayılarla uyuşmuyordu. Sayılarla yalan söylememeyi
- * satan bir ürünün vitrininde bunu yapamayız.
+ * KARTLAR ÖNİZLEME TAŞIYOR, İKON DEĞİL. Bir ikon "belge üretebilir"
+ * der; küçük bir bilanço tablosu neye benzediğini gösterir. İkincisi
+ * kanıt, birincisi iddia.
+ *
+ * GRAFİK GERÇEK BİR OLGUYU ANLATIYOR: net maaş yıl içinde düşer
+ * çünkü gelir vergisi dilimi büyür. Uydurma bir eğri çizmek yerine
+ * Türkiye'de her bordrocunun tanıdığı basamağı çizdik.
  */
 
-/** Ocak→Aralık net maaş eğrisi; ilk aya göre yüzde. */
-const BORDRO = [100, 100, 100, 96, 96, 93, 93, 90, 90, 87, 85, 85];
+/** Bordro basamağı — yıl içinde vergi dilimi büyüdükçe net maaş düşer. */
+const NET_MAAS = [100, 100, 92, 86, 86, 79, 79, 72, 72, 66, 66, 66];
 
 export function Capabilities() {
   return (
-    <section className="mk-sec">
-      <span className="mk-anchor" id="ne-yapar" />
-      <p className="mk-eyebrow k-rise-sm">Ne yapar</p>
-      <h2 className="mk-h2 k-rise">
-        Her soru kendi biçiminde
+    <section id="ne-yapar" className="v-sec">
+      <h2 className="v-h2">
+        Her soru,
         <br />
-        <span className="dim">cevaplanır.</span>
+        <span className="dim">kendi biçiminde cevaplanır.</span>
       </h2>
-      <p className="mk-sub k-rise-sm">
-        Belge, tablo, grafik ya da onaylamanız gereken bir form. Aşağıdakiler
-        gerçek çıktılar — 136 iş, tek arayüz.
-      </p>
 
-      <div className="mk-cards">
-        <article className="mk-card k-rise">
-          <p className="mk-kind">BELGE</p>
-          <h3>Bilanço</h3>
-          <p>
-            &ldquo;31 Aralık itibarıyla bilançoyu çıkar&rdquo; — TDHP
-            gruplarıyla, denksizse üzerinde yazar.
-          </p>
-          <div className="mk-mini">
-            <div className="mk-mini-head">
-              <span>AKTİF</span>
-              <span>PASİF</span>
+      <div className="v-cards">
+        <article className="v-card">
+          <h3>Belge</h3>
+          <p>Bilanço, gelir tablosu, bordro. Mali müşavirinizin beklediği düzende.</p>
+          <div className="v-mini">
+            <div className="v-mini-row">
+              <span>Hazır Değerler</span>
+              <span className="val">10.800.000</span>
             </div>
-            <div className="mk-mini-row">
-              <span>
-                Hazır Değerler <b>10.800.000</b>
-              </span>
-              <span>
-                Ticari Borçlar <b>2.900.000</b>
-              </span>
+            <div className="v-mini-row">
+              <span>Stoklar</span>
+              <span className="val">5.000.000</span>
             </div>
-            <div className="mk-mini-row">
-              <span>
-                Stoklar <b>5.000.000</b>
-              </span>
-              <span>
-                Sermaye <b>19.070.000</b>
-              </span>
-            </div>
-            <div className="mk-mini-foot">
-              <span>21.433.316</span>
-              <span className="mk-ok">DENK</span>
+            <div className="v-mini-row total">
+              <span>Aktif toplam</span>
               <span>21.433.316</span>
             </div>
           </div>
         </article>
 
-        <article className="mk-card k-rise" style={{ animationDelay: ".08s" }}>
-          <p className="mk-kind">GRAFİK</p>
-          <h3>Bordro seyri</h3>
-          <p>
-            Net maaş yıl içinde düşer: kümülatif matrah büyüdükçe dilim
-            yükselir. Tek ayın on iki katı yanlış cevaptır.
-          </p>
-          <div className="mk-mini">
-            <div className="mk-bars">
-              {BORDRO.map((h, i) => (
+        <article className="v-card" style={{ animationDelay: ".07s" }}>
+          <h3>Grafik</h3>
+          <p>Net maaş yıl içinde neden düşer? Vergi dilimi büyür. Grafik anlatır.</p>
+          <div className="v-mini">
+            <div className="v-bars">
+              {NET_MAAS.map((h, i) => (
                 <i
                   key={i}
-                  style={{ height: `${h}%`, animationDelay: `${i * 0.04}s` }}
+                  style={{
+                    height: `${h}%`,
+                    // Her çubuk bir öncekinden biraz sonra yükselir:
+                    // hepsi aynı anda çıksaydı bu bir grafik değil bir
+                    // blok olurdu.
+                    animationRange: `entry ${12 + i * 2}% cover ${34 + i * 2}%`,
+                  }}
                 />
               ))}
             </div>
-            <div className="mk-bars-axis">
-              <span>OCA · 100.974 ₺</span>
-              <span>ARA · 86.120 ₺</span>
+            <div className="v-bars-x">
+              <span>Ocak</span>
+              <span>Aralık</span>
             </div>
           </div>
         </article>
 
-        <article className="mk-card k-rise" style={{ animationDelay: ".16s" }}>
-          <p className="mk-kind">ONAY FORMU</p>
-          <h3>Kalıcı izleme</h3>
-          <p>
-            Yazan her işlem alanları doldurulmuş bir formla önünüze gelir. Siz
-            onaylamadan hiçbir kayıt oluşmaz.
-          </p>
-          <div className="mk-form">
-            <span className="mk-wait">ONAYINIZI BEKLİYOR</span>
-            <p className="mk-form-k">Koşul</p>
-            <p className="mk-form-v">
-              Kullanılabilir bakiye 500.000 ₺ altına düşerse
-            </p>
-            <div className="mk-form-acts">
-              <span className="no">Vazgeç</span>
-              <span className="yes">Onayla</span>
+        <article className="v-card" style={{ animationDelay: ".14s" }}>
+          <h3>Onay</h3>
+          <p>Yazan her işlem önce önünüze gelir. Siz onaylamadan kayıt oluşmaz.</p>
+          <div className="v-mini">
+            <div className="v-mini-k">Koşul</div>
+            <div className="v-mini-v">Bakiye 500.000 ₺ altına düşerse bildir</div>
+            <div className="v-mini-acts">
+              <span className="ghost">Vazgeç</span>
+              <span className="go">Onayla</span>
             </div>
           </div>
         </article>
       </div>
-      <a className="mk-more k-rise-sm" href="/ne-yapar">
-        Belge, grafik ve onay formunu ayrıntılı gör <span aria-hidden>→</span>
-      </a>
-
     </section>
   );
 }

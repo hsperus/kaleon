@@ -5,19 +5,27 @@
   --glide: cubic-bezier(.32, .72, 0, 1);
 
   /* ── Yüzeyler ──
-     Zemin neredeyse siyah, panel bir kademe açık, kartlar bir kademe
-     daha. Ayrım gölgeye değil ZEMİN FARKINA dayanır; koyu ekranda
-     gölge zaten görünmez. */
-  --bg: #08090b;
-  --surface: #0b0e12;
-  --surface-2: #12161c;
+     Zemin TAM SİYAH. Önceki #08090b "neredeyse siyah"tı ve OLED bir
+     ekranda bunun bedeli görünür: piksel kapanmaz, zemin gri bir
+     perde gibi durur. Tam siyahta kart kenarları kendiliğinden
+     ayrışır ve arayüz ekrandan değil ekranın içinden çıkmış görünür.
+
+     Panel ve kart iki kademe açık; ayrım yine gölgeye değil ZEMİN
+     FARKINA dayanıyor. */
+  --bg: #000;
+  --surface: #0a0a0c;
+  --surface-2: #101012;
   --spec: rgba(255, 255, 255, .045);
 
-  /* ── Metin ── dört kademe: başlık, gövde, ikincil, üçüncül. */
-  --ink: #f4f6f8;
-  --ink-2: #b9c0c9;
-  --muted: #9aa2ac;
-  --faint: #5f6771;
+  /* ── Metin ── beş kademe.
+     Dört kademe yetmiyordu: gövde metniyle ikincil metin arasında bir
+     ara ton gerekiyor — kart açıklamaları ikincil kadar sönük, gövde
+     kadar da baskın olmamalı. */
+  --ink: #f5f5f7;
+  --ink-2: #d5d5da;
+  --muted: #a1a1a6;
+  --soft: #86868b;
+  --faint: #6e6e73;
 
   /* Çizgiler opak değil YARI SAYDAM: üstünde durdukları yüzey hangi
      kademede olursa olsun aynı incelikte görünürler. */
@@ -26,19 +34,21 @@
 
   /* ── Vurgu ── tek vurgu rengi; kritik ve uyarı ANLAM taşır,
      vurgu değildir. */
-  --accent: #5aa2ff;
-  --accent-veil: rgba(90, 162, 255, .13);
-  --accent-ink: #8fbcff;
-  /* Vurgu ZEMİN olduğunda üzerine yazılacak renk. Vurgu açık bir mavi
-     olduğu için beyaz yazı okunmaz — bu koyu lacivert onun karşıtı. */
-  --on-accent: #04121f;
+  --accent: #2997ff;
+  --accent-hi: #54aeff;
+  --accent-veil: rgba(41, 151, 255, .14);
+  --accent-ink: #6fb8ff;
+  /* Vurgu ZEMİN olduğunda üzerine yazılacak renk. Vurgu doygun ve
+     parlak bir mavi; üzerinde beyaz yazı okunmaz, siyah okunur. */
+  --on-accent: #000;
 
   --crit: #f0736a;
   --crit-veil: rgba(240, 115, 106, .13);
   --warn: #e3a950;
   --warn-veil: rgba(227, 169, 80, .14);
-  --ok: #5bbf93;
-  --ok-veil: rgba(91, 191, 147, .13);
+  --ok: #7cd4a8;
+  --ok-veil: rgba(124, 212, 168, .09);
+  --ok-ink: #cfe8da;
 
   /* ── Gölge ── iki katman: 1px'lik "kenar" + uzun yumuşak düşüş.
      Tek katmanlı gölge ekranı bulanık gösterir; kenar katmanı formu
@@ -46,7 +56,21 @@
   --sh-s: 0 1px 2px rgba(0, 0, 0, .45);
   --sh-m: 0 1px 2px rgba(0, 0, 0, .45), 0 16px 34px -22px rgba(0, 0, 0, .85);
   --sh-l: 0 1px 2px rgba(0, 0, 0, .5), 0 24px 60px -30px rgba(0, 0, 0, .95);
-  --sh-accent: 0 1px 2px rgba(0, 0, 0, .45), 0 10px 22px -12px rgba(90, 162, 255, .5);
+  --sh-accent: 0 1px 2px rgba(0, 0, 0, .45), 0 12px 32px -12px rgba(41, 151, 255, .6);
+
+  /*
+   * ── Yarıçap ──
+   *
+   * HAP GERÇEKTEN HAPTIR: 980px, 24px değil. Büyük bir sayı seçmenin
+   * sebebi, düğme yüksekliği ne olursa olsun kenarın tam yarım daire
+   * kalması. Sabit bir yarıçapta uzun düğme "köşesi yuvarlatılmış
+   * dikdörtgen"e döner ve aynı ekranda iki farklı düğme dili olur.
+   */
+  --r-pill: 980px;
+  --r-lg: 24px;
+  --r-md: 18px;
+  --r-sm: 14px;
+  --r-xs: 10px;
 }
 
 /*
@@ -73,10 +97,14 @@ body {
      hiç yüklenmiyordu — ekranda zaten sistem fontu görünüyordu. Artık bu
      bir TERCİH: macOS'ta SF, Windows'ta Segoe. Yerel font indirme
      beklemez, ilk boyamada doğru görünür. */
-  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "Segoe UI",
-    ui-sans-serif, system-ui, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text",
+    "Segoe UI", ui-sans-serif, system-ui, sans-serif;
   font-size: 15px;
   line-height: 1.6;
+  /* Negatif harf aralığı bu tipografinin belkemiği: sistem fontu
+     varsayılan aralıkta gevşek durur, sıkıştırılınca başlık ile gövde
+     aynı aileden çıkmış gibi okunur. */
+  letter-spacing: -.012em;
   -webkit-font-smoothing: antialiased;
   /*
    * UYGULAMA SABİT YÜKSEKLİKLİDİR, TANITIM SAYFASI DEĞİL.
@@ -213,10 +241,19 @@ button.role, select.role {
 
 .stream { display: flex; flex-direction: column; gap: 26px; padding-bottom: 20px; }
 .turn { display: flex; flex-direction: column; gap: 14px; }
+/*
+ * KULLANICI BALONU KENARSIZ.
+ *
+ * 1px kenarlığı vardı ve tam siyah zeminde kenarlık ile dolgu iki
+ * ayrı çizgi gibi okunuyordu — balon "kutu" hâline geliyordu. Dolgu
+ * zeminden yeterince ayrıldığı için kenarlığın anlattığı hiçbir şey
+ * kalmamıştı.
+ */
 .ask {
-  align-self: flex-end; max-width: 80%;
-  background: var(--surface); border: 1px solid var(--line);
-  border-radius: 19px 19px 7px 19px; padding: 11px 16px; font-size: 15px;
+  align-self: flex-end; max-width: 78%;
+  background: #1c1c1f;
+  border-radius: 18px 18px 4px 18px; padding: 11px 16px;
+  font-size: 15px; line-height: 1.5;
   animation: askIn .7s var(--spring) both;
 }
 @keyframes askIn { from { opacity: 0; transform: translateY(14px) scale(.94); filter: blur(5px); } to { opacity: 1; transform: none; filter: blur(0); } }
@@ -297,24 +334,34 @@ button.role, select.role {
 .risk.info b { color: var(--muted); }
 
 .dock { position: relative; z-index: 5; }
+/*
+ * YAZMA ÇUBUĞU HAP BİÇİMİNDE.
+ *
+ * 22px yarıçaplı bir kutuydu ve tek satırlıkken "köşesi yuvarlatılmış
+ * dikdörtgen" gibi duruyordu. Hap yarıçapı (980px) tek satırda tam
+ * daire, çok satırda kendiliğinden dikeyde uzayan bir form verir —
+ * yani aynı kural iki durumda da doğru görünüyor.
+ */
 .composer {
-  display: flex; align-items: flex-end; gap: 8px;
-  background: var(--surface); border: 1px solid var(--line); border-radius: 22px;
-  padding: 8px 8px 8px 18px; box-shadow: var(--sh-m);
-  transition: box-shadow .5s var(--glide), border-color .3s var(--glide);
+  display: flex; align-items: flex-end; gap: 10px;
+  background: var(--surface-2); border: 1px solid rgba(255, 255, 255, .12);
+  border-radius: var(--r-pill);
+  padding: 7px 7px 7px 18px;
+  transition: border-color .25s var(--glide);
 }
-.composer:focus-within { border-color: color-mix(in srgb, var(--accent) 45%, var(--line)); box-shadow: var(--sh-m), 0 0 0 4px var(--accent-veil); }
+.composer:focus-within { border-color: color-mix(in srgb, var(--accent) 50%, transparent); }
 .composer textarea { flex: 1; background: none; border: none; resize: none; outline: none; font: inherit; font-size: 15px; line-height: 1.5; color: var(--ink); max-height: 150px; padding: 7px 0; }
 .composer textarea::placeholder { color: var(--faint); }
 
 .send {
-  flex: 0 0 auto; width: 34px; height: 34px; border-radius: 11px; display: grid; place-items: center;
-  background: var(--ink); color: var(--surface); opacity: .22; pointer-events: none; transform: scale(.9);
+  flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--ink); color: var(--bg); opacity: .22; pointer-events: none; transform: scale(.9);
   transition: opacity .3s var(--glide), transform .5s var(--spring), background .2s var(--glide);
 }
 /* Aktifken mavi: gönderilebilir olmak bir EYLEM durumudur, vurgu rengi
    tam olarak bunun için var. */
-.send.on { background: var(--accent); color: var(--on-accent); box-shadow: var(--sh-accent); }
+.send.on { background: var(--accent); color: var(--on-accent); }
+.send.on:hover { background: var(--accent-hi); }
 .send.on { opacity: 1; pointer-events: auto; transform: scale(1); }
 .send:active { transform: scale(.9); transition-duration: .1s; }
 .send svg { width: 15px; height: 15px; }
@@ -475,76 +522,121 @@ button.role, select.role {
  * kasıtlı: uygulamanın teması değiştiğinde köprü kaymamalı.
  * ═══════════════════════════════════════════════════════════════════ */
 
-.login-shell {
-  position: relative;
-  min-height: 100dvh;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 32px;
-  overflow: hidden;
-  background: #08090b;
-  color: #f4f6f8;
-  -webkit-font-smoothing: antialiased;
+/*
+ * GİRİŞ EKRANI İKİ SÜTUN.
+ *
+ * Önce ortalanmış tek bir karttı. Sorun şuydu: tanıtım sayfası
+ * ürünü uzun uzun anlatıyor, sonra giriş ekranı bomboş bir kutuya
+ * düşüyordu — sanki başka bir ürünün kapısıydı. Solda vaadin kısa
+ * hâli durunca, kullanıcı nereye girdiğini bilerek giriyor.
+ *
+ * DAR EKRANDA SOL SÜTUN KAYBOLUR. Telefonda vaat metni formu aşağı
+ * iter ve asıl işi zorlaştırır; süsün bedeli bu olamaz.
+ */
+.auth {
+  min-height: 100dvh; display: flex; flex-direction: column;
+  background: #000; color: var(--ink);
+  -webkit-font-smoothing: antialiased; overflow: hidden;
+}
+.auth-top {
+  position: relative; z-index: 5; flex: 0 0 auto;
+  display: flex; align-items: center; justify-content: center; height: 52px;
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+  background: rgba(0, 0, 0, .72);
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+.auth-top-in {
+  display: flex; align-items: center; justify-content: space-between;
+  width: 100%; max-width: 1024px; padding: 0 24px;
+}
+.auth-logo { font-size: 14px; font-weight: 600; letter-spacing: .14em; color: var(--ink); text-decoration: none }
+.auth-logo:hover { opacity: .7 }
+.auth-top-r { display: flex; align-items: center; gap: 14px }
+.auth-top-q { font-size: 12.5px; color: var(--faint) }
+.auth-demo {
+  display: inline-flex; align-items: center; gap: 6px;
+  border: 1px solid rgba(41, 151, 255, .4); border-radius: var(--r-pill);
+  padding: 6px 15px; font-size: 12.5px; font-weight: 590;
+  color: var(--accent-ink); text-decoration: none;
+  transition: background .25s, border-color .25s, color .25s;
+}
+.auth-demo:hover { background: var(--accent-veil); border-color: var(--accent); color: #a8d2ff }
+
+.auth-body { position: relative; flex: 1; display: grid; grid-template-columns: 1fr 1fr; min-height: 0 }
+.auth-pitch {
+  position: relative; overflow: hidden;
+  display: flex; flex-direction: column; justify-content: center;
+  padding: 56px clamp(32px, 5vw, 64px);
+  border-right: 1px solid rgba(255, 255, 255, .06);
+}
+.auth-glow {
+  position: absolute; bottom: -220px; left: -160px; width: 640px; height: 520px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, rgba(41, 151, 255, .18), transparent 65%);
+  animation: kDrift 24s ease-in-out infinite; pointer-events: none;
+}
+.auth-h2 {
+  position: relative; margin: 0;
+  font-size: clamp(30px, 3.4vw, 46px); font-weight: 640;
+  letter-spacing: -.04em; line-height: 1.08; text-wrap: balance;
+  animation: kMask .9s cubic-bezier(.25, .9, .25, 1) .1s both;
+}
+.auth-h2 .dim { color: var(--faint) }
+.auth-lede {
+  position: relative; max-width: 400px; margin: 20px 0 0;
+  font-size: 15.5px; line-height: 1.6; color: var(--muted);
+  animation: kRise .9s cubic-bezier(.25, .9, .25, 1) .3s both;
+}
+.auth-list {
+  position: relative; list-style: none; margin: 34px 0 0; padding: 0;
+  display: flex; flex-direction: column; gap: 14px;
+  animation: kRise .9s cubic-bezier(.25, .9, .25, 1) .45s both;
+}
+.auth-list li {
+  display: flex; align-items: center; gap: 12px;
+  font-size: 14px; color: var(--ink-2);
+}
+.auth-tick {
+  width: 26px; height: 26px; flex: 0 0 26px; border-radius: 50%;
+  background: var(--accent-veil); color: var(--accent);
+  display: flex; align-items: center; justify-content: center; font-size: 12px;
 }
 
-/* Karta yukarıdan düşen ışık — kart bu ışığın içinde durur. */
-.login-shell::before {
-  content: "";
-  position: absolute; top: -20vh; left: 50%;
-  width: 120vw; height: 80vh; transform: translateX(-50%);
-  background: radial-gradient(ellipse at center, rgba(52, 110, 205, .22), rgba(52, 110, 205, .07) 34%, transparent 62%);
-  animation: kDrift 24s ease-in-out infinite;
-  pointer-events: none;
+.auth-form-col { display: flex; align-items: center; justify-content: center; padding: 56px 32px }
+.auth-form {
+  width: 100%; max-width: 360px;
+  display: flex; flex-direction: column; gap: 0;
+  animation: kPop .7s cubic-bezier(.25, .9, .25, 1) .15s both;
+}
+.auth-form > form, .auth-form > div { display: flex; flex-direction: column }
+.auth-title { margin: 0 0 6px; font-size: 26px; font-weight: 640; letter-spacing: -.032em }
+.auth-sub { margin: 0 0 30px; font-size: 13.5px; color: var(--soft) }
+
+@media (max-width: 900px) {
+  .auth-body { grid-template-columns: 1fr }
+  .auth-pitch { display: none }
 }
 
-.login-card {
-  position: relative;
-  width: 100%;
-  max-width: 392px;
-  display: flex;
-  flex-direction: column;
-  gap: 18px;
-  padding: 34px 30px 28px;
-  border-radius: 22px;
-  border: 1px solid rgba(255, 255, 255, .09);
-  background: linear-gradient(180deg, rgba(23, 28, 34, .94), rgba(13, 16, 20, .94));
-  backdrop-filter: blur(24px);
-  -webkit-backdrop-filter: blur(24px);
-  box-shadow: 0 50px 130px -50px rgba(0, 0, 0, .95);
-  animation: kPop .8s cubic-bezier(.2, .85, .2, 1) both;
-}
-
-/* Marka, ne yapılacağı, kimin tanımladığı — üçü ortada tek blok. */
-.login-head {
-  display: flex; flex-direction: column; align-items: center;
-  gap: 5px; text-align: center;
-}
-.login-card .login-brand {
-  font-size: 13px; font-weight: 640; letter-spacing: .18em; color: #f4f6f8;
-}
-.login-card .login-title {
-  margin-top: 6px; font-size: 20px; font-weight: 600; letter-spacing: -.026em; color: #f4f6f8;
-}
-
-.login-lead { margin: 0; font-size: 13.5px; line-height: 1.5; color: #9aa2ac; text-align: center; }
+.login-lead { margin: 0 0 16px; font-size: 13.5px; line-height: 1.5; color: var(--muted); }
 
 .login-fields { display: flex; flex-direction: column; gap: 12px }
-.login-field { display: flex; flex-direction: column; gap: 6px }
-.login-field span { font-size: 11.5px; letter-spacing: .02em; color: #8b939d }
+.login-field { display: flex; flex-direction: column; gap: 7px }
+.login-field span { font-size: 12px; color: var(--muted) }
 .login-field input {
-  font: inherit; font-size: 14px; height: 42px;
-  padding: 0 13px; border-radius: 10px;
-  background: rgba(255, 255, 255, .03); color: #f4f6f8;
-  border: 1px solid rgba(255, 255, 255, .11);
-  transition: border-color .2s, box-shadow .2s;
+  font: inherit; font-size: 14.5px; height: 46px;
+  padding: 0 15px; border-radius: 12px;
+  background: rgba(255, 255, 255, .04); color: var(--ink);
+  border: 1px solid rgba(255, 255, 255, .14);
+  transition: border-color .25s, box-shadow .25s, background .25s;
 }
-.login-field input::placeholder { color: #5f6771 }
-.login-field input:hover { border-color: rgba(255, 255, 255, .2) }
+.login-field input::placeholder { color: var(--faint) }
+.login-field input:hover { border-color: rgba(255, 255, 255, .22) }
 .login-field input:focus-visible {
   outline: none;
-  border-color: rgba(90, 162, 255, .6);
-  box-shadow: 0 0 0 3px rgba(90, 162, 255, .15);
+  border-color: var(--accent);
+  background: rgba(255, 255, 255, .06);
+  box-shadow: 0 0 0 4px var(--accent-veil);
 }
 
 /* Hata kırmızı bir kutu değil, alanın altındaki bir cümle. */
@@ -554,12 +646,16 @@ button.role, select.role {
 }
 
 .login-submit {
-  font: inherit; font-size: 14.5px; font-weight: 640; letter-spacing: -.01em;
-  height: 44px; padding: 0 14px; border-radius: 10px; border: 0;
-  background: #5aa2ff; color: #04121f; cursor: pointer;
-  transition: filter .2s, transform .2s;
+  font: inherit; font-size: 14.5px; font-weight: 590; letter-spacing: -.01em;
+  height: 46px; margin-top: 22px; padding: 0 14px;
+  border-radius: var(--r-pill); border: 0;
+  background: var(--accent); color: var(--on-accent); cursor: pointer;
+  transition: background .25s, transform .25s, box-shadow .25s;
 }
-.login-submit:hover:not(:disabled) { filter: brightness(1.08); transform: translateY(-1px) }
+.login-submit:hover:not(:disabled) {
+  background: var(--accent-hi); transform: translateY(-1px);
+  box-shadow: 0 12px 32px -12px rgba(41, 151, 255, .6);
+}
 .login-submit:active:not(:disabled) { transform: translateY(0) scale(.99) }
 .login-submit:disabled { opacity: .45; cursor: default; transform: none }
 
@@ -567,19 +663,19 @@ button.role, select.role {
    bu bir SEÇİM listesi — tek gruplanmış liste, aralarında saç teli. */
 .login-choices {
   display: flex; flex-direction: column;
-  border: 1px solid rgba(255, 255, 255, .11); border-radius: 10px; overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, .14); border-radius: 12px; overflow: hidden;
 }
 .login-choice {
   font: inherit; font-size: 14.5px; text-align: left;
   display: flex; align-items: center; gap: 10px;
-  padding: 13px 14px; background: rgba(255, 255, 255, .02); color: #f4f6f8;
+  padding: 13px 14px; background: rgba(255, 255, 255, .02); color: var(--ink);
   border: 0; border-top: 1px solid rgba(255, 255, 255, .08); cursor: pointer;
   transition: background .16s;
 }
 .login-choice:first-child { border-top: 0 }
 .login-choice::after {
   content: ""; margin-left: auto; width: 6px; height: 6px;
-  border-right: 1.5px solid #5f6771; border-top: 1.5px solid #5f6771;
+  border-right: 1.5px solid var(--faint); border-top: 1.5px solid var(--faint);
   transform: rotate(45deg); flex: 0 0 auto;
 }
 .login-choice:hover:not(:disabled) { background: rgba(255, 255, 255, .06) }
@@ -685,7 +781,7 @@ button.role, select.role {
   width: 30px; height: 30px; flex: 0 0 30px; border-radius: 50%;
   display: flex; align-items: center; justify-content: center;
   background: linear-gradient(140deg, var(--accent), var(--ok));
-  font-size: 12px; font-weight: 640; color: #04121f;
+  font-size: 12px; font-weight: 600; color: var(--on-accent);
 }
 .history-foot .id { flex: 1; min-width: 0; display: block }
 .history-foot .id b {
@@ -759,12 +855,12 @@ button.role, select.role {
 /* Karttaki ikincil bağlantı: "Parolamı unuttum", "Vazgeç".
    Düğme gibi görünmemeli — birincil eylem tektir ve o mavi olandır. */
 .login-link {
-  font: inherit; font-size: 12.5px; color: #7d858f; text-align: center;
-  background: none; border: 0; padding: 6px; cursor: pointer;
-  text-decoration: none; /* <a> olarak da kullanılıyor */
+  font: inherit; font-size: 12.5px; color: var(--soft);
+  background: none; border: 0; cursor: pointer; text-decoration: none;
+  align-self: center; margin-top: 16px; padding: 2px 4px;
   transition: color .2s;
 }
-.login-link:hover { color: #b9c0c9 }
+.login-link:hover { color: var(--ink-2) }
 
 /* ─────────────────── Kullanıcı yönetimi ───────────────────
    Sağdan açılan panel. Sohbetin yerini almaz, üstüne gelir: yönetim
@@ -2036,7 +2132,7 @@ button.role, select.role {
  *
  * TASARIM FİKRİ: DERİNLİK VE ÖLÇÜ.
  *
- * Zemin neredeyse siyah (#08090b) ama düz değil: arkada yavaşça
+ * Zemin tam siyah ama düz değil: arkada yavaşça
  * sürüklenen iki renk kütlesi ve maskelenmiş bir ızgara var. Ürün
  * "arka planda çalışan bir sistem" olduğunu söylüyor; sayfa da öyle
  * duruyor — hareket eden ama dikkat çekmeyen bir zemin.
@@ -2054,19 +2150,21 @@ button.role, select.role {
  * ═══════════════════════════════════════════════════════════════════ */
 
 .mk {
-  --bg: #08090b;
-  --panel: #0b0e12;
-  --fg: #f4f6f8;
-  --fg-2: #b9c0c9;
-  --fg-3: #9aa2ac;
-  --fg-4: #8b939d;
-  --fg-5: #5f6771;
-  --fg-6: #4d555f;
-  --hair: rgba(255, 255, 255, .07);
+  --bg: #000;
+  --panel: #101012;
+  --panel-2: #0a0a0c;
+  --fg: #f5f5f7;
+  --fg-2: #d5d5da;
+  --fg-3: #a1a1a6;
+  --fg-4: #86868b;
+  --fg-5: #6e6e73;
+  --fg-6: #48484c;
+  --hair: rgba(255, 255, 255, .06);
   --hair-2: rgba(255, 255, 255, .12);
-  --blue: #5aa2ff;
-  --blue-soft: #8fbcff;
-  --green: #5bbf93;
+  --blue: #2997ff;
+  --blue-hi: #54aeff;
+  --blue-soft: #6fb8ff;
+  --green: #7cd4a8;
   --red: #f0736a;
 
   position: relative;
@@ -2120,28 +2218,33 @@ button.role, select.role {
  * doku ayırtır; kaydırırken karo boyaması yetişemez ve sayfa siyah
  * kalır. Radyal gradyanın kendi geçişi zaten yumuşak — filtre görsel
  * olarak neredeyse hiçbir şey eklemiyordu, bedeli ise ağırdı. */
+/*
+ * TEK KÜTLE KALDI.
+ *
+ * İki sürüklenen kütle vardı — mavi ve yeşil — ve tam siyah zeminde
+ * ikisi birden çalışmıyordu: yeşil, mavi ile karışıp zemine kirli bir
+ * kamuflaj deseni veriyordu. Siyahın işe yaraması için üstünde tek bir
+ * renk olmalı.
+ */
 .mk-blob-a {
-  position: absolute; top: -30vh; left: -10vw; width: 80vw; height: 80vw; border-radius: 50%;
-  background: radial-gradient(circle, rgba(52, 110, 205, .30), rgba(52, 110, 205, .10) 38%, transparent 66%);
+  position: absolute; top: -34vh; left: 50%; width: min(1100px, 120vw); height: 70vw; border-radius: 50%;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at center, rgba(41, 151, 255, .16), transparent 65%);
   animation: kDrift 26s ease-in-out infinite;
 }
-.mk-blob-b {
-  position: absolute; top: 10vh; right: -25vw; width: 70vw; height: 70vw; border-radius: 50%;
-  background: radial-gradient(circle, rgba(31, 122, 82, .18), rgba(31, 122, 82, .06) 40%, transparent 68%);
-  animation: kDrift2 34s ease-in-out infinite;
-}
+.mk-blob-b { display: none }
 /* ── Üst çubuk ── */
 .mk-top {
   position: fixed; top: 0; left: 0; right: 0; z-index: 20;
   display: flex; align-items: center; justify-content: space-between; gap: 24px;
-  height: 60px; padding: 0 clamp(16px, 4vw, 28px);
-  background: rgba(8, 9, 11, .62);
+  height: 52px; padding: 0 clamp(16px, 4vw, 28px);
+  background: rgba(0, 0, 0, .72);
   backdrop-filter: saturate(180%) blur(22px);
   -webkit-backdrop-filter: saturate(180%) blur(22px);
   border-bottom: 1px solid rgba(255, 255, 255, .06);
 }
-.mk-logo { font-size: 14.5px; font-weight: 640; letter-spacing: .16em; color: var(--fg) }
-.mk-nav { display: flex; align-items: center; gap: clamp(14px, 2.4vw, 26px); font-size: 13px }
+.mk-logo { font-size: 14px; font-weight: 600; letter-spacing: .14em; color: var(--fg) }
+.mk-nav { display: flex; align-items: center; gap: clamp(14px, 2.4vw, 30px); font-size: 12.5px }
 .mk-nav a { color: var(--fg-3); transition: color .2s var(--glide) }
 .mk-nav a:hover { color: var(--fg) }
 
@@ -2149,17 +2252,17 @@ button.role, select.role {
  * `.mk` ile niteleniyor: yukarıdaki `.mk a { color: inherit }` kuralı
  * aksi hâlde bunları ezer ve beyaz zemine beyaz yazı bırakır. */
 .mk .mk-pill, .mk .mk-pill-lg {
-  border: 0; border-radius: 980px; background: var(--fg); color: #0a0c0f;
+  border: 0; border-radius: 980px; background: var(--blue); color: #000;
   font-weight: 640; letter-spacing: -.012em; cursor: pointer;
   transition: transform .3s cubic-bezier(.2, .8, .2, 1), box-shadow .3s;
   display: inline-block;
 }
 .mk .mk-pill { padding: 8px 18px; font-size: 13px; font-weight: 600 }
 .mk .mk-pill-lg { padding: 14px 26px; font-size: 15px }
-.mk .mk-pill:hover { transform: translateY(-1px); box-shadow: 0 10px 30px -10px rgba(244, 246, 248, .55) }
-.mk .mk-pill-lg:hover { transform: translateY(-2px); box-shadow: 0 18px 50px -16px rgba(244, 246, 248, .5) }
+.mk .mk-pill:hover { background: var(--blue-hi); transform: translateY(-1px) }
+.mk .mk-pill-lg:hover { background: var(--blue-hi); transform: translateY(-1px); box-shadow: 0 18px 50px -16px rgba(41, 151, 255, .6) }
 .mk .mk-pill-blue {
-  background: var(--blue); color: #04121f;
+  background: var(--blue); color: #000;
 }
 .mk .mk-pill-blue:hover { box-shadow: 0 18px 50px -16px rgba(90, 162, 255, .75) }
 .mk .mk-pill-ghost {
@@ -2345,7 +2448,7 @@ button.role, select.role {
 .mk-form-acts { display: flex; gap: 8px; margin-top: 16px }
 .mk-form-acts span { flex: 1; text-align: center; padding: 8px; border-radius: 8px; font-size: 12.5px }
 .mk-form-acts .no { border: 1px solid rgba(255, 255, 255, .1); color: var(--fg-4) }
-.mk-form-acts .yes { background: var(--blue); color: #04121f; font-weight: 620 }
+.mk-form-acts .yes { background: var(--blue); color: #000; font-weight: 620 }
 
 /* ── Mevzuat: saç teli aralıklı ızgara ── */
 .mk-law {
@@ -2769,7 +2872,7 @@ button.role, select.role {
 .dt-form-acts { display: flex; gap: 10px; margin-top: 22px }
 .dt-form-acts span { flex: 1; text-align: center; padding: 11px; border-radius: 10px; font-size: 13.5px }
 .dt-form-acts .no { border: 1px solid rgba(255, 255, 255, .11); color: var(--fg-4) }
-.dt-form-acts .yes { background: var(--blue); color: #04121f; font-weight: 640 }
+.dt-form-acts .yes { background: var(--blue); color: #000; font-weight: 640 }
 @media (max-width: 560px) { .dt-form dl > div { grid-template-columns: 1fr; gap: 4px } }
 
 /* ── Kaynak dörtlüsü ── */
@@ -3316,4 +3419,217 @@ button.role, select.role {
 @media (max-width: 560px) {
   .fcard { flex-wrap: wrap }
   .fcard-acts { width: 100%; justify-content: flex-end }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+ * V2 — ANA SAYFA
+ *
+ * Ayrı bir ön ek (`.v-`) altında duruyor çünkü ana sayfa yeniden
+ * yazıldı ama alt sayfalar (`/mevzuat`, `/roller`, `/gecis`,
+ * `/deneyin`) eski `.mk-*` iskeletini kullanmaya devam ediyor. İki
+ * ismi tek isim altında birleştirmek, alt sayfaların hepsini aynı
+ * anda yeniden yazmayı gerektirirdi — ve o iş bitene kadar site
+ * yarısı yeni yarısı kırık olurdu.
+ *
+ * Renkler `.mk` değişkenlerinden geliyor; burada tek bir çıplak renk
+ * kodu yok. Palet bir daha değişirse burası kendiliğinden uyar.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+@keyframes vGlow {
+  0%, 100% { opacity: .35; transform: translateX(-50%) scale(1) }
+  50% { opacity: .6; transform: translateX(-50%) scale(1.08) }
+}
+
+/* ── Kahraman ── */
+.v-hero {
+  position: relative; z-index: 1; max-width: 1024px; margin: 0 auto;
+  padding: clamp(132px, 17vw, 200px) 24px 0; text-align: center;
+}
+.v-glow {
+  position: absolute; top: -260px; left: 50%; width: min(900px, 130vw); height: 600px;
+  transform: translateX(-50%); border-radius: 50%;
+  background: radial-gradient(ellipse at center, rgba(41, 151, 255, .16), transparent 65%);
+  animation: vGlow 14s ease-in-out infinite;
+  pointer-events: none;
+}
+.v-h1 {
+  position: relative; margin: 0;
+  font-size: clamp(48px, 8vw, 112px); font-weight: 640;
+  letter-spacing: -.05em; line-height: 1.02; text-wrap: balance;
+}
+.v-h1 span { display: block }
+/*
+ * MASKELİ GİRİŞ.
+ *
+ * Satır aşağıdan yükselirken üstündeki satırın altından çıkıyor gibi
+ * görünmeli; `overflow: clip` bunu yapar. `hidden` KULLANILMIYOR:
+ * kaydırılabilir bir kap yaratır ve odak içeriye gittiğinde tarayıcı
+ * düzeni yana kaydırır (bu projede bir kez yaşandı).
+ */
+/*
+ * TÜRKÇE HARFLER MASKENİN ALTINDA KALIYORDU.
+ *
+ * `overflow: clip` satırı kutusunun dibinden keser. Latin alfabesinde
+ * büyük harflerin altına taşan bir şey yoktur; TÜRKÇEDE VARDIR — Ş ve
+ * Ç'nin kuyruğu taban çizgisinin altına iner. "Şirketinize" başlığında
+ * Ş'nin kuyruğu kesiliyordu ve harf "S" gibi okunuyordu.
+ *
+ * Boşluk aşağıya ekleniyor, sonra aynı kadar negatif kenarla geri
+ * alınıyor: kuyruk sığıyor ama satır aralığı büyümüyor.
+ */
+.v-h1 > span { overflow: clip; padding-bottom: .18em; margin-bottom: -.18em }
+.v-mask { animation: kMask 1s cubic-bezier(.25, .9, .25, 1) both }
+/* Gradyan metin: `background-clip` desteklenmezse renk `transparent`
+   kalır ve başlık KAYBOLUR. Bu yüzden yedek renk önce yazılıyor ve
+   şeffaflık yalnızca destek varsa uygulanıyor. */
+.v-grad { color: var(--blue-soft) }
+@supports (background-clip: text) or (-webkit-background-clip: text) {
+  .v-grad {
+    background: linear-gradient(100deg, #6fb8ff, #2997ff 45%, #7cd4a8);
+    -webkit-background-clip: text; background-clip: text; color: transparent;
+  }
+}
+.v-lede {
+  position: relative; max-width: 500px; margin: 26px auto 0;
+  font-size: 19px; line-height: 1.5; color: var(--fg-3); letter-spacing: -.015em;
+  animation: kRise .9s cubic-bezier(.25, .9, .25, 1) both;
+}
+.v-acts {
+  position: relative; display: flex; justify-content: center; align-items: center;
+  gap: 22px; margin-top: 30px; flex-wrap: wrap;
+  animation: kRise .9s cubic-bezier(.25, .9, .25, 1) both;
+}
+.mk .v-btn {
+  display: inline-block; border: 0; border-radius: var(--r-pill);
+  padding: 13px 26px; background: var(--blue); color: #000;
+  font-size: 15px; font-weight: 590; letter-spacing: -.01em; cursor: pointer;
+  transition: background .25s, transform .25s, box-shadow .25s;
+}
+.mk .v-btn:hover { background: var(--blue-hi); transform: translateY(-1px) }
+.mk .v-btn.light { padding: 14px 30px; background: var(--fg); color: #000 }
+.mk .v-btn.light:hover { box-shadow: 0 14px 40px -14px rgba(245, 245, 247, .5) }
+.mk .v-link { font-size: 15px; letter-spacing: -.01em; color: var(--blue) }
+.mk .v-link:hover { color: var(--blue-soft) }
+
+/* ── Örnek cevap kartı ── */
+.v-demo-wrap {
+  position: relative; z-index: 1; max-width: 760px; margin: 0 auto;
+  padding: clamp(72px, 10vw, 110px) 24px 0;
+  animation: kPop 1.1s cubic-bezier(.25, .9, .25, 1) .65s both;
+  scroll-margin-top: 72px;
+}
+.v-demo {
+  border: 1px solid rgba(255, 255, 255, .09); border-radius: var(--r-lg);
+  background: var(--panel); box-shadow: 0 50px 120px -40px rgba(0, 0, 0, .9);
+  overflow: hidden;
+}
+.v-demo-body { padding: 26px 28px 28px }
+.v-demo-ask { display: flex; justify-content: flex-end }
+.v-demo-ask span {
+  border-radius: 16px 16px 4px 16px; background: #1c1c1f;
+  padding: 10px 16px; font-size: 15px; letter-spacing: -.012em;
+}
+.v-demo-p {
+  margin: 22px 0 0; font-size: 16px; line-height: 1.6;
+  color: var(--fg-2); letter-spacing: -.012em;
+  animation: kFade 1s 1.2s both;
+}
+.v-demo-p b { color: var(--fg); font-weight: 600 }
+.v-demo-table {
+  width: 100%; margin-top: 20px; border-collapse: collapse;
+  border-top: 1px solid rgba(255, 255, 255, .08);
+  font-variant-numeric: tabular-nums; font-size: 14px;
+  animation: kFade 1s 1.8s both;
+}
+.v-demo-table td { padding: 12px 0; border-bottom: 1px solid rgba(255, 255, 255, .06) }
+.v-demo-table td:first-child { color: var(--fg-3) }
+.v-demo-table td:last-child { text-align: right }
+.v-demo-table .total td { border-bottom: 0; font-weight: 600; color: var(--fg) }
+.v-demo-note { margin: 18px 0 0; text-align: center; font-size: 13px; color: var(--fg-5) }
+
+/* ── Bölümler ── */
+.v-sec {
+  position: relative; z-index: 1; max-width: 1024px; margin: 0 auto;
+  padding: clamp(110px, 16vw, 170px) 24px 0; scroll-margin-top: 72px;
+}
+.v-h2 {
+  max-width: 680px; margin: 0;
+  font-size: clamp(32px, 4.6vw, 56px); font-weight: 640;
+  letter-spacing: -.04em; line-height: 1.05; text-wrap: balance;
+  animation: kRise .9s both;
+}
+.v-h2.center { max-width: none; text-align: center }
+.v-h2 .dim { color: var(--fg-5) }
+@supports (animation-timeline: view()) {
+  .v-h2, .v-card, .v-col, .v-cta-acts {
+    animation-timeline: view(); animation-range: entry 5% cover 24%;
+  }
+}
+
+/* ── Yetenek kartları ── */
+.v-cards {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 16px; margin-top: 56px;
+}
+.v-card {
+  border-radius: var(--r-lg); background: var(--panel); padding: 30px;
+  animation: kRise .9s both;
+}
+.v-card h3 { margin: 0; font-size: 20px; font-weight: 620; letter-spacing: -.025em }
+.v-card > p { margin: 8px 0 24px; font-size: 14px; line-height: 1.55; color: var(--fg-3) }
+.v-mini {
+  border-radius: var(--r-sm); background: var(--panel-2); padding: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.v-mini-row {
+  display: flex; justify-content: space-between; gap: 12px;
+  font-size: 12.5px; color: var(--fg-3); padding: 7px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, .06);
+}
+.v-mini-row .val { color: var(--fg) }
+.v-mini-row.total {
+  border-bottom: 0; padding: 9px 0 2px; font-weight: 600; color: var(--fg);
+}
+.v-mini-k { font-size: 12px; color: var(--fg-5) }
+.v-mini-v { font-size: 13.5px; margin-top: 4px }
+.v-mini-acts { display: flex; gap: 8px; margin-top: 16px }
+.v-mini-acts span {
+  flex: 1; text-align: center; padding: 8px; border-radius: var(--r-pill);
+  font-size: 12.5px;
+}
+.v-mini-acts .ghost { border: 1px solid rgba(255, 255, 255, .12); color: var(--fg-3) }
+.v-mini-acts .go { background: var(--blue); color: #000; font-weight: 590 }
+
+/* Sütun grafiği. `transform-origin: bottom` olmadan çubuklar
+   ortalarından büyür ve zemine yapışmaz. */
+.v-bars { display: flex; align-items: flex-end; gap: 4px; height: 88px }
+.v-bars i {
+  flex: 1; border-radius: 3px; background: var(--blue);
+  transform-origin: bottom; animation: kGrowY .8s cubic-bezier(.25, .9, .25, 1) both;
+}
+@supports (animation-timeline: view()) { .v-bars i { animation-timeline: view() } }
+.v-bars-x {
+  display: flex; justify-content: space-between; margin-top: 10px;
+  font-size: 11px; color: var(--fg-5);
+}
+
+/* ── Neden Kaelon ── */
+.v-cols {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 48px 40px; margin-top: 60px;
+}
+.v-col { animation: kRise .9s both }
+.v-col h3 { margin: 0; font-size: 17px; font-weight: 620; letter-spacing: -.02em }
+.v-col p { margin: 8px 0 0; font-size: 14.5px; line-height: 1.6; color: var(--fg-3) }
+
+/* ── Kapanış ── */
+.v-cta {
+  position: relative; z-index: 1; max-width: 900px; margin: 0 auto;
+  padding: clamp(120px, 19vw, 190px) 24px clamp(90px, 13vw, 130px); text-align: center;
+}
+.v-cta .v-h2 { font-size: clamp(34px, 5.6vw, 72px); letter-spacing: -.045em; line-height: 1.04 }
+.v-cta-acts { display: flex; justify-content: center; margin-top: 32px; animation: kRise 1s both }
+
+@media (prefers-reduced-motion: reduce) {
+  .v-glow { animation: none }
 }

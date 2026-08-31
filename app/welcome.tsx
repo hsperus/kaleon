@@ -75,7 +75,7 @@ const ADIMLAR: readonly Adim[] = [
     kicker: "3 / 4",
     baslik: "Yazan hiçbir işlem tek başına çalışmaz.",
     metin:
-      "141 işin 77'si veri yazar. Hepsi alanları doldurulmuş bir formla " +
+      "159 işin 70'i veri yazar. Hepsi alanları doldurulmuş bir formla " +
       "önünüze gelir; siz onaylamadan kayıt oluşmaz. Yapay zekâ hazırlar, " +
       "sistem doğrular, insan onaylar.",
     gorsel: "onay",
@@ -92,10 +92,10 @@ const ADIMLAR: readonly Adim[] = [
 ];
 
 const ROLLER = [
-  { ad: "Patron", n: 141, w: 100 },
-  { ad: "CFO", n: 83, w: 59 },
-  { ad: "Depo", n: 36, w: 26 },
-  { ad: "Operatör", n: 15, w: 11 },
+  { ad: "Patron", n: 159, w: 100 },
+  { ad: "CFO", n: 95, w: 60 },
+  { ad: "Depo", n: 40, w: 25 },
+  { ad: "Operatör", n: 15, w: 9 },
 ];
 
 function Gorsel({ tip }: { tip: Adim["gorsel"] }) {

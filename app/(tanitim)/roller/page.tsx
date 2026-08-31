@@ -8,14 +8,21 @@ export const metadata: Metadata = {
     "ve kimin neyi görüp neyi yazabildiği.",
 };
 
+/*
+ * RAKAMLAR KATALOGDAN ÖLÇÜLDÜ, TAHMİN EDİLMEDİ.
+ *
+ * `registry.visibleTo(principal).length` ile her rol için tek tek
+ * sayıldı. Elle yazılan bir sayı, her yeni tool'da sessizce
+ * eskiyor — bu sayfada tam olarak öyle oldu ve 141'de kalmıştı.
+ */
 const ROLLER = [
-  { ad: "Patron", tool: 141, oran: 100 },
-  { ad: "CFO", tool: 83, oran: 59 },
-  { ad: "Üretim Müdürü", tool: 74, oran: 52 },
-  { ad: "Satın Alma", tool: 47, oran: 33 },
-  { ad: "Depo Sorumlusu", tool: 36, oran: 26 },
-  { ad: "İK Müdürü", tool: 27, oran: 19 },
-  { ad: "Operatör", tool: 15, oran: 11 },
+  { ad: "Patron", tool: 159, oran: 100 },
+  { ad: "CFO", tool: 95, oran: 60 },
+  { ad: "Üretim Müdürü", tool: 82, oran: 52 },
+  { ad: "Satın Alma", tool: 53, oran: 33 },
+  { ad: "Depo Sorumlusu", tool: 40, oran: 25 },
+  { ad: "İK Müdürü", tool: 32, oran: 20 },
+  { ad: "Operatör", tool: 15, oran: 9 },
 ] as const;
 
 /** o = okur, y = okur ve yazar, boş = hiç görmez. */
@@ -65,10 +72,10 @@ export default function Page() {
       <article className="dt-block k-rise">
         <header>
           <span className="mk-kind">ÖLÇÜLDÜ</span>
-          <h2>Yedi rol, 141 iş</h2>
+          <h2>Yedi rol, 159 iş</h2>
           <p>
             Aşağıdaki sayılar tahmin değil: her rol için katalog gerçekten
-            filtrelenip sayıldı. Operatör 15 araç görür, patron 141.
+            filtrelenip sayıldı. Operatör 15 araç görür, patron 159.
           </p>
         </header>
 

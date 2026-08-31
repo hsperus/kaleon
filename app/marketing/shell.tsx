@@ -18,18 +18,23 @@ import { useEffect, type ReactNode } from "react";
 import { Footer } from "./footer.js";
 
 /*
- * MENÜ GERÇEK SAYFALARA GİDER, ÇAPAYA DEĞİL.
+ * MENÜ İKİ BAŞLIĞA İNDİ.
  *
- * Önce `#ne-yapar` gibi çıplak çapalardı ve yalnızca ana sayfada
- * çalışıyordu: `/deneyin` üzerindeyken menüye tıklayan kişi hiçbir yere
- * gitmiyordu — bağlantı ölüydü ve bu, ürünün bozuk olduğu izlenimini
- * veren türden bir sessizlik.
+ * Dört başlık vardı ve hepsi gerçek sayfalara gidiyordu; sorun
+ * bağlantılarda değil sayıdaydı. Üst çubuk bir içindekiler listesi
+ * değildir: ziyaretçiden dört başlık arasında seçim yapmasını istemek,
+ * ürünün ne olduğunu henüz bilmeyen birine sınav vermektir.
+ *
+ * Kalanlar ayakta duruyor — arayan buluyor, aramayan boğulmuyor.
+ *
+ * BAĞLANTILAR ÇAPA AMA ÖNÜNDE `/` VAR: `/#cevap` her sayfadan
+ * çalışır, çıplak `#cevap` yalnızca ana sayfada. Çıplak hâli
+ * `/deneyin` üzerindeyken hiçbir yere gitmiyordu ve ölü bir bağlantı,
+ * ürünün bozuk olduğu izlenimini veren türden bir sessizliktir.
  */
 const LINKS = [
-  { href: "/ne-yapar", label: "Ne yapar" },
-  { href: "/gecis", label: "Geçiş" },
-  { href: "/mevzuat", label: "Mevzuat" },
-  { href: "/roller", label: "Roller" },
+  { href: "/#cevap", label: "Ürün" },
+  { href: "/#guven", label: "Neden Kaelon" },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
@@ -61,9 +66,8 @@ export function Shell({ children }: { children: ReactNode }) {
               {l.label}
             </a>
           ))}
-          <a href="/deneyin">Deneyin</a>
           <a className="mk-pill" href="/uygulama">
-            Giriş
+            Giriş yap
           </a>
         </nav>
       </header>

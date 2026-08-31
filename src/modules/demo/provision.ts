@@ -3,7 +3,7 @@
  *
  * DENEYEN KİŞİ GERÇEK ÜRÜNÜ GÖRÜR. Sahte bir ekran değil: kendi
  * Postgres şeması, kendi kullanıcısı, kendi denetim kaydı. Aynı kodu,
- * aynı 141 tool'u, aynı yetki modelini çalıştırır. Tek farkı verinin
+ * aynı 159 tool'u, aynı yetki modelini çalıştırır. Tek farkı verinin
  * hazır gelmesi ve tenant'ın bir son kullanma tarihi taşıması.
  *
  * ─────────────────────────────────────────────────────────────────

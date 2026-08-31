@@ -1178,7 +1178,7 @@ export default function Page() {
               <h1 className="greet in" style={{ animationDelay: ".12s" }}>
                 {greeting(session?.displayName)}
                 <br />
-                <em>Ne öğrenmek istersiniz?</em>
+                <em>Neyi merak ediyorsunuz?</em>
               </h1>
             </div>
           )}

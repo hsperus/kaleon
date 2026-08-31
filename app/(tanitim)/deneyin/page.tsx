@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: "Ürünü deneyin · KAELON",
   description:
     "Şirketinize göre kurulmuş gerçek bir ortamda deneyin. Sahte ekran değil: " +
-    "kendi veritabanı şemanız, kendi verileriniz, 141 işin tamamı.",
+    "kendi veritabanı şemanız, kendi verileriniz, 159 işin tamamı.",
 };
 
 export default function Page() {
@@ -21,7 +21,7 @@ export default function Page() {
         Bu bir tanıtım videosu ya da hazır ekran görüntüsü değil. Şirketinizi
         anlatın, size ait bir veritabanı şeması kurulsun: kendi ticari
         unvanınızla kesilmiş faturalar, kendi ölçeğinizde bir bilanço, kendi
-        sektörünüzün ürün kartları ve 141 işin tamamı. Sorulan her alan
+        sektörünüzün ürün kartları ve 159 işin tamamı. Sorulan her alan
         ekranda göreceğiniz bir şeyi değiştirir; kullanmayacağımız hiçbir
         bilgiyi istemiyoruz.
       </p>

@@ -1,67 +1,62 @@
 /**
- * Kahraman bölümü — başlık ve canlı cevap kartı.
+ * Kahraman bölümü — başlık ve örnek cevap kartı.
  *
  * KART NEDEN CANLI: ürünün tamamı tek bir davranışa dayanıyor —
  * soruyorsunuz, cevap geliyor. Bunu anlatmak yerine gösteriyoruz.
- * Soru yazılıyor, adım tamamlanıyor, cevap yükseliyor, altında kaynak
- * satırı duruyor. Sıralama CSS gecikmeleriyle kurulu; JavaScript yok,
- * durum yok, sunucuda da aynı görünür.
+ * Soru duruyor, cevap yükseliyor, altında tablo açılıyor. Sıralama
+ * CSS gecikmeleriyle kurulu; JavaScript yok, durum yok, sunucuda da
+ * aynı görünür.
  *
  * SEÇİLEN ÖRNEK ZARAR GÖSTERİYOR. Brüt kâr var ama dönem zararla
  * kapanıyor. Ürünün iddiası "iyi haber üretmek" değil, doğru olanı
  * söylemek; vitrin de onu söylemeli.
+ *
+ * BAŞLIK BİR CÜMLEDİR, İKİ SLOGAN DEĞİL: "Şirketinize
+ * sorabilirsiniz." İkinci satır gradyanla ayrılıyor ama cümle
+ * bölünmüyor — okuyan kişi iki ayrı iddia değil tek bir vaat görüyor.
  */
 export function Hero() {
   return (
     <>
-      <section className="mk-hero">
-        <h1 className="mk-h1">
-          <span className="k-rise" style={{ animationDelay: ".05s" }}>
-            Her şeyi bilin.
+      <section className="v-hero">
+        {/* Başlığın arkasındaki ışık. Dekoratif; ekran okuyucudan gizli. */}
+        <div className="v-glow" aria-hidden />
+        <h1 className="v-h1">
+          <span className="v-mask" style={{ animationDelay: ".05s" }}>
+            Şirketinize
           </span>
-          <span className="dim k-rise" style={{ animationDelay: ".18s" }}>
-            Hiçbir şey öğrenmeyin.
+          <span className="v-mask v-grad" style={{ animationDelay: ".2s" }}>
+            sorabilirsiniz.
           </span>
         </h1>
-        <p className="mk-lede k-rise" style={{ animationDelay: ".32s" }}>
-          SAP’yi kullanmak aylarca eğitim ve bir danışman ister. Burada
-          öğrenilecek menü, ezberlenecek kod yok — Türkçe sorarsınız.
-          Üretimden nakde, bordrodan mevzuata şirketin her santimi bir cümle
-          uzağınızda.
+        <p className="v-lede" style={{ animationDelay: ".4s" }}>
+          ERP’nin aylarca süren kurulumu, yüzlerce ekranı yok. Soruyu yazın;
+          işinizin her köşesi tek cümleyle önünüzde.
         </p>
-        <div className="mk-acts k-rise" style={{ animationDelay: ".44s" }}>
-          <a className="mk-pill-lg" href="/deneyin">
-            Şirketinizle deneyin
+        <div className="v-acts" style={{ animationDelay: ".52s" }}>
+          <a className="v-btn" href="/uygulama">
+            Sisteme girin
           </a>
-          <a className="mk-pill-ghost" href="/ne-yapar">
-            Ne yapabildiğini gör
+          <a className="v-link" href="#cevap">
+            Nasıl çalışır <span aria-hidden>›</span>
           </a>
         </div>
       </section>
 
-      <div className="mk-demo-wrap">
-        <div className="mk-demo k-fade" style={{ animationDelay: ".6s" }}>
-          <div className="mk-demo-bar">
-            <i /> KAELON · SOHBET
-          </div>
-          <div className="mk-demo-body">
-            <p className="mk-demo-q">
+      <section id="cevap" className="v-demo-wrap">
+        <div className="v-demo">
+          <div className="v-demo-body">
+            <div className="v-demo-ask">
               <span>Bu ay kâr ettik mi?</span>
-              <i />
-            </p>
-
-            <div className="mk-step">
-              <span className="mk-check">✓</span>
-              Gelir tablosu çıkarıldı · 3 hesap grubu okundu
             </div>
 
-            <p className="mk-demo-p">
-              <b>379.610 ₺ brüt kâr</b> ettiniz ama amortisman ve personel
-              gideriyle birlikte dönem <b className="bad">601.890 ₺ zararla</b>{" "}
-              kapanıyor.
+            <p className="v-demo-p">
+              Brüt 379.610 ₺ kâr var; amortisman ve personel gideriyle dönem{" "}
+              <b>601.890 ₺ zararla</b> kapandı. En büyük kalem Kaynak
+              Robotu’nun ilk yıl amortismanı.
             </p>
 
-            <table className="mk-demo-table">
+            <table className="v-demo-table">
               <tbody>
                 <tr>
                   <td>Net satış</td>
@@ -73,15 +68,14 @@ export function Hero() {
                 </tr>
                 <tr className="total">
                   <td>Dönem sonucu</td>
-                  <td>-601.890</td>
+                  <td>−601.890</td>
                 </tr>
               </tbody>
             </table>
-
-            <p className="mk-mono">YEVMİYE DEFTERİ · BUGÜN 09:14 · GÜVEN 0.92</p>
           </div>
         </div>
-      </div>
+        <p className="v-demo-note">Gerçek yevmiye kayıtlarından, saniyeler içinde.</p>
+      </section>
     </>
   );
 }

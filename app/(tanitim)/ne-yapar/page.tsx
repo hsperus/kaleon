@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   title: "Ne yapar · KAELON",
   description:
     "Her soru kendi biçiminde cevaplanır: belge, tablo, grafik ya da onaylamanız " +
-    "gereken bir form. 141 işin çıktısı ve nasıl göründüğü.",
+    "gereken bir form. 159 işin çıktısı ve nasıl göründüğü.",
 };
 
 /** Bilanço önizlemesi — TDHP gruplarıyla, denklik satırıyla. */
@@ -143,7 +143,7 @@ export default function Page() {
             <span className="mk-kind">ONAY FORMU</span>
             <h2>Yazan her işlem</h2>
             <p>
-              141 işin 77&apos;si veri yazar. Hiçbiri doğrudan çalışmaz: alanları
+              159 işin 70&apos;i veri yazar. Hiçbiri doğrudan çalışmaz: alanları
               doldurulmuş bir form önünüze gelir, siz onaylamadan kayıt
               oluşmaz. Vazgeçmek de bir sonuçtur ve iz bırakır.
             </p>
