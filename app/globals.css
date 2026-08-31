@@ -223,7 +223,16 @@ button.role, select.role {
   padding: 0 24px 24px; scroll-behavior: smooth;
 }
 .stage > .col { margin-top: auto }
-.col { width: 100%; max-width: 700px; margin: 0 auto; display: flex; flex-direction: column; }
+/*
+ * SÜTUN GENİŞLİĞİ TEK YERDE TANIMLI.
+ *
+ * Sohbet sütunu 700px, yazma çubuğu 760px'di. İkisi de ortalı olduğu
+ * için üst üste değil İÇ İÇE duruyorlardı: cevabın sol kenarı ile
+ * yazma çubuğunun sol kenarı 30px kayıktı. Göz bu kaymayı "bir şey
+ * yamuk" diye okur ama nereden geldiğini söyleyemez.
+ */
+:root { --sutun: 720px }
+.col { width: 100%; max-width: var(--sutun); margin: 0 auto; display: flex; flex-direction: column; }
 .tail { flex: 0 0 auto; }
 
 .hero { display: flex; flex-direction: column; align-items: center; gap: 5px; padding-bottom: 26px; overflow: hidden; }
@@ -3097,8 +3106,18 @@ button.role, select.role {
    bir boşluk bırakır. Karşılama bir sohbet değil, bir kapıdır. */
 /* Karşılama ekranı ortalanır — yine `margin` ile, `justify-content`
    ile değil. Aynı tuzak: ortalanmış bir kutuda taşan içeriğin ÜSTÜ DE
-   ALTI DA ulaşılamaz olur. */
-.stage.welcome > .col { margin: auto 0; flex: 0 0 auto }
+   ALTI DA ulaşılamaz olur.
+
+   `margin: auto`, `margin: auto 0` DEĞİL.
+
+   `auto 0` yazmak dikeyde ortalar ama YATAYDA SIFIRLAR — ve `.col`
+   zaten `margin: 0 auto` ile yatayda ortalanıyordu. Bu kısayol o
+   ortalamayı eziyordu: karşılama ekranında selamlama ve gündem kartı
+   sola kaçıyor, alttaki yazma çubuğu ortada duruyordu. İki öğe aynı
+   sütunda ama farklı eksende hizalı görünüyordu.
+
+   Dört tarafa `auto` vermek ikisini birden yapar. */
+.stage.welcome > .col { margin: auto; flex: 0 0 auto }
 
 /* ═══════════════════════════════════════════════════════════════════
  * İLK GİRİŞ KARŞILAMASI
@@ -3314,7 +3333,7 @@ button.role, select.role {
   background: linear-gradient(180deg, transparent, var(--bg) 22%);
 }
 .main > .dock > .composer, .main > .dock > .attach {
-  max-width: 760px; margin-left: auto; margin-right: auto;
+  max-width: var(--sutun); margin-left: auto; margin-right: auto;
 }
 
 /* Dar ekranda kabuk hâlâ esnek sütun; ana sütun da öyle davranmalı. */
