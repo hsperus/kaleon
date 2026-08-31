@@ -40,6 +40,14 @@ import { SEED_USER } from "./seed.js";
 
 const d = (s: string) => new Date(`${s}T00:00:00.000Z`);
 
+/** ISO hafta numarası — perşembe kuralı. */
+function isoHafta(t: Date): number {
+  const g = new Date(Date.UTC(t.getUTCFullYear(), t.getUTCMonth(), t.getUTCDate()));
+  g.setUTCDate(g.getUTCDate() + 4 - (g.getUTCDay() || 7));
+  const yilBasi = new Date(Date.UTC(g.getUTCFullYear(), 0, 1));
+  return Math.ceil(((g.getTime() - yilBasi.getTime()) / 86_400_000 + 1) / 7);
+}
+
 /** Kur: 2026 için makul bir seyir. Değerleme bunların farkını yazar. */
 const USD = { mart: 34.8, aralik: 41.2 } as const;
 const EUR = { mart: 37.6, aralik: 44.9 } as const;
@@ -728,14 +736,30 @@ export async function seedUls(
       return "izleme: kiracının kullanıcısı yok, kural açılmadı";
     }
     const mevcut = new Set((await w.listFor(watchOwnerUserId)).map((x) => x.name));
+    /*
+     * TOOL GİRDİLERİ GERÇEKTEN GEÇERLİ OLMALI.
+     *
+     * Önce ikisi de `toolInput: {}` ile açılmıştı ve zamanlanmış koşum
+     * eklenince ortaya çıktı: `get_bank_balance` para birimi,
+     * `get_shipment_risk` hafta numarası istiyor — ikisi de
+     * "invalid_input" ile düşüyordu.
+     *
+     * Hiç fark edilmemişti çünkü izlemeler HİÇ KOŞMAMIŞTI. Ve kök
+     * neden şu: `create_watch` tool'u girdiyi tool'un şemasıyla
+     * DOĞRULUYOR, ama tohumlama tool'u değil repository'yi çağırıp o
+     * doğrulamayı atlıyor.
+     */
     const kurallar = [
       {
-        name: "Banka bakiyesi kritik", tool: "get_bank_balance", toolInput: {},
+        name: "Banka bakiyesi kritik", tool: "get_bank_balance",
+        toolInput: { currency: "TRY" },
         path: "totalAvailable", operator: "lt" as const, threshold: 50_000_000,
         level: 2 as const, message: "Kullanılabilir banka bakiyesi 50 milyon ₺ altına düştü.",
       },
       {
-        name: "Taahhüt riski", tool: "get_shipment_risk", toolInput: {},
+        name: "Taahhüt riski", tool: "get_shipment_risk",
+        // ISO hafta zorunlu; içinde bulunulan hafta hesaplanıyor.
+        toolInput: { isoWeek: isoHafta(new Date()) },
         path: "atRiskCount", operator: "gt" as const, threshold: 0,
         level: 2 as const, message: "Taahhüt tarihi riske giren AWB var.",
       },
