@@ -163,6 +163,39 @@ export function sessionContext(input: {
     );
   }
 
+  /*
+   * TEMEL SÖZLÜK — HER OTURUMDA.
+   *
+   * Tool adları İngilizce; arama da ada göre eşleşiyor. "sipariş"
+   * sorusu `list_sales_orders`'ı buluyor çünkü "order" benziyor,
+   * "sayım" `list_stock_counts`'u buluyor çünkü "stock" benziyor.
+   * Ama "müşteri" hiçbir zaman `list_partners`'ı bulmuyor — kelimeler
+   * birbirine benzemiyor.
+   *
+   * Ölçüldü: "müşterilerimiz kimler" sorusuna ajan "tüm müşterileri
+   * listeleyen bir yeteneğim yok" dedi; oysa tool kataloğunda,
+   * görünür ve çalışır hâldeydi.
+   *
+   * Bu liste sektörden bağımsızdır: her Türkçe konuşan kullanıcı bu
+   * kelimeleri kullanır.
+   */
+  lines.push(
+    `Tool adları İngilizcedir; Türkçe kavramın karşılığını burada ara:`,
+    `  müşteri, tedarikçi, cari, firma → partner (list_partners, resolve_partner)`,
+    `  sayım, envanter sayımı → stock count (list_stock_counts)`,
+    `  teklif → quotation (list_sales_quotations)`,
+    `  talep, satın alma talebi → requisition (list_purchase_requisitions)`,
+    `  bordro, maaş → payroll (list_payroll_runs, get_payroll_summary)`,
+    `  çalışan, personel, kadro → employee (search_employees, get_employee)`,
+    `  parti, lot → batch (list_batches)`,
+    `  seri no → serial (list_customer_serials)`,
+    `  mizan → trial balance · bilanço → balance sheet · gelir tablosu → income statement`,
+    `  kur farkı, değerleme → fx revaluation (preview_fx_revaluation)`,
+    `  irsaliye → despatch · fatura → invoice · dekont → credit note`,
+    `  iş emri → work order · makine → machine · arıza → breakdown`,
+    `  onay → approval · izin → leave · mesai → overtime · vardiya → shift`,
+  );
+
   if (input.glossary && input.glossary.length > 0) {
     lines.push(
       `Bu sektörün kelimeleri ile sistemin kelimeleri farklı. Aradığın ` +

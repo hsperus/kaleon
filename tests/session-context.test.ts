@@ -81,9 +81,18 @@ describe("oturum bağlamı", () => {
       expect(s).toContain("MUTLAKA");
     });
 
-    it("sözlük yoksa satır hiç yazılmaz — boşuna token yakılmaz", () => {
-      expect(sessionContext(base)).not.toContain("→");
-      expect(sessionContext({ ...base, glossary: [] })).not.toContain("→");
+    it("SEKTÖR sözlüğü yoksa o blok yazılmaz — temel sözlük yine durur", () => {
+      // Temel sözlük her oturumda var: tool adları İngilizce ve
+      // "müşteri" hiçbir zaman "partners"a benzemez.
+      const s = sessionContext(base);
+      expect(s).toContain("müşteri, tedarikçi, cari, firma → partner");
+      expect(s).not.toContain("uçak, filo");
+    });
+
+    it("TEMEL SÖZLÜK HER ZAMAN VAR", () => {
+      const s = sessionContext(base);
+      expect(s).toContain("list_partners");
+      expect(s).toContain("stock count");
     });
   });
 
