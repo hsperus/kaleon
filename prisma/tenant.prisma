@@ -558,7 +558,8 @@ model BankAccount {
   isActive   Boolean  @default(true) @map("is_active")
   createdAt  DateTime @default(now()) @map("created_at")
 
-  balances BankBalanceSnapshot[]
+  balances   BankBalanceSnapshot[]
+  statements BankStatement[]
 
   @@unique([externalId, currency])
   @@index([currency])
@@ -2120,4 +2121,100 @@ model Watch {
   @@index([isActive])
   @@index([ownerUserId])
   @@map("watches")
+}
+
+/// Banka ekstresi — mutabakatın ham maddesi.
+///
+/// Entegrasyon katmanı bu belgeleri zaten `bank_statement` tipiyle
+/// kabul ediyordu; eksik olan onları defterle karşılaştıran süreçti.
+model BankStatement {
+  id             String   @id @default(uuid()) @db.Uuid
+  accountId      String   @map("account_id") @db.Uuid
+  statementNo    String   @map("statement_no")
+  fromDate       DateTime @map("from_date") @db.Date
+  toDate         DateTime @map("to_date") @db.Date
+  openingBalance Decimal  @map("opening_balance") @db.Decimal(18, 2)
+  closingBalance Decimal  @map("closing_balance") @db.Decimal(18, 2)
+  currency       String   @default("TRY")
+  importedBy     String?  @map("imported_by") @db.Uuid
+  importedAt     DateTime @default(now()) @map("imported_at")
+
+  account BankAccount         @relation(fields: [accountId], references: [id], onDelete: Cascade)
+  lines   BankStatementLine[]
+
+  @@unique([accountId, statementNo])
+  @@map("bank_statements")
+}
+
+model BankStatementLine {
+  id               String   @id @default(uuid()) @db.Uuid
+  statementId      String   @map("statement_id") @db.Uuid
+  lineNo           Int      @map("line_no")
+  /// Bankanın valör tarihi — bizim kaydettiğimiz tarih değil.
+  valueDate        DateTime @map("value_date") @db.Date
+  /// İşaretli: pozitif giriş, negatif çıkış. Sıfır olamaz.
+  amount           Decimal  @db.Decimal(18, 2)
+  description      String
+  counterparty     String?
+  counterpartyIban String?  @map("counterparty_iban")
+  reference        String?
+  /// open | matched | ignored
+  status           String   @default("open")
+
+  statement BankStatement          @relation(fields: [statementId], references: [id], onDelete: Cascade)
+  match     ReconciliationMatch?
+
+  @@unique([statementId, lineNo])
+  @@index([status, valueDate])
+  @@map("bank_statement_lines")
+}
+
+/// Ekstre satırı ↔ ödeme eşleşmesi.
+///
+/// İkisi de BENZERSİZ: aynı ödemeyi iki satıra bağlamak, aynı parayı
+/// iki kez tahsil edilmiş göstermek demektir.
+model ReconciliationMatch {
+  id              String   @id @default(uuid()) @db.Uuid
+  lineId          String   @unique @map("line_id") @db.Uuid
+  paymentId       String   @unique @map("payment_id") @db.Uuid
+  matchedBy       String   @map("matched_by") @db.Uuid
+  matchedAt       DateTime @default(now()) @map("matched_at")
+  /// Otomatik öneri kabul edildiyse skoru; elle eşleştirmede null.
+  suggestedScore  Int?     @map("suggested_score")
+  note            String?
+
+  line BankStatementLine @relation(fields: [lineId], references: [id], onDelete: Cascade)
+
+  @@map("reconciliation_matches")
+}
+
+/// İhtar kademesi. Gün eşikleri ve metin işletmenin tercihidir; koda
+/// gömülemez çünkü her sektörde farklıdır.
+model DunningLevel {
+  id             String   @id @default(uuid()) @db.Uuid
+  level          Int      @unique
+  minOverdueDays Int      @map("min_overdue_days")
+  label          String
+  body           String
+  /// Yıllık gecikme faizi oranı; null = faiz işletilmiyor.
+  interestRate   Decimal? @map("interest_rate") @db.Decimal(6, 3)
+
+  @@map("dunning_levels")
+}
+
+model DunningNotice {
+  id                String   @id @default(uuid()) @db.Uuid
+  documentNo        String   @unique @map("document_no")
+  partnerId         String   @map("partner_id") @db.Uuid
+  level             Int
+  issuedAt          DateTime @map("issued_at") @db.Date
+  totalAmount       Decimal  @map("total_amount") @db.Decimal(18, 2)
+  currency          String   @default("TRY")
+  oldestOverdueDays Int      @map("oldest_overdue_days")
+  invoiceNos        String[] @map("invoice_nos")
+  issuedBy          String   @map("issued_by") @db.Uuid
+  createdAt         DateTime @default(now()) @map("created_at")
+
+  @@index([partnerId, issuedAt])
+  @@map("dunning_notices")
 }

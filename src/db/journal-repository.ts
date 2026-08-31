@@ -26,6 +26,7 @@ import {
   type JournalSource,
 } from "../modules/accounting/journal.js";
 import { account } from "../modules/accounting/accounts.js";
+import { buildCashFlowStatement } from "../modules/accounting/cash-flow-statement.js";
 import { buildKebirXml, buildYevmiyeXml } from "../modules/accounting/edefter.js";
 
 type Tx = Prisma.TransactionClient;
@@ -248,6 +249,49 @@ export class JournalRepository {
   async income(from: Date, to: Date) {
     const tb = await this.trialBalance(from, to);
     return { ...incomeSummary(tb.rows), balanced: tb.balanced };
+  }
+
+  /**
+   * Nakit akış tablosu — DOLAYLI YÖNTEM.
+   *
+   * ÜÇ SORGU: dönem başı birikimli bakiyeler, dönem sonu birikimli
+   * bakiyeler, ve dönemin kâr/zararı. Bakiyeler BİRİKİMLİ olmak
+   * zorunda — sadece dönem hareketleriyle kurulan bir "değişim",
+   * geçmişten devreden stoğu ve alacağı yok sayar.
+   *
+   * HAM `debit - credit` KULLANILIYOR, `balance` DEĞİL.
+   *
+   * `trialBalance` satırındaki `balance`, hesabın KENDİ normal
+   * yönüne göre işaretli: bir satıcı borcu alacak bakiyeliyken
+   * POZİTİF döner. Nakit akış tablosu ise tek bir işaret dünyası
+   * ister (borç +, alacak −); aksi hâlde "borç arttı mı azaldı mı"
+   * sorusu hesap türüne göre farklı yanıt verir ve işaret hatası
+   * tabloyu denk ama YANLIŞ yapar.
+   */
+  async cashFlowStatement(from: Date, to: Date) {
+    const dawn = new Date(Date.UTC(1900, 0, 1));
+    const dayBefore = new Date(from.getTime() - 86_400_000);
+
+    const [acilis, kapanis, sonuc] = await Promise.all([
+      this.trialBalance(dawn, dayBefore),
+      this.trialBalance(dawn, to),
+      this.income(from, to),
+    ]);
+
+    const harita = (rows: readonly { accountCode: string; debit: number; credit: number }[]) =>
+      new Map(rows.map((r) => [r.accountCode, Math.round((r.debit - r.credit) * 100) / 100]));
+
+    return {
+      statement: buildCashFlowStatement(
+        from,
+        to,
+        sonuc.netProfit,
+        harita(acilis.rows),
+        harita(kapanis.rows),
+      ),
+      netProfit: sonuc.netProfit,
+      trialBalanced: kapanis.balanced,
+    };
   }
 
   /**

@@ -1304,6 +1304,80 @@ CREATE TABLE "watches" (
     CONSTRAINT "watches_pkey" PRIMARY KEY ("id")
 );
 
+-- CreateTable
+CREATE TABLE "bank_statements" (
+    "id" UUID NOT NULL,
+    "account_id" UUID NOT NULL,
+    "statement_no" TEXT NOT NULL,
+    "from_date" DATE NOT NULL,
+    "to_date" DATE NOT NULL,
+    "opening_balance" DECIMAL(18,2) NOT NULL,
+    "closing_balance" DECIMAL(18,2) NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'TRY',
+    "imported_by" UUID,
+    "imported_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "bank_statements_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "bank_statement_lines" (
+    "id" UUID NOT NULL,
+    "statement_id" UUID NOT NULL,
+    "line_no" INTEGER NOT NULL,
+    "value_date" DATE NOT NULL,
+    "amount" DECIMAL(18,2) NOT NULL,
+    "description" TEXT NOT NULL,
+    "counterparty" TEXT,
+    "counterparty_iban" TEXT,
+    "reference" TEXT,
+    "status" TEXT NOT NULL DEFAULT 'open',
+
+    CONSTRAINT "bank_statement_lines_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "reconciliation_matches" (
+    "id" UUID NOT NULL,
+    "line_id" UUID NOT NULL,
+    "payment_id" UUID NOT NULL,
+    "matched_by" UUID NOT NULL,
+    "matched_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "suggested_score" INTEGER,
+    "note" TEXT,
+
+    CONSTRAINT "reconciliation_matches_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "dunning_levels" (
+    "id" UUID NOT NULL,
+    "level" INTEGER NOT NULL,
+    "min_overdue_days" INTEGER NOT NULL,
+    "label" TEXT NOT NULL,
+    "body" TEXT NOT NULL,
+    "interest_rate" DECIMAL(6,3),
+
+    CONSTRAINT "dunning_levels_pkey" PRIMARY KEY ("id")
+);
+
+-- CreateTable
+CREATE TABLE "dunning_notices" (
+    "id" UUID NOT NULL,
+    "document_no" TEXT NOT NULL,
+    "partner_id" UUID NOT NULL,
+    "level" INTEGER NOT NULL,
+    "issued_at" DATE NOT NULL,
+    "total_amount" DECIMAL(18,2) NOT NULL,
+    "currency" TEXT NOT NULL DEFAULT 'TRY',
+    "oldest_overdue_days" INTEGER NOT NULL,
+    "invoice_nos" TEXT[],
+    "issued_by" UUID NOT NULL,
+    "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "dunning_notices_pkey" PRIMARY KEY ("id")
+);
+
 -- CreateIndex
 CREATE UNIQUE INDEX "partners_code_key" ON "partners"("code");
 
@@ -1790,6 +1864,30 @@ CREATE INDEX "watches_owner_user_id_idx" ON "watches"("owner_user_id");
 -- CreateIndex
 CREATE UNIQUE INDEX "watches_owner_user_id_name_key" ON "watches"("owner_user_id", "name");
 
+-- CreateIndex
+CREATE UNIQUE INDEX "bank_statements_account_id_statement_no_key" ON "bank_statements"("account_id", "statement_no");
+
+-- CreateIndex
+CREATE INDEX "bank_statement_lines_status_value_date_idx" ON "bank_statement_lines"("status", "value_date");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "bank_statement_lines_statement_id_line_no_key" ON "bank_statement_lines"("statement_id", "line_no");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "reconciliation_matches_line_id_key" ON "reconciliation_matches"("line_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "reconciliation_matches_payment_id_key" ON "reconciliation_matches"("payment_id");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "dunning_levels_level_key" ON "dunning_levels"("level");
+
+-- CreateIndex
+CREATE UNIQUE INDEX "dunning_notices_document_no_key" ON "dunning_notices"("document_no");
+
+-- CreateIndex
+CREATE INDEX "dunning_notices_partner_id_issued_at_idx" ON "dunning_notices"("partner_id", "issued_at");
+
 -- AddForeignKey
 ALTER TABLE "partner_aliases" ADD CONSTRAINT "partner_aliases_partner_id_fkey" FOREIGN KEY ("partner_id") REFERENCES "partners"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 
@@ -1912,4 +2010,13 @@ ALTER TABLE "payroll_lines" ADD CONSTRAINT "payroll_lines_run_id_fkey" FOREIGN K
 
 -- AddForeignKey
 ALTER TABLE "payroll_lines" ADD CONSTRAINT "payroll_lines_employee_id_fkey" FOREIGN KEY ("employee_id") REFERENCES "employees"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "bank_statements" ADD CONSTRAINT "bank_statements_account_id_fkey" FOREIGN KEY ("account_id") REFERENCES "bank_accounts"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "bank_statement_lines" ADD CONSTRAINT "bank_statement_lines_statement_id_fkey" FOREIGN KEY ("statement_id") REFERENCES "bank_statements"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- AddForeignKey
+ALTER TABLE "reconciliation_matches" ADD CONSTRAINT "reconciliation_matches_line_id_fkey" FOREIGN KEY ("line_id") REFERENCES "bank_statement_lines"("id") ON DELETE CASCADE ON UPDATE CASCADE;
 

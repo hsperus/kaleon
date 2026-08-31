@@ -780,6 +780,37 @@ export async function seedUls(db: TenantDb): Promise<UlsResult> {
   });
 
   /*
+   * ── 16b. İHTAR KADEMELERİ ──
+   *
+   * Kademeler KONFİGÜRASYONDUR, demo verisi değil — ama tanımlı
+   * değilken `plan_dunning_run` hiçbir şey yapamaz ve kullanıcı
+   * "bozuk" sanır. Makul bir başlangıç kurulur; işletme değiştirir.
+   *
+   * Faiz oranları ilk kademede YOK: ilk hatırlatmada faiz istemek,
+   * çoğu zaman unutulmuş bir ödemeyi ticari bir soruna çevirir.
+   */
+  await step("ihtar-kademe", async () => {
+    const kademeler = [
+      { level: 1, minOverdueDays: 15, label: "Hatırlatma", interestRate: null,
+        body: "Vadesi geçmiş bakiyenizi hatırlatmak isteriz. Ödemenizi yaptıysanız bu yazıyı dikkate almayınız." },
+      { level: 2, minOverdueDays: 45, label: "İkinci ihtar", interestRate: 36,
+        body: "Vadesi geçen borcunuz için ikinci kez bildirimde bulunuyoruz. Gecikme faizi işletilmektedir." },
+      { level: 3, minOverdueDays: 90, label: "Son ihtar", interestRate: 48,
+        body: "Bu son bildirimdir. Ödeme yapılmadığı takdirde hukuki yollara başvurma hakkımız saklıdır." },
+    ];
+    let yeni = 0;
+    for (const k of kademeler) {
+      const r = await db.dunningLevel.upsert({
+        where: { level: k.level },
+        create: k,
+        update: {},
+      });
+      if (r) yeni += 1;
+    }
+    return `ihtar: ${yeni} kademe (15/45/90 gün)`;
+  });
+
+  /*
    * ── 17a. BANKA HESAPLARI ──
    *
    * NAKİT PROJEKSİYONUNUN AÇILIŞ SATIRI. Hesap yoksa `openingCash`
@@ -876,6 +907,77 @@ export async function seedUls(db: TenantDb): Promise<UlsResult> {
       yeni += 1;
     }
     return `vade: ${yeni} gelen fatura (1 bloke, 1 vadesiz, 1 dövizli) · ${vadeYazilan} cariye vade`;
+  });
+
+  /*
+   * ── 17c. ÖDEME VE BANKA EKSTRESİ ──
+   *
+   * MUTABAKATIN GÖSTERİLEBİLMESİ İÇİN ÖNCE ÖDEME GEREKİR. Ekstre
+   * satırı tek başına bir şey anlatmaz; anlamı, karşısında duran
+   * ödemeyle eşleşip eşleşmemesinde.
+   *
+   * Ekstre KASITLI OLARAK ÜÇ SATIRLI: biri ödemeyle tam eşleşir,
+   * biri hiçbir kayda uymaz (banka masrafı — sistemde karşılığı yok),
+   * biri ise tutarı tutan ama başka bir tarihte olan bir hareket.
+   * Hepsi eşleşseydi mutabakat aracı yalnızca kolay hâlini gösterirdi.
+   */
+  await step("tahsilat", async () => {
+    if (await db.payment.count() > 0) return "tahsilat: zaten var, atlandı";
+    const yakit = await db.partner.findUnique({ where: { code: "S-2001" } });
+    if (!yakit) return "tahsilat: cari yok, atlandı";
+
+    // Temmuz yakıt faturasının ödemesi — 23.808.000 ₺.
+    const odeme = await db.payment.create({
+      data: {
+        documentNo: "ODM-2026-0001",
+        direction: "outgoing",
+        partnerId: yakit.id,
+        amount: 23_808_000,
+        currency: "TRY",
+        method: "eft",
+        paidAt: d("2026-08-14"),
+        reference: "DK20260814",
+        createdBy: SEED_USER,
+        allocations: { create: [{ invoiceNo: "GF-2026-4488", amount: 23_808_000 }] },
+      },
+    });
+
+    const hesap = await db.bankAccount.findUnique({
+      where: { externalId_currency: { externalId: "ULS-TRY-001", currency: "TRY" } },
+    });
+    if (!hesap) return `tahsilat: ${odeme.documentNo} (banka hesabı yok, ekstre atlandı)`;
+
+    const varMi = await db.bankStatement.findUnique({
+      where: { accountId_statementNo: { accountId: hesap.id, statementNo: "EK-2026-08" } },
+    });
+    if (varMi) return `tahsilat: ${odeme.documentNo} · ekstre zaten var`;
+
+    // Açılış + hareketler = kapanış olacak şekilde kuruluyor; tutarsız
+    // bir ekstre tohumlamak, aracın uyarısını yalancı çıkarırdı.
+    const hareketler = [
+      { lineNo: 1, valueDate: d("2026-08-14"), amount: -23_808_000,
+        description: "EFT DK20260814 PETROL OFISI HAVACILIK", counterparty: "PETROL OFISI HAVACILIK A.S.",
+        reference: "DK20260814" },
+      { lineNo: 2, valueDate: d("2026-08-14"), amount: -175,
+        description: "EFT MASRAFI", counterparty: null, reference: null },
+      { lineNo: 3, valueDate: d("2026-08-26"), amount: 412_000,
+        description: "GELEN HAVALE MUHTELIF", counterparty: null, reference: null },
+    ];
+    const hareket = hareketler.reduce((t, h) => t + h.amount, 0);
+    await db.bankStatement.create({
+      data: {
+        accountId: hesap.id,
+        statementNo: "EK-2026-08",
+        fromDate: d("2026-08-01"),
+        toDate: d("2026-08-31"),
+        openingBalance: 84_600_000,
+        closingBalance: 84_600_000 + hareket,
+        currency: "TRY",
+        importedBy: SEED_USER,
+        lines: { create: hareketler },
+      },
+    });
+    return `tahsilat: ${odeme.documentNo} + EK-2026-08 (3 hareket, 1'i eşleşir)`;
   });
 
   // ── 18. İade dekontu ── navlun düzeltmesi.

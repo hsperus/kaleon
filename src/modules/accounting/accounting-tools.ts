@@ -169,6 +169,77 @@ export function accountingTools(repo: JournalRepository) {
     },
   });
 
+  const cashFlow = defineTool({
+    name: "get_cash_flow_statement",
+    module: "accounting",
+    authority: 0,
+    description: {
+      tr:
+        "Nakit akış tablosu (DOLAYLI YÖNTEM): işletme, yatırım ve finansman " +
+        "faaliyetlerinden nakit akışı. Kâr eden bir şirketin nakdinin neden " +
+        "azaldığını yalnızca bu tablo anlatır. 'Nakit akış tablosu', 'kâr var " +
+        "ama para yok', 'nakdimiz nereye gitti' sorularında kullan. " +
+        "GELECEĞE bakan project_cash_flow ile karıştırma: bu tablo GEÇMİŞİ " +
+        "anlatır ve mali müşavirin istediği belgedir.",
+      en: "Indirect-method cash flow statement: operating, investing, financing.",
+    },
+    input: z.strictObject({
+      from: z.string().describe("Dönem başı (ISO 8601)."),
+      to: z.string().describe("Dönem sonu (ISO 8601), dahil."),
+    }),
+    requires: ["accounting:ledger.read"],
+    async execute(input, _ctx) {
+      const r = await repo.cashFlowStatement(new Date(input.from), new Date(input.to));
+      const s = r.statement;
+      return {
+        ok: true as const,
+        data: s,
+        sources: [
+          {
+            system: "Yevmiye defteri",
+            kind: "module" as const,
+            recordCount: 1,
+            syncedAt: new Date().toISOString(),
+          },
+        ],
+        risks: [
+          /*
+           * DENGESİZ TABLO SESSİZ KALMAZ.
+           *
+           * Tablonun ürettiği net değişim, nakit hesaplarının gerçek
+           * değişimine eşit olmak zorunda. Tutmuyorsa bir hesap grubu
+           * kaçırılmıştır — ve yanlış bir nakit akış tablosu, doğru
+           * görünen bir yalandır.
+           */
+          ...(s.balanced
+            ? []
+            : [
+                {
+                  severity: "critical" as const,
+                  message:
+                    `TABLO DENGESİZ: hesaplanan net değişim ${money(s.netChange)}, ` +
+                    `nakit hesaplarındaki gerçek değişim ${money(s.closingCash - s.openingCash)}. ` +
+                    `Fark ${money(s.checkDifference)}. Bir hesap grubu tabloya girmemiş; ` +
+                    `bu tablo mali müşavire verilmemeli.`,
+                },
+              ]),
+          ...(s.operatingTotal < 0
+            ? [
+                {
+                  severity: "warning" as const,
+                  message:
+                    `İşletme faaliyetlerinden nakit ÇIKIŞI var (${money(s.operatingTotal)}). ` +
+                    `Şirket esas işinden nakit üretmiyor; fark yatırım ya da ` +
+                    `finansmanla kapanıyor demektir.`,
+                },
+              ]
+            : []),
+        ],
+        confidence: s.balanced ? 94 : 35,
+      };
+    },
+  });
+
   const income = defineTool({
     name: "get_income_statement",
     module: "accounting",
@@ -648,6 +719,7 @@ export function accountingTools(repo: JournalRepository) {
     trialBalance,
     balance,
     income,
+    cashFlow,
     statement,
     aging,
     documentEntry,

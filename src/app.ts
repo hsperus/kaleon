@@ -15,6 +15,8 @@ import { discoveryTools } from "./modules/discovery/tools.js";
 import { masterDataCrudTools } from "./modules/master-data/crud-tools.js";
 import { cashFlowTools } from "./modules/finance/cashflow-tools.js";
 import { CashFlowRepository } from "./db/cashflow-repository.js";
+import { reconciliationTools } from "./modules/finance/reconciliation-tools.js";
+import { ReconciliationRepository } from "./db/reconciliation-repository.js";
 import { batchTools } from "./modules/inventory/batch-tools.js";
 import { procurementTools } from "./modules/procurement/procurement-tools.js";
 import { leaveTools } from "./modules/hr/leave-tools.js";
@@ -193,6 +195,12 @@ export function buildRegistry(db: DataSource, repos: Repositories = {}): ToolReg
      * dünü anlatır, gelecek haftanın banka bakiyesini söylemez.
      */
     ...(repos.tenantDb ? cashFlowTools(new CashFlowRepository(repos.tenantDb), db) : []),
+    /*
+     * BANKA MUTABAKATI VE İHTAR. Entegrasyon katmanı `bank_statement`
+     * tipinde belge kabul ediyordu ama onu defterle eşleştiren süreç
+     * yoktu — boru vardı, süreç yoktu.
+     */
+    ...(repos.tenantDb ? reconciliationTools(new ReconciliationRepository(repos.tenantDb)) : []),
     // Kur değerlemesi HEM defteri HEM kur tablosunu okur; ikisi de
     // yoksa tool hiç kurulmaz — yarım bir değerleme yanlış sayı üretir.
     ...(repos.revaluation && repos.valuation
