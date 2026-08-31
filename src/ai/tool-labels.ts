@@ -59,6 +59,8 @@ const LABELS: Readonly<Record<string, string>> = {
   post_goods_receipt: "Mal kabulü kaydedildi",
   get_period_status: "Dönem durumu okundu",
   close_period: "Dönem kapatıldı",
+  search_employees: "Çalışan listesi okundu",
+  get_employee: "Personel kartı okundu",
   preview_fx_revaluation: "Kur değerlemesi hesaplandı",
   post_fx_revaluation: "Kur değerlemesi yevmiyeye yazıldı",
   reopen_period: "Dönem yeniden açıldı",

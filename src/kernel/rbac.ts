@@ -89,6 +89,8 @@ export const ROLE_PERMISSIONS: Record<RoleId, readonly Permission[]> = {
      */
     "hr:payroll.read",
     "hr:payroll.run",
+    // Bordro çalıştıran, kimin bordroya gireceğini görebilmeli.
+    "hr:roster.read",
     // ÖDEME MALİ İŞLEMDİR VE TALEBİ AÇANLA AYNI ELDE OLAMAZ.
     "finance:payment.read",
     "finance:payment.write",
@@ -143,6 +145,20 @@ export const ROLE_PERMISSIONS: Record<RoleId, readonly Permission[]> = {
     "master-data:employee.write",
     "hr:attendance.write",
     "hr:attendance.read",
+    /*
+     * KADRO LİSTESİ AYRI BİR İZİNDİR.
+     *
+     * Mesai kaydını okumakla "kim çalışıyor" listesini görmek aynı şey
+     * değil. Ayrılmasının sebebi somut: CFO'nun mesai kaydına ihtiyacı
+     * yok ama bordro çalıştırdığı için kadroyu görmesi gerekiyor;
+     * operatörün ise kendi devamı dışında hiçbir kadro bilgisine
+     * ihtiyacı yok. Tek izinde toplansaydı biri fazla, biri eksik
+     * görürdü.
+     *
+     * ÜCRET BU İZNE BAĞLI DEĞİL: liste herkese açık olsa da ücret
+     * alanı `hr:payroll.read` ile ayrıca maskeleniyor.
+     */
+    "hr:roster.read",
     "hr:leave.read",
     // İK izin talebi girer ve vardiya tanımlar; ONAYLAYAN AYRI OLABİLİR
     // ama İK kendi talebini yine onaylayamaz — kural kimlik
@@ -207,6 +223,8 @@ export const ROLE_PERMISSIONS: Record<RoleId, readonly Permission[]> = {
     "maintenance:order.write",
     "maintenance:breakdown.report",
     "hr:attendance.department",
+    // Kendi hattındaki ekibi görmesi gerekir; ücreti yine göremez.
+    "hr:roster.read",
     // Üretim müdürü kendi ekibinin vardiyasını planlar ve izin onaylar;
     // kapasite planı buna bağlıdır.
     "hr:leave.read",

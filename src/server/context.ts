@@ -333,6 +333,7 @@ function buildRegistryForTenant(tenant: TenantContext, isDemo = false): ToolRegi
     valuation: new ValuationRepository(db),
     periods: new PeriodRepository(db),
     revaluation: new RevaluationRepository(db),
+    tenantDb: db,
     batches: new BatchRepository(db),
     procurement: new ProcurementRepository(db),
     leave: new LeaveRepository(db),

@@ -10,6 +10,7 @@ import { salesTools } from "./modules/sales/sales-tools.js";
 import { valuationTools } from "./modules/inventory/valuation-tools.js";
 import { periodTools } from "./modules/finance/period-tools.js";
 import { revaluationTools } from "./modules/finance/revaluation-tools.js";
+import { rosterTools } from "./modules/hr/roster-tools.js";
 import { batchTools } from "./modules/inventory/batch-tools.js";
 import { procurementTools } from "./modules/procurement/procurement-tools.js";
 import { leaveTools } from "./modules/hr/leave-tools.js";
@@ -50,6 +51,7 @@ import type { ProcurementRepository } from "./db/procurement-repository.js";
 import type { BatchRepository } from "./db/batch-repository.js";
 import type { PeriodRepository } from "./db/period-repository.js";
 import type { RevaluationRepository } from "./db/revaluation-repository.js";
+import type { TenantDb } from "./db/client.js";
 import type { ValuationRepository } from "./db/valuation-repository.js";
 import type { SalesRepository } from "./db/sales-repository.js";
 import { InMemoryAuditSink, type AuditSink } from "./kernel/audit.js";
@@ -92,6 +94,8 @@ export interface Repositories {
   /** Muhasebe dönemi ve dönem kapama. */
   readonly periods?: PeriodRepository;
   readonly revaluation?: RevaluationRepository;
+  /** Doğrudan tenant istemcisi — kadro gibi tek tablo sorguları için. */
+  readonly tenantDb?: TenantDb;
   /** Parti izleme ve şecere. */
   readonly batches?: BatchRepository;
   /** Satın alma talebi ve ödeme. */
@@ -164,6 +168,9 @@ export function buildRegistry(db: DataSource, repos: Repositories = {}): ToolReg
     ...(repos.sales ? salesTools(repos.sales) : []),
     ...(repos.valuation ? valuationTools(repos.valuation) : []),
     ...(repos.periods ? periodTools(repos.periods) : []),
+    // KADRO LİSTESİ ZİNCİRİN İLK HALKASI. Kişi sorguları personel kodu
+    // istiyor; kodu bilmek için önce listeyi görmek gerekiyor.
+    ...(repos.tenantDb ? rosterTools(repos.tenantDb) : []),
     // Kur değerlemesi HEM defteri HEM kur tablosunu okur; ikisi de
     // yoksa tool hiç kurulmaz — yarım bir değerleme yanlış sayı üretir.
     ...(repos.revaluation && repos.valuation

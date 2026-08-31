@@ -951,6 +951,13 @@ export default function Page() {
         </>
       )}
 
+      {/*
+        ALT BAR KAYDIRMA ALANININ DIŞINDA.
+        Önce `.stage` içindeydi ve mesajlarla birlikte yukarı kayıyordu:
+        uzun bir cevabın ortasında soru sormak için önce en alta inmek
+        gerekiyordu. Yazma alanı her zaman aynı yerde durmalı.
+      */}
+      <div className="main">
       <div
         className={`stage${panels.length ? " shifted" : ""}${chatting ? "" : " welcome"}`}
         ref={stageRef}
@@ -1057,83 +1064,86 @@ export default function Page() {
             </div>
           )}
 
-          <div className="dock">
-            {upload && (
-              <div className="attach in">
-                <span className="attach-name">{upload.filename}</span>
-                <span className="attach-meta">
-                  {upload.rowCount} satır · {upload.headers.length} sütun
-                </span>
-                <button
-                  type="button"
-                  className="attach-x"
-                  aria-label="Dosyayı kaldır"
-                  onClick={() => {
-                    setUpload(null);
-                    uploadRef.current = null;
-                  }}
-                >
-                  ×
-                </button>
-              </div>
-            )}
-            <div className="composer in" style={{ animationDelay: ".44s" }}>
-              <input
-                ref={fileRef}
-                type="file"
-                accept=".csv,.txt,.tsv"
-                hidden
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) void attachFile(f);
-                }}
-              />
-              <button
-                type="button"
-                className="clip"
-                aria-label="Dosya ekle"
-                title="CSV dosyası ekle"
-                disabled={uploading}
-                onClick={() => fileRef.current?.click()}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                  <path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.67 3.67 0 0 1 5.19 5.19l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.59l8.49-8.48" />
-                </svg>
-              </button>
-              <textarea
-                ref={inputRef}
-                rows={1}
-                value={value}
-                placeholder={
-                  upload ? "Bu dosyayla ne yapayım?" : "Şirketinize bir şey sorun…"
-                }
-                onChange={(e) => {
-                  setValue(e.target.value);
-                  e.target.style.height = "auto";
-                  e.target.style.height = `${Math.min(e.target.scrollHeight, 150)}px`;
-                }}
-                onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) {
-                    e.preventDefault();
-                    void ask(value);
-                  }
-                }}
-                aria-label="Soru"
-              />
-              <button
-                className={`send${value.trim() ? " on" : ""}`}
-                onClick={() => void ask(value)}
-                aria-label="Gönder"
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 19V5M5 12l7-7 7 7" />
-                </svg>
-              </button>
-            </div>
-
-          </div>
         </div>
         <div className="tail" style={{ height: chatting ? 0 : "18vh" }} />
+      </div>
+
+        <div className="dock">
+          {upload && (
+            <div className="attach in">
+              <span className="attach-name">{upload.filename}</span>
+              <span className="attach-meta">
+                {upload.rowCount} satır · {upload.headers.length} sütun
+              </span>
+              <button
+                type="button"
+                className="attach-x"
+                aria-label="Dosyayı kaldır"
+                onClick={() => {
+                  setUpload(null);
+                  uploadRef.current = null;
+                }}
+              >
+                ×
+              </button>
+            </div>
+          )}
+          <div className="composer in" style={{ animationDelay: ".44s" }}>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".csv,.txt,.tsv"
+              hidden
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) void attachFile(f);
+              }}
+            />
+            <button
+              type="button"
+              className="clip"
+              aria-label="Dosya ekle"
+              title="CSV dosyası ekle"
+              disabled={uploading}
+              onClick={() => fileRef.current?.click()}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M21.4 11.05 12.25 20.2a5.5 5.5 0 0 1-7.78-7.78l9.19-9.19a3.67 3.67 0 0 1 5.19 5.19l-9.2 9.19a1.83 1.83 0 0 1-2.59-2.59l8.49-8.48" />
+              </svg>
+            </button>
+            <textarea
+              ref={inputRef}
+              rows={1}
+              value={value}
+              /* Boş kutuda yer tutucu yok: imleç zaten orada yanıp
+                 sönüyor ve ne yapılacağı belli. Dosya eklendiğinde
+                 ise gerçekten bir soru var — o zaman yazıyor. */
+              {...(upload ? { placeholder: "Bu dosyayla ne yapayım?" } : {})}
+              onChange={(e) => {
+                setValue(e.target.value);
+                e.target.style.height = "auto";
+                e.target.style.height = `${Math.min(e.target.scrollHeight, 150)}px`;
+              }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" && !e.shiftKey) {
+                  e.preventDefault();
+                  void ask(value);
+                }
+              }}
+              aria-label="Soru"
+            />
+            <button
+              className={`send${value.trim() ? " on" : ""}`}
+              onClick={() => void ask(value)}
+              aria-label="Gönder"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.3" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 19V5M5 12l7-7 7 7" />
+              </svg>
+            </button>
+          </div>
+
+        </div>
       </div>
 
       <aside className={`drawer${panels.length ? " open" : ""}`} aria-label="Paneller">
