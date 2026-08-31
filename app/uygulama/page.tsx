@@ -60,6 +60,7 @@ interface Session {
   readonly modelConnected: boolean;
   readonly maxAuthority: number;
   readonly identitySource: "session" | "dev-header";
+  readonly starters?: readonly { label: string; question: string }[];
   readonly dataPlane: "demo" | "postgres";
   readonly displayName: string;
   /** Belge antedinde görünür. */
@@ -842,7 +843,7 @@ export default function Page() {
                 {new Date().toLocaleDateString("tr-TR", { day: "numeric", month: "long" })}
               </div>
               <h1 className="greet in" style={{ animationDelay: ".12s" }}>
-                Günaydın Cebrail Bey.
+                {greeting(session?.displayName)}
                 <br />
                 <em>Ne öğrenmek istersiniz?</em>
               </h1>
@@ -851,6 +852,25 @@ export default function Page() {
 
           {!chatting && briefing && briefing.signals.length > 0 && (
             <Signals signals={briefing.signals} onAsk={(q) => void ask(q)} />
+          )}
+
+          {/*
+            BOŞ BRİFİNG SESSİZ KALMAZ AMA ALARM DA UYDURMAZ.
+
+            Yeni kurulan bir şirkette uyarılacak bir şey olmaması iyi
+            haberdir; ekranı doldurmak için sahte bir kritik konu
+            üretmek, ürünün ilk verdiği bilginin yalan olması demektir.
+            Onun yerine ne sorulabileceğini gösteriyoruz — ve sorular
+            şirketin kendi sektöründen.
+          */}
+          {!chatting && briefing && briefing.signals.length === 0 && session?.starters && (
+            <div className="starters in" style={{ animationDelay: ".2s" }}>
+              {session.starters.map((s2) => (
+                <button key={s2.question} type="button" onClick={() => void ask(s2.question)}>
+                  {s2.label}
+                </button>
+              ))}
+            </div>
           )}
 
           <div className="stream">
@@ -1238,6 +1258,31 @@ export function asAttachedDoc(data: unknown): AttachedDoc | null {
   }
 
   return null;
+}
+
+/**
+ * Karşılama cümlesi.
+ *
+ * ADI DA SAATİ DE SABİT YAZILIYDU: "Günaydın Cebrail Bey." Gece
+ * yarısı giren birine günaydın diyordu ve adı ne olursa olsun
+ * Cebrail'e sesleniyordu. Demo ortamında bu, kişinin ürünü ilk
+ * gördüğü ekranda başkasının adını görmesi demekti.
+ *
+ * UNVAN EKLENMİYOR. "Bey" yazmak, adından cinsiyet tahmin etmek
+ * demektir ve Türkçe adların çoğunda bu tahmin yanlış olabilir.
+ * Sadece ilk ad kullanılıyor — hem daha sıcak hem de tahminsiz.
+ */
+function greeting(displayName: string | undefined): string {
+  const h = new Date().getHours();
+  const zaman =
+    h < 6 ? "İyi geceler" : h < 12 ? "Günaydın" : h < 18 ? "İyi günler" : "İyi akşamlar";
+
+  const ilkAd = (displayName ?? "")
+    .trim()
+    .split(/\s+/)
+    .find((w) => /^\p{L}/u.test(w));
+
+  return ilkAd ? `${zaman}, ${ilkAd}.` : `${zaman}.`;
 }
 
 /**

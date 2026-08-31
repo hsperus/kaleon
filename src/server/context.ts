@@ -196,11 +196,16 @@ async function seedDemo(tenant: TenantContext): Promise<void> {
  * Şema adı UYGULAMADAN TÜRETİLMEZ, kayıttan okunur: slug'dan şema adı
  * hesaplamak, kaydın söylediğinden farklı bir şemaya yazma riski demektir.
  */
-const tenantCache = new Map<string, { ctx: TenantContext; name: string }>();
+interface TenantEntry {
+  readonly ctx: TenantContext;
+  readonly name: string;
+  readonly sector: string | null;
+  readonly goals: string | null;
+}
 
-async function tenantContextById(
-  tenantId: string,
-): Promise<{ ctx: TenantContext; name: string } | null> {
+const tenantCache = new Map<string, TenantEntry>();
+
+async function tenantContextById(tenantId: string): Promise<TenantEntry | null> {
   const cached = tenantCache.get(tenantId);
   if (cached) return cached;
   const row = await sharedClient().tenant.findUnique({ where: { id: tenantId } });
@@ -213,6 +218,8 @@ async function tenantContextById(
       baseCurrency: row.baseCurrency,
     },
     name: row.name,
+    sector: row.sector,
+    goals: row.goals,
   };
   tenantCache.set(tenantId, entry);
   return entry;
@@ -410,6 +417,16 @@ export interface RequestContext {
   readonly displayName: string;
   /** Şirketin görünen adı — kimliği değil. */
   readonly companyName: string;
+  /*
+   * ŞİRKET PROFİLİ — AJANIN NEYE DİKKAT EDECEĞİ.
+   *
+   * Sektör ve öncelikler cevabın TONUNU belirler, RAKAMINI değil.
+   * Bir dökümhaneye tekstil örneği vermemek, bir ihracatçıya kur
+   * riskini hatırlatmak için. Hiçbir hesaba girmez, hiçbir yetkiyi
+   * genişletmez; yanlış girilmiş bir sektör yanlış rakam üretmez.
+   */
+  readonly sector: string | null;
+  readonly goals: string | null;
   /**
    * Verinin durumu — arayüzde AÇIKÇA gösterilir.
    *   "demo"     → demo tenant'ının hazır veri kümesi
@@ -465,6 +482,8 @@ export async function createContext(req: Request): Promise<RequestContext> {
       identitySource: "session",
       displayName: identity.displayName,
       companyName: found.name,
+      sector: found.sector,
+      goals: found.goals,
       dataPlane: isDemo ? "demo" : "postgres",
     };
   }
@@ -485,6 +504,8 @@ export async function createContext(req: Request): Promise<RequestContext> {
     identitySource: "dev-header",
     displayName: "Cebrail Karaarslan (demo)",
     companyName: DEMO_COMPANY_NAME,
+    sector: "Makina imalatı",
+    goals: null,
     dataPlane: "demo",
     principal: createPrincipal({
       userId: "00000000-0000-0000-0000-0000000000de",

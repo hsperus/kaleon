@@ -28,8 +28,8 @@ export function Hero() {
           amortisman ya da üretim tarafından ne gerekiyorsa o gelsin.
         </p>
         <div className="mk-acts k-rise" style={{ animationDelay: ".44s" }}>
-          <a className="mk-pill-lg" href="/uygulama">
-            Sisteme gir
+          <a className="mk-pill-lg" href="/deneyin">
+            Şirketinizle deneyin
           </a>
           <a className="mk-pill-ghost" href="#ne-yapar">
             Ne yapabildiğini gör

@@ -51,6 +51,7 @@ export function Shell({ children }: { children: ReactNode }) {
               {l.label}
             </a>
           ))}
+          <a href="/deneyin">Deneyin</a>
           <a className="mk-pill" href="/uygulama">
             Giriş
           </a>

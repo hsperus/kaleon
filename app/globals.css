@@ -2359,3 +2359,141 @@ button.role, select.role {
     max-width: none !important;
   }
 }
+
+/* ═══════════════════════════════════════════════════════════════════
+ * DEMO KAYIT AKIŞI
+ *
+ * Form tanıtım sayfasının içinde yaşıyor ama ONUN GÖRSEL DİLİNİ
+ * SÜRDÜRMEZ, sakinleştirir: kapsül düğmeler ve mono etiketler kalır,
+ * hareket ve renk kütleleri geri çekilir. Kayıt anı gösteri anı
+ * değildir; kişi burada bir şey yazıyor ve yazarken rahatsız
+ * edilmemeli.
+ *
+ * ALAN ALTI AÇIKLAMALARI (`em`) SÜS DEĞİL. Her alanın niçin sorulduğu
+ * yazılmazsa "sektör" bir pazarlama sorusu sanılır, rastgele seçilir
+ * ve ürün kişinin işine benzemez çıkar.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+.dm { max-width: 640px; margin: 44px 0 0 }
+
+/* Adım rayı — nerede olduğunu söyler, tıklanmaz. */
+.dm-rail {
+  display: flex; gap: 0; margin-bottom: 30px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px; letter-spacing: .1em; text-transform: uppercase;
+}
+.dm-rail span {
+  flex: 1; padding: 0 0 9px; color: var(--fg-6);
+  border-bottom: 2px solid rgba(255, 255, 255, .07);
+  transition: color .3s var(--glide), border-color .3s var(--glide);
+}
+.dm-rail span.done { color: var(--fg-4); border-bottom-color: rgba(255, 255, 255, .16) }
+.dm-rail span.on { color: var(--blue); border-bottom-color: var(--blue) }
+
+.dm-step { display: flex; flex-direction: column; gap: 26px; animation: kRiseSm .5s ease-out both }
+
+.dm-field { display: flex; flex-direction: column; gap: 8px }
+.dm-field > span {
+  font-size: 14.5px; font-weight: 560; letter-spacing: -.012em; color: var(--fg);
+}
+.dm-field > span i { font-style: normal; font-weight: 400; color: var(--fg-5); font-size: 13px }
+/* Alanın NİÇİN sorulduğu. Yardım metni değil, gerekçe. */
+.dm-field em {
+  font-style: normal; font-size: 12.5px; line-height: 1.5; color: var(--fg-5);
+}
+
+.dm-field input, .dm-field textarea {
+  font: inherit; font-size: 15px; color: var(--fg);
+  background: rgba(255, 255, 255, .03);
+  border: 1px solid rgba(255, 255, 255, .11); border-radius: 10px;
+  padding: 12px 14px; resize: vertical;
+  transition: border-color .2s, box-shadow .2s;
+}
+.dm-field input::placeholder, .dm-field textarea::placeholder { color: var(--fg-6) }
+.dm-field input:hover, .dm-field textarea:hover { border-color: rgba(255, 255, 255, .2) }
+.dm-field input:focus-visible, .dm-field textarea:focus-visible {
+  outline: none; border-color: rgba(90, 162, 255, .6);
+  box-shadow: 0 0 0 3px rgba(90, 162, 255, .15);
+}
+
+/* Seçim hapları — açılır liste değil. Altı seçenek zaten görünürken
+   onları bir menünün arkasına saklamak fazladan bir tıklamadır. */
+.dm-chips { display: flex; flex-wrap: wrap; gap: 8px }
+.dm-chips button {
+  font: inherit; font-size: 13.5px; color: var(--fg-3);
+  background: rgba(255, 255, 255, .02);
+  border: 1px solid rgba(255, 255, 255, .11); border-radius: 980px;
+  padding: 8px 16px; cursor: pointer;
+  transition: background .2s, border-color .2s, color .2s;
+}
+.dm-chips button:hover { background: rgba(255, 255, 255, .06); color: var(--fg) }
+.dm-chips button.on {
+  background: rgba(90, 162, 255, .14); border-color: rgba(90, 162, 255, .5); color: var(--blue-soft);
+}
+
+.dm-consent {
+  display: flex; align-items: flex-start; gap: 11px;
+  padding: 15px 17px; border-radius: 12px;
+  background: rgba(255, 255, 255, .02); border: 1px solid rgba(255, 255, 255, .08);
+  font-size: 12.5px; line-height: 1.55; color: var(--fg-4); cursor: pointer;
+}
+.dm-consent input { margin-top: 2px; accent-color: var(--blue); flex: 0 0 auto }
+
+.dm-error {
+  margin: 0; font-size: 13.5px; line-height: 1.5; color: var(--red);
+}
+
+.dm-acts { display: flex; gap: 10px; align-items: center; margin-top: 4px }
+.dm .mk-pill-lg:disabled {
+  opacity: .35; cursor: default; transform: none; box-shadow: none;
+}
+
+/* ── Kurulum ekranı ──
+   Adımlar sahte bir ilerleme çubuğu değil, gerçekten olan işler.
+   Son adımda DURUR ve cevabı bekler; "tamamlandı" demez çünkü
+   bilmiyor. */
+.dm-wait { max-width: 620px; margin: 44px 0 0; animation: kRise .6s cubic-bezier(.2, .8, .2, 1) both }
+.dm-steps { list-style: none; margin: 34px 0 0; padding: 0; display: flex; flex-direction: column; gap: 2px }
+.dm-steps li {
+  display: flex; align-items: center; gap: 12px;
+  padding: 11px 0; font-size: 13.5px; color: var(--fg-6);
+  transition: color .4s var(--glide);
+}
+.dm-steps li .dot {
+  width: 7px; height: 7px; flex: 0 0 7px; border-radius: 50%;
+  background: rgba(255, 255, 255, .14);
+  transition: background .4s var(--glide), box-shadow .4s var(--glide);
+}
+.dm-steps li.done { color: var(--fg-3) }
+.dm-steps li.done .dot { background: var(--green) }
+.dm-steps li.on { color: var(--fg) }
+.dm-steps li.on .dot {
+  background: var(--blue);
+  box-shadow: 0 0 0 4px rgba(90, 162, 255, .16);
+  animation: kBreathe 1.8s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dm-step, .dm-wait { animation: none }
+  .dm-steps li.on .dot { animation: none }
+}
+
+/* Boş brifing yerine önerilen sorular. Kart değil DÜĞME: tıklanacağı
+   belli olmalı, yoksa kimse dokunmaz ve ekran yine boş kalır. */
+.starters {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px; margin: 6px 0 18px;
+}
+.starters button {
+  font: inherit; font-size: 14px; text-align: left; line-height: 1.4;
+  color: var(--ink-2); background: var(--surface);
+  border: 1px solid var(--line); border-radius: 12px;
+  padding: 15px 17px; cursor: pointer;
+  transition: background .18s var(--glide), border-color .18s var(--glide),
+              color .18s var(--glide), transform .18s var(--glide);
+}
+.starters button:hover {
+  background: var(--surface-2); border-color: var(--accent);
+  color: var(--ink); transform: translateY(-1px);
+}
+.starters button:active { transform: translateY(0) scale(.99) }

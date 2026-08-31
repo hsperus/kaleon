@@ -34,6 +34,7 @@ import { confirmPendingAction } from "../kernel/invoke.js";
 import { TOOL_LABELS, actionLabel } from "../ai/tool-labels.js";
 import { MODEL_CONNECTED, ROLE_LABEL } from "./context.js";
 import { GOLDEN_QUESTIONS } from "../eval/golden.js";
+import { sectorProfile } from "../modules/demo/sectors.js";
 import { buildBriefing } from "../modules/briefing/engine.js";
 
 export const appRouter = router({
@@ -56,6 +57,16 @@ export const appRouter = router({
       // Arayüz yönetim düğmesini bu bayrağa göre gösterir. Yetki kontrolü
       // yine sunucuda; bayrak yalnızca gereksiz bir düğmeyi gizler.
       canManageUsers: holds(ctx.principal, "admin:user.manage"),
+      /*
+       * BOŞ EKRAN İÇİN ÖNERİLEN SORULAR.
+       *
+       * Yeni kurulan bir şirkette brifing haklı olarak boştur —
+       * uyarılacak bir şey yoktur. Uydurma alarm üretmek yerine
+       * SORULABİLECEKLERİ gösteriyoruz, ve sorular sektörün kendi
+       * dilinde: tekstilciye "kaplin stoğu" sormayı önermek, ürünün
+       * onun işini bilmediğini söyler.
+       */
+      starters: sectorProfile(ctx.sector).starters,
     };
   }),
 
@@ -72,10 +83,22 @@ export const appRouter = router({
           correlationId: crypto.randomUUID(),
           channel: ctx.channel,
           task: "lookup",
+          /*
+           * KİMLİK BAĞLAMDAN GELİR, SABİT DEĞİL.
+           *
+           * Burada ad ve şirket sabit yazılıydı: kim giriş yaparsa
+           * yapsın, ajan ona "Cebrail Karaarslan" diye sesleniyor ve
+           * "Orthaus" hakkında akıl yürütüyordu. `ctx.displayName` ve
+           * `ctx.companyName` zaten birkaç satır yukarıdaki `session`
+           * sorgusunda doğru biçimde kullanılıyordu — yalnızca burası
+           * atlanmıştı.
+           */
           display: {
-            name: "Cebrail Karaarslan",
+            name: ctx.displayName,
             roleLabel: ROLE_LABEL[ctx.principal.roles[0]!],
-            companyName: "Orthaus",
+            companyName: ctx.companyName,
+            sector: ctx.sector,
+            goals: ctx.goals,
           },
           pending: ctx.pending,
         },

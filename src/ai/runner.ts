@@ -58,7 +58,14 @@ export interface RunRequest {
   readonly correlationId: string;
   readonly channel: Channel;
   readonly task: TaskKind;
-  readonly display: { name: string; roleLabel: string; companyName: string };
+  readonly display: {
+    name: string;
+    roleLabel: string;
+    companyName: string;
+    /** Sektör ve öncelikler — cevabın tonunu belirler, rakamını değil. */
+    sector?: string | null;
+    goals?: string | null;
+  };
   readonly now?: () => Date;
   /** İlerleme olayları. Verilmezse döngü sessiz çalışır. */
   readonly onEvent?: (event: RunEvent) => void;
@@ -191,6 +198,8 @@ export async function runConversation(
         displayName: req.display.name,
         roleLabel: req.display.roleLabel,
         companyName: req.display.companyName,
+        sector: req.display.sector ?? null,
+        goals: req.display.goals ?? null,
         localDate: now().toLocaleDateString("tr-TR"),
         visibleTools: catalog.names,
       }),

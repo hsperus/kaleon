@@ -17,6 +17,41 @@ datasource db {
   url      = env("SHARED_DATABASE_URL")
 }
 
+/**
+ * Demo talebi — ürünü denemek isteyen kişinin bıraktığı bilgi.
+ *
+ * NEDEN TENANT'TAN AYRI: iletişim bilgisi KİŞİSEL VERİDİR ve
+ * işletmesel veriyle aynı yerde durmamalı. Tenant silindiğinde bu
+ * kayıt bir süre daha kalır (satış takibi), ama tersi de mümkün
+ * olmalı: kişi "bilgimi silin" derse tenant'a dokunmadan silinir.
+ *
+ * AÇIK RIZA KAYDA GEÇER. KVKK açısından "form dolduruldu" yetmez;
+ * onayın hangi metne, ne zaman verildiği saklanır.
+ */
+model DemoRequest {
+  id            String   @id @default(uuid()) @db.Uuid
+  companyName   String   @map("company_name")
+  sector        String
+  employeeBand  String   @map("employee_band")
+  goals         String
+  contactName   String   @map("contact_name")
+  contactEmail  String   @map("contact_email")
+  contactPhone  String?  @map("contact_phone")
+  /// Açık rıza: hangi metne, ne zaman.
+  consentText   String   @map("consent_text")
+  consentAt     DateTime @map("consent_at")
+  /// Kötüye kullanımı sınırlamak için — ham IP değil, tuzlanmış özet.
+  clientHash    String   @map("client_hash")
+  /// Kurulan tenant. Kurulum başarısız olursa null kalır ve talep
+  /// yine kaydedilir — başarısız denemeler de bilgidir.
+  tenantId      String?  @map("tenant_id") @db.Uuid
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  @@index([clientHash, createdAt])
+  @@index([contactEmail])
+  @@map("demo_requests")
+}
+
 model Tenant {
   id           String   @id @default(uuid()) @db.Uuid
   slug         String   @unique
@@ -26,6 +61,32 @@ model Tenant {
   locale       String   @default("tr-TR")
   baseCurrency String   @default("TRY") @map("base_currency")
   status       TenantStatus @default(provisioning)
+
+  /*
+   * ŞİRKET PROFİLİ — AJANIN BAĞLAMI.
+   *
+   * Ajan "hangi şirkette çalıştığını" bilmeden cevap verirse, cevap
+   * genel geçer olur: bir dökümhaneye tekstil örneği verir, bir
+   * ihracatçıya kur riskinden hiç söz etmez. Sektör ve öncelikler
+   * oturum bağlamına giriyor ve cevabın tonunu belirliyor.
+   *
+   * VERİ DEĞİL, BAĞLAM. Buradaki bilgi hiçbir hesaba girmez ve hiçbir
+   * yetkiyi genişletmez; yalnızca modelin neye dikkat edeceğini
+   * söyler. Yanlış girilmiş bir sektör yanlış rakam üretmez.
+   */
+  sector       String?
+  /// Şirketin kendi ifadesiyle öncelikleri. Serbest metin.
+  goals        String?
+
+  /*
+   * DEMO TENANT'LARI KENDİLİĞİNDEN ÖLÜR.
+   *
+   * Süresiz bir demo, aylar sonra kimsenin sahiplenmediği gerçek
+   * kişisel veri taşıyan bir şemadır. `expiresAt` geçince şema
+   * düşürülür ve iletişim bilgisi silinir.
+   */
+  isDemo       Boolean  @default(false) @map("is_demo")
+  expiresAt    DateTime? @map("expires_at")
   createdAt    DateTime @default(now()) @map("created_at")
   updatedAt    DateTime @updatedAt @map("updated_at")
 
