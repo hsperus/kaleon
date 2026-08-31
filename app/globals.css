@@ -434,6 +434,10 @@ button.role, select.role {
 
 .kv { display: flex; justify-content: space-between; gap: 14px; font-size: 13.5px; padding: 8px 0; border-bottom: 1px solid var(--line-soft); }
 .kv:last-of-type { border-bottom: none; }
+/* Toplam satırı: üstündeki çizgi onu kalemlerden ayırır, kalın yazı
+   hangisinin sonuç olduğunu söyler. */
+.kv.total { border-top: 1px solid var(--line); border-bottom: none; margin-top: 4px; padding-top: 10px; }
+.kv.total span { color: var(--ink-2); font-weight: 500; }
 .kv span { color: var(--muted); }
 .kv b { font-weight: 600; font-variant-numeric: tabular-nums; }
 

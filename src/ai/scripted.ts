@@ -127,7 +127,11 @@ const RULES: readonly Rule[] = [
     tool: "get_bank_balance",
     input: { currency: null },
     render: (d) => {
-      const rows = d as { bank: string; currency: string; available: number; blocked: number }[];
+      // Tool artık satırların yanında toplamı da döndürüyor; satırlar
+      // `accounts` altında. Eskiden çıplak dizi dönüyordu.
+      const { accounts: rows } = d as {
+        accounts: { bank: string; currency: string; available: number; blocked: number }[];
+      };
       const byCurrency = new Map<string, number>();
       for (const r of rows) byCurrency.set(r.currency, (byCurrency.get(r.currency) ?? 0) + r.available);
       return (

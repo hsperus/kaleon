@@ -181,7 +181,10 @@ describe.skipIf(!enabled)("izleme tool katmanı ve brifing", () => {
         name: "Kasa alt sınırı",
         tool: "get_bank_balance",
         toolInput: { currency: null },
-        path: "length",
+        // Toplam kullanılabilir bakiye — "kasada ne kadar var"
+        // sorusunun cevabı. Önce `length` izleniyordu çünkü sonuç bir
+        // DİZİYDİ ve hesap SAYISINDAN başka izlenebilir bir şey yoktu.
+        path: "totalAvailable",
         operator: "gt",
         threshold: 0,
         level: 2,
@@ -282,12 +285,14 @@ describe.skipIf(!enabled)("izleme tool katmanı ve brifing", () => {
       name: "Nakit eşiği",
       tool: "get_bank_balance",
       toolInput: { currency: null },
-      // Sonuç bir DİZİ: izlenebilecek sayısal alan `length`.
-      path: "length",
+      // Toplam bakiye. Tool artık satırların yanında toplamı da
+      // döndürüyor; önce yalnızca dizi dönüyordu ve izlenebilecek
+      // tek sayı hesap adediydi.
+      path: "totalAvailable",
       operator: "gt",
       threshold: 0,
       level: 2,
-      message: "{deger} banka hesabı var (eşik {esik}).",
+      message: "Kullanılabilir bakiye {deger} (eşik {esik}).",
       ownerUserId: USER,
     });
 

@@ -157,7 +157,11 @@ function Body({ payload }: { payload: PanelPayload }): ReactNode {
   }
 
   if (payload.tool === "get_bank_balance") {
-    const rows = payload.data as { bank: string; currency: string; available: number; blocked: number }[];
+    // Tool artık toplamı da döndürüyor; satırlar `accounts` altında.
+    const { accounts: rows, totalAvailable } = payload.data as {
+      accounts: { bank: string; currency: string; available: number; blocked: number }[];
+      totalAvailable: number;
+    };
     return (
       <>
         {rows.map((r, i) => (
@@ -173,6 +177,14 @@ function Body({ payload }: { payload: PanelPayload }): ReactNode {
             </b>
           </div>
         ))}
+        {/* Toplam ayrı satırda: "kasada ne kadar var" sorusunun cevabı
+            hesap satırlarına dağılmış hâlde okunmuyordu. */}
+        {rows.length > 1 && (
+          <div className="kv total">
+            <span>Toplam kullanılabilir</span>
+            <b>{tl(totalAvailable)}</b>
+          </div>
+        )}
       </>
     );
   }
