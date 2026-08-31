@@ -3175,3 +3175,52 @@ button.role, select.role {
 /* Kenar çubuğu KENDİ İÇİNDE kayar: "Yeni sohbet", arama ve alttaki
    kimlik sabit kalır, yalnızca konuşma listesi hareket eder. */
 .history { overflow: hidden }
+
+/* ── Konuşma satırı: başlık + işlemler ──
+   İşlem düğmeleri normalde GÖRÜNMEZ. Her satırda iki ikon durursa
+   liste araç çubuğuna döner ve asıl iş olan başlıkları taramak
+   zorlaşır. Üzerine gelince ve klavye odağında beliriyorlar. */
+.history-row {
+  display: flex; align-items: center; border-radius: 8px;
+  transition: background .14s var(--glide);
+}
+.history-row:hover { background: color-mix(in srgb, var(--ink) 6%, transparent) }
+.history-row.on { background: var(--accent-veil) }
+.history-row.on .history-item { color: var(--accent-ink) }
+.history-row .history-item { flex: 1; min-width: 0; background: none }
+.history-row .history-item:hover { background: none }
+
+.history-acts { display: flex; gap: 2px; padding-right: 6px; opacity: 0; transition: opacity .14s var(--glide) }
+.history-row:hover .history-acts,
+.history-row:focus-within .history-acts { opacity: 1 }
+.history-acts button {
+  display: flex; align-items: center; justify-content: center;
+  width: 24px; height: 24px; border-radius: 6px;
+  border: 0; background: none; color: var(--faint); cursor: pointer;
+  transition: background .14s var(--glide), color .14s var(--glide);
+}
+.history-acts button:hover { background: var(--surface-2); color: var(--ink) }
+.history-acts button:last-child:hover { color: var(--crit) }
+
+/* Yeniden adlandırma satırın YERİNDE: ayrı bir kutu açmak, hangi
+   konuşmayı adlandırdığını gözden kaçırtır. */
+.history-rename { padding: 2px 0 }
+.history-rename input {
+  width: 100%; font: inherit; font-size: 13.5px; color: var(--ink);
+  background: var(--surface); border: 1px solid var(--accent); border-radius: 8px;
+  padding: 8px 9px; outline: none; box-shadow: 0 0 0 3px var(--accent-veil);
+}
+
+/* Onayı satırın kendisi soruyor: hangi satırı sildiğini görmek
+   onayın yarısıdır. */
+.history-confirm {
+  display: flex; align-items: center; gap: 6px;
+  padding: 7px 8px; border-radius: 8px;
+  background: var(--crit-veil); font-size: 12.5px; color: var(--ink-2);
+}
+.history-confirm span { flex: 1; min-width: 0 }
+.history-confirm button {
+  font: inherit; font-size: 12px; border-radius: 6px; cursor: pointer;
+  padding: 4px 9px; border: 1px solid var(--line); background: var(--surface); color: var(--ink-2);
+}
+.history-confirm button.yes { background: var(--crit); border-color: var(--crit); color: #fff }

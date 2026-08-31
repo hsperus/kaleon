@@ -50,6 +50,8 @@ export interface ConversationRepository {
    * türetiliyor ve aranan şey çoğu zaman konuşmanın ortasında geçiyor.
    */
   search(userId: string, query: string, limit?: number): Promise<readonly ConversationHit[]>;
+  /** Sahibi doğrulanmış yeniden adlandırma. */
+  rename(conversationId: string, userId: string, title: string): Promise<boolean>;
   /** Sahibi doğrulanmış silme. */
   remove(conversationId: string, userId: string): Promise<boolean>;
 }
@@ -165,6 +167,14 @@ export class InMemoryConversationRepository implements ConversationRepository {
     }
 
     return hits.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, limit);
+  }
+
+  async rename(conversationId: string, userId: string, title: string): Promise<boolean> {
+    const c = this.#conversations.get(conversationId);
+    if (!c || c.userId !== userId) return false;
+    c.title = title;
+    c.updatedAt = new Date().toISOString();
+    return true;
   }
 
   async remove(conversationId: string, userId: string): Promise<boolean> {

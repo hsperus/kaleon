@@ -147,6 +147,25 @@ export class PrismaConversationRepository implements ConversationRepository {
     }));
   }
 
+  /**
+   * Başlığı değiştirir.
+   *
+   * SAHİPLİK KOŞULU GÜNCELLEME SORGUSUNUN İÇİNDE — `updateMany` ile.
+   * Önce okuyup sonra yazmak, iki sorgu arasında sahiplik değişirse
+   * (pratikte olmaz ama) yarış açar; tek sorguda koşul atomiktir.
+   *
+   * `updatedAt` BİLEREK DOKUNULMUYOR: yeniden adlandırma konuşmayı
+   * listenin başına taşımamalı. Sıralama son KONUŞMA zamanına göre;
+   * başlığı düzeltmek konuşmayı tazelemez.
+   */
+  async rename(conversationId: string, userId: string, title: string): Promise<boolean> {
+    const r = await this.#db.conversation.updateMany({
+      where: { id: conversationId, userId },
+      data: { title },
+    });
+    return r.count > 0;
+  }
+
   async remove(conversationId: string, userId: string): Promise<boolean> {
     try {
       // Sahiplik koşulu silme sorgusunun içinde: başkasının konuşması,

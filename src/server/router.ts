@@ -242,6 +242,26 @@ export const appRouter = router({
       ctx.conversations.search(ctx.principal.userId, input.query, 20),
     ),
 
+  /**
+   * Konuşmayı yeniden adlandırır.
+   *
+   * Başlık ilk sorudan türetiliyor ve çoğu zaman işe yarıyor — ama
+   * "selam" diye başlayan bir konuşma iki gün sonra bulunamaz.
+   * Sahiplik depo katmanında, güncelleme sorgusunun içinde.
+   */
+  renameConversation: procedure
+    .input(
+      z.object({
+        id: z.string().min(1).max(64),
+        title: z.string().trim().min(1).max(120),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const ok = await ctx.conversations.rename(input.id, ctx.principal.userId, input.title);
+      if (!ok) throw new TRPCError({ code: "NOT_FOUND" });
+      return { ok: true as const };
+    }),
+
   /** Bir konuşmanın turları. Sahiplik depo katmanında doğrulanır. */
   conversation: procedure
     .input(z.object({ id: z.string().min(1).max(64) }))

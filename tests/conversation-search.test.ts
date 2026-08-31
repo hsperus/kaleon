@@ -107,3 +107,48 @@ describe("alıntı çıkarma", () => {
     expect(excerptAround("bir\n\n  iki\tüç", "iki")).toBe("bir iki üç");
   });
 });
+
+describe("yeniden adlandırma ve silme", () => {
+  let repo: InMemoryConversationRepository;
+  let benim: string;
+
+  beforeEach(async () => {
+    repo = new InMemoryConversationRepository();
+    benim = await repo.create(BEN, "selam");
+    await repo.appendTurn(benim, { question: "selam", answer: "Merhaba." });
+  });
+
+  it("başlık değişir", async () => {
+    expect(await repo.rename(benim, BEN, "Ağustos kâr durumu")).toBe(true);
+    const liste = await repo.list(BEN);
+    expect(liste[0]!.title).toBe("Ağustos kâr durumu");
+  });
+
+  it("BAŞKASININ KONUŞMASI ADLANDIRILAMAZ — kimliği bilinse bile", async () => {
+    expect(await repo.rename(benim, BASKASI, "ele geçirildi")).toBe(false);
+    expect((await repo.list(BEN))[0]!.title).toBe("selam");
+  });
+
+  it("BAŞKASININ KONUŞMASI SİLİNEMEZ", async () => {
+    expect(await repo.remove(benim, BASKASI)).toBe(false);
+    expect(await repo.list(BEN)).toHaveLength(1);
+  });
+
+  it("silinen konuşma listeden ve aramadan düşer", async () => {
+    expect(await repo.remove(benim, BEN)).toBe(true);
+    expect(await repo.list(BEN)).toHaveLength(0);
+    expect(await repo.search(BEN, "selam")).toHaveLength(0);
+  });
+
+  it("olmayan konuşma false döner, patlamaz", async () => {
+    expect(await repo.rename("yok", BEN, "x")).toBe(false);
+    expect(await repo.remove("yok", BEN)).toBe(false);
+  });
+
+  it("YENİ AD ARAMADA BULUNUR", async () => {
+    await repo.rename(benim, BEN, "Ağustos kâr durumu");
+    const r = await repo.search(BEN, "Ağustos");
+    expect(r).toHaveLength(1);
+    expect(r[0]!.id).toBe(benim);
+  });
+});

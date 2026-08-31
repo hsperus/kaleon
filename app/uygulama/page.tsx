@@ -249,6 +249,20 @@ export default function Page() {
    * bahsetmiştim" sorusu başlıkla cevaplanamaz.
    */
   const [query, setQuery] = useState("");
+  /*
+   * SATIR İŞLEMLERİ.
+   *
+   * Başlık ilk sorudan türetiliyor ve çoğu zaman işe yarıyor — ama
+   * "selam" diye başlayan bir konuşma iki gün sonra bulunamaz. Silme
+   * ve yeniden adlandırma bu yüzden var.
+   *
+   * SİLME ONAY İSTER ama tarayıcının `confirm()` kutusuyla değil:
+   * satırın kendisi soruyu soruyor, çünkü hangi satırı sildiğini
+   * görmek onayın yarısıdır.
+   */
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [renameValue, setRenameValue] = useState("");
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [hits, setHits] = useState<
     { id: string; title: string; updatedAt: string; snippet: string | null }[] | null
   >(null);
@@ -604,6 +618,45 @@ export default function Page() {
     void refreshHistory();
   }, [refreshHistory]);
 
+  const renameConversation = useCallback(
+    async (id: string, title: string) => {
+      const t = title.trim();
+      setRenaming(null);
+      if (t.length === 0) return;
+      // İYİMSER GÜNCELLEME: liste anında değişir, sunucu arkadan gelir.
+      // Yeniden adlandırma geri alınamaz bir şey değil; bir saniyelik
+      // gecikme göstermek gereksiz.
+      setHistory((eski) => eski?.map((c) => (c.id === id ? { ...c, title: t } : c)) ?? eski);
+      try {
+        await client(role).renameConversation.mutate({ id, title: t });
+      } catch {
+        void refreshHistory();
+      }
+    },
+    [role, refreshHistory],
+  );
+
+  const deleteConversation = useCallback(
+    async (id: string) => {
+      setConfirmDelete(null);
+      setHistory((eski) => eski?.filter((c) => c.id !== id) ?? eski);
+      // Açık olan konuşma silindiyse ekran da boşalmalı: silinmiş bir
+      // konuşmayı okumaya devam etmek yanıltıcı olur.
+      if (conversationIdRef.current === id) {
+        conversationIdRef.current = null;
+        setConversationId(null);
+        setTurns([]);
+        setPanels([]);
+      }
+      try {
+        await client(role).deleteConversation.mutate({ id });
+      } catch {
+        void refreshHistory();
+      }
+    },
+    [role, refreshHistory],
+  );
+
   /** Geçmişi açar ve listeyi tazeler. */
   const openHistory = useCallback(async () => {
     setHistory([]);
@@ -644,13 +697,22 @@ export default function Page() {
           })),
         );
         setPanels([]);
-        setHistory(null);
+        /*
+         * ÇEKMECEYİ KAPAT — AMA YALNIZCA ÇEKMECEYSE.
+         *
+         * Dar ekranda geçmiş bir örtüdür ve seçim yapılınca kapanmalı.
+         * Geniş ekranda ise KALICI SÜTUNDUR: `null` yazmak sütunu
+         * tamamen yok ediyordu ve hamburger de o genişlikte gizli
+         * olduğu için bir daha geri gelmiyordu. Kullanıcı bir
+         * konuşmaya tıklıyor ve geçmişi kaybediyordu.
+         */
+        if (!wide) setHistory(null);
       } catch {
         // Konuşma silinmiş veya başkasına ait: listeyi tazele.
         void openHistory();
       }
     },
-    [role, openHistory],
+    [role, openHistory, wide],
   );
 
   const attachFile = useCallback(async (file: File) => {
@@ -919,16 +981,100 @@ export default function Page() {
                 {groupByDay(history).map((g) => (
                   <div key={g.label}>
                     <div className="history-head">{g.label}</div>
-                    {g.items.map((c) => (
-                      <button
-                        key={c.id}
-                        type="button"
-                        className={`history-item${c.id === conversationId ? " on" : ""}`}
-                        onClick={() => void loadConversation(c.id)}
-                      >
-                        <span className="t">{c.title}</span>
-                      </button>
-                    ))}
+                    {g.items.map((c) =>
+                      renaming === c.id ? (
+                        /* Yeniden adlandırma SATIRIN YERİNDE olur:
+                           ayrı bir kutu açmak, hangi konuşmayı
+                           adlandırdığını gözden kaçırtır. */
+                        <form
+                          key={c.id}
+                          className="history-rename"
+                          onSubmit={(e) => {
+                            e.preventDefault();
+                            void renameConversation(c.id, renameValue);
+                          }}
+                        >
+                          <input
+                            autoFocus
+                            value={renameValue}
+                            maxLength={120}
+                            onChange={(e) => setRenameValue(e.target.value)}
+                            onBlur={() => void renameConversation(c.id, renameValue)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Escape") setRenaming(null);
+                            }}
+                            aria-label="Konuşma adı"
+                          />
+                        </form>
+                      ) : confirmDelete === c.id ? (
+                        /* Onayı satırın kendisi soruyor: hangi satırı
+                           sildiğini görmek onayın yarısıdır. */
+                        <div key={c.id} className="history-confirm">
+                          <span>Silinsin mi?</span>
+                          <button type="button" onClick={() => setConfirmDelete(null)}>
+                            Vazgeç
+                          </button>
+                          <button
+                            type="button"
+                            className="yes"
+                            onClick={() => void deleteConversation(c.id)}
+                          >
+                            Sil
+                          </button>
+                        </div>
+                      ) : (
+                        <div
+                          key={c.id}
+                          className={`history-row${c.id === conversationId ? " on" : ""}`}
+                        >
+                          <button
+                            type="button"
+                            className="history-item"
+                            onClick={() => void loadConversation(c.id)}
+                          >
+                            <span className="t">{c.title}</span>
+                          </button>
+                          <span className="history-acts">
+                            <button
+                              type="button"
+                              title="Yeniden adlandır"
+                              aria-label={`${c.title} — yeniden adlandır`}
+                              onClick={() => {
+                                setRenameValue(c.title);
+                                setRenaming(c.id);
+                              }}
+                            >
+                              <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden>
+                                <path
+                                  d="M11.5 2.5 13.5 4.5 5.5 12.5 3 13 3.5 10.5z"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.3"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            </button>
+                            <button
+                              type="button"
+                              title="Sil"
+                              aria-label={`${c.title} — sil`}
+                              onClick={() => setConfirmDelete(c.id)}
+                            >
+                              <svg viewBox="0 0 16 16" width="13" height="13" aria-hidden>
+                                <path
+                                  d="M3.5 4.5h9M6.5 4.5V3h3v1.5M5 4.5l.5 8h5l.5-8"
+                                  fill="none"
+                                  stroke="currentColor"
+                                  strokeWidth="1.3"
+                                  strokeLinecap="round"
+                                  strokeLinejoin="round"
+                                />
+                              </svg>
+                            </button>
+                          </span>
+                        </div>
+                      ),
+                    )}
                   </div>
                 ))}
               </div>
