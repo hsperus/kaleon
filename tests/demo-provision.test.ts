@@ -31,10 +31,18 @@ const enabled = Boolean(SHARED_URL && TENANT_URL);
 function input(over: Partial<Parameters<typeof provisionDemo>[1]> = {}) {
   return {
     companyName: "Test Kalıp",
+    legalName: null,
+    taxId: null,
+    taxOffice: null,
+    city: null,
     sector: "plastik",
     employeeBand: "11–50",
+    revenueBand: "10-50m",
+    exportCurrency: "EUR",
+    currentSystem: "excel",
     goals: "Kalıp maliyetlerini iş bazında göremiyoruz.",
     contactName: "Deneme Kişi",
+    contactTitle: "Genel Müdür",
     contactEmail: "deneme@example.com",
     contactPhone: null,
     consentText: "onay metni",
@@ -163,6 +171,67 @@ describe.skipIf(!enabled)("demo kurulumu kalıcılığı", () => {
 
       // Bordro sekiz ay koşmuş olmalı — kümülatif matrah görünsün.
       expect(await db.payrollRun.count()).toBe(8);
+    } finally {
+      await db.$disconnect();
+    }
+  }, 120_000);
+
+  it("İHRACATÇIDA DÖVİZLİ AÇIK ALACAK KURULUR — kur değerlemesi çalışsın", async () => {
+    const slug = created[0]!;
+    const t = await shared.tenant.findUnique({ where: { slug } });
+    const db = new TenantPrisma({
+      datasources: { db: { url: urlForSchema(TENANT_URL!, t!.schemaName) } },
+    });
+    try {
+      const line = await db.journalLine.findFirst({ where: { currency: "EUR" } });
+      expect(line, "EUR satırı").not.toBeNull();
+      expect(Number(line!.fxDebit)).toBe(126_000);
+
+      // Kur olmadan değerleme reddediliyor — haklı olarak. Demo bu
+      // yüzden kuru da yazmak zorunda.
+      expect(await db.exchangeRate.count({ where: { currency: "EUR" } })).toBeGreaterThanOrEqual(2);
+    } finally {
+      await db.$disconnect();
+    }
+  });
+
+  it("İHRACAT YOKSA DÖVİZLİ SATIR DA YOK — olmayan bir sorun gösterilmez", async () => {
+    const r = await provisionDemo(
+      shared,
+      input({ ip: "203.0.113.11", exportCurrency: "yok", companyName: "İç Piyasa" }),
+    );
+    created.push(r.slug);
+    const db = new TenantPrisma({
+      datasources: { db: { url: urlForSchema(TENANT_URL!, r.schema) } },
+    });
+    try {
+      expect(await db.journalLine.count({ where: { currency: { not: "TRY" } } })).toBe(0);
+    } finally {
+      await db.$disconnect();
+    }
+  }, 120_000);
+
+  it("CİRO BANDI BİLANÇONUN ÖLÇEĞİNİ DEĞİŞTİRİR — ama denk kalır", async () => {
+    const r = await provisionDemo(
+      shared,
+      input({ ip: "203.0.113.12", revenueBand: "0-10m", companyName: "Küçük Atölye" }),
+    );
+    created.push(r.slug);
+    const db = new TenantPrisma({
+      datasources: { db: { url: urlForSchema(TENANT_URL!, r.schema) } },
+    });
+    try {
+      const acilis = await db.journalEntry.findFirst({
+        where: { description: { contains: "Açılış" } },
+        include: { lines: true },
+      });
+      const borc = acilis!.lines.reduce((t, l) => t + Number(l.debit), 0);
+      const alacak = acilis!.lines.reduce((t, l) => t + Number(l.credit), 0);
+      // Ölçek değişti ama fiş DENK: sermaye farktan hesaplanıyor.
+      expect(borc).toBe(alacak);
+      // 0.15 çarpanı: banka 12.4M yerine 1.86M.
+      const banka = acilis!.lines.find((l) => l.accountCode === "102");
+      expect(Number(banka!.debit)).toBe(1_860_000);
     } finally {
       await db.$disconnect();
     }

@@ -46,10 +46,23 @@ export const CONSENT_TEXT =
 
 const Body = z.object({
   companyName: z.string().trim().min(2).max(120),
+  legalName: z.string().trim().max(160).nullable(),
+  /*
+   * VKN ON HANE, TCKN ON BİR. İkisi de kabul edilir çünkü şahıs
+   * şirketleri TCKN ile fatura keser. Boş bırakılabilir: demo bu
+   * alan olmadan da çalışır, yalnızca faturada örnek değer görünür.
+   */
+  taxId: z.string().trim().regex(/^\d{10,11}$/, "vkn").nullable().or(z.literal("")),
+  taxOffice: z.string().trim().max(60).nullable(),
+  city: z.string().trim().max(40).nullable(),
   sector: z.string().trim().min(1).max(40),
   employeeBand: z.string().trim().min(1).max(20),
+  revenueBand: z.string().trim().min(1).max(20),
+  exportCurrency: z.enum(["yok", "EUR", "USD"]),
+  currentSystem: z.string().trim().min(1).max(20),
   goals: z.string().trim().min(10).max(600),
   contactName: z.string().trim().min(2).max(80),
+  contactTitle: z.string().trim().max(60).nullable(),
   contactEmail: z.string().trim().email().max(160),
   contactPhone: z.string().trim().max(30).nullable(),
   consent: z.literal(true),
@@ -64,7 +77,9 @@ export async function POST(req: Request): Promise<Response> {
         error:
           first?.path.join(".") === "consent"
             ? "Devam etmek için onay kutusunu işaretlemeniz gerekiyor."
-            : "Formda eksik ya da hatalı alan var.",
+            : first?.message === "vkn"
+              ? "Vergi numarası 10 hane (VKN) ya da 11 hane (TCKN) olmalı."
+              : "Formda eksik ya da hatalı alan var.",
       },
       { status: 400 },
     );
@@ -81,10 +96,18 @@ export async function POST(req: Request): Promise<Response> {
   try {
     const demo = await provisionDemo(db, {
       companyName: d.companyName,
+      legalName: d.legalName || null,
+      taxId: d.taxId || null,
+      taxOffice: d.taxOffice || null,
+      city: d.city || null,
       sector: d.sector,
       employeeBand: d.employeeBand,
+      revenueBand: d.revenueBand,
+      exportCurrency: d.exportCurrency,
+      currentSystem: d.currentSystem,
       goals: d.goals,
       contactName: d.contactName,
+      contactTitle: d.contactTitle || null,
       contactEmail: d.contactEmail,
       contactPhone: d.contactPhone,
       consentText: CONSENT_TEXT,

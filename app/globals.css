@@ -2331,17 +2331,11 @@ button.role, select.role {
 .mk-role-d { font-size: 13px; color: var(--fg-4) }
 
 /* ── Kapanış ── */
-.mk-end { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: clamp(110px, 16vw, 180px) clamp(16px, 4vw, 28px) 70px; text-align: center }
+.mk-end { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: clamp(110px, 16vw, 180px) clamp(16px, 4vw, 28px) 150px; text-align: center }
 .mk-end h2 {
   margin: 0; font-size: clamp(30px, 5.4vw, 72px); font-weight: 640; letter-spacing: -.045em; line-height: 1.02;
 }
 .mk-end h2 .dim { color: #5c6570 }
-.mk-end-foot {
-  position: relative; z-index: 1;
-  margin: 0; padding: 0 20px 90px; text-align: center;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10.5px; letter-spacing: .12em; color: #3f464f;
-}
 
 @media (max-width: 860px) {
   .mk-role { grid-template-columns: 1fr; gap: 10px }
@@ -2497,3 +2491,14 @@ button.role, select.role {
   color: var(--ink); transform: translateY(-1px);
 }
 .starters button:active { transform: translateY(0) scale(.99) }
+
+/* İki alanın yan yana durduğu satır. Dar ekranda alt alta iner:
+   40 karakterlik bir alanı iki sütuna sıkıştırmak yazmayı zorlaştırır. */
+.dm-row { display: grid; grid-template-columns: 1fr 1fr; gap: 18px }
+@media (max-width: 640px) { .dm-row { grid-template-columns: 1fr } }
+
+/* Geçersiz alan KIRMIZI KUTU DEĞİL: kenarı kızarır ve altındaki
+   gerekçe metni ne beklendiğini söyler. Kullanıcı hâlâ yazıyorken
+   bağırmak, formu bırakma sebebidir. */
+.dm-field input[aria-invalid="true"] { border-color: rgba(240, 115, 106, .55) }
+.dm-field input[aria-invalid="true"] + em { color: var(--red) }

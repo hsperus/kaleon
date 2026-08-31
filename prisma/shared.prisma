@@ -31,10 +31,26 @@ datasource db {
 model DemoRequest {
   id            String   @id @default(uuid()) @db.Uuid
   companyName   String   @map("company_name")
+  /// Ticari unvan — faturanın anteti. Şirket adından farklı olabilir.
+  legalName     String?  @map("legal_name")
+  /// VKN ve vergi dairesi: e-Faturanın zorunlu alanları. Girilmezse
+  /// demo fatura üretebilir ama alanlar örnek değerle dolar.
+  taxId         String?  @map("tax_id")
+  taxOffice     String?  @map("tax_office")
+  city          String?
   sector        String
   employeeBand  String   @map("employee_band")
+  /// Açılış bilançosunun ölçeğini belirler.
+  revenueBand   String?  @map("revenue_band")
+  /// "yok" | "EUR" | "USD" — dövizli fatura ve kur değerlemesi
+  /// yalnızca ihracatçıda kurulur.
+  exportCurrency String? @map("export_currency")
+  /// Şu an ne kullanıyor: excel | logo | mikro | netsis | sap | diger
+  currentSystem String?  @map("current_system")
   goals         String
   contactName   String   @map("contact_name")
+  /// Görev — ajan "kim soruyor" bilgisini buradan alır.
+  contactTitle  String?  @map("contact_title")
   contactEmail  String   @map("contact_email")
   contactPhone  String?  @map("contact_phone")
   /// Açık rıza: hangi metne, ne zaman.
@@ -77,6 +93,16 @@ model Tenant {
   sector       String?
   /// Şirketin kendi ifadesiyle öncelikleri. Serbest metin.
   goals        String?
+  /*
+   * ŞU AN NE KULLANIYOR.
+   *
+   * Ajanın cevabını değiştirir: SAP'den geçen birine "bu SAP'deki
+   * KE30 raporunun karşılığı" demek işe yarar; Excel'den gelene aynı
+   * cümle hiçbir şey ifade etmez.
+   */
+  currentSystem String? @map("current_system")
+  /// "yok" | "EUR" | "USD" — ihracatçıda kur riski öne çıkar.
+  exportCurrency String? @map("export_currency")
 
   /*
    * DEMO TENANT'LARI KENDİLİĞİNDEN ÖLÜR.

@@ -30,14 +30,40 @@ const SEKTORLER = [
 
 const BANTLAR = ["1–10", "11–50", "51–150", "151–500", "500+"] as const;
 
+/** Ciro bandı — açılış bilançosunun ölçeğini belirler. */
+const CIROLAR = [
+  { id: "0-10m", label: "10 milyon ₺ altı" },
+  { id: "10-50m", label: "10–50 milyon ₺" },
+  { id: "50-250m", label: "50–250 milyon ₺" },
+  { id: "250m-1mr", label: "250 milyon – 1 milyar ₺" },
+  { id: "1mr+", label: "1 milyar ₺ üstü" },
+] as const;
+
+/** İhracat — dövizli alacak ve kur değerlemesi yalnızca burada kurulur. */
+const IHRACAT = [
+  { id: "yok", label: "İhracat yapmıyoruz" },
+  { id: "EUR", label: "Euro ile ihracat" },
+  { id: "USD", label: "Dolar ile ihracat" },
+] as const;
+
+/** Şu an ne kullanıyor — ajanın cevabını hangi dile çevireceğini belirler. */
+const SISTEMLER = [
+  { id: "excel", label: "Excel" },
+  { id: "logo", label: "Logo" },
+  { id: "mikro", label: "Mikro" },
+  { id: "netsis", label: "Netsis" },
+  { id: "sap", label: "SAP" },
+  { id: "diger", label: "Başka / yok" },
+] as const;
+
 /** Kurulum sırasında gösterilen adımlar — hepsi gerçekten oluyor. */
 const KURULUM = [
   "Şirketiniz için ayrı bir veritabanı şeması açılıyor",
   "Otuz şema göçü uygulanıyor",
-  "Hesap planı, depo ve ürün kartları kuruluyor",
+  "Tek Düzen Hesap Planı, depo ve ürün kartları kuruluyor",
   "Açılış bilançosu ve sabit kıymetler yazılıyor",
   "Sipariş → sevkiyat → fatura zinciri işletiliyor",
-  "Sekiz aylık bordro hesaplanıyor",
+  "Amortisman ve sekiz aylık bordro hesaplanıyor",
 ];
 
 const ONAY =
@@ -48,10 +74,18 @@ const ONAY =
 export function DemoForm() {
   const [step, setStep] = useState(0);
   const [companyName, setCompanyName] = useState("");
+  const [legalName, setLegalName] = useState("");
+  const [taxId, setTaxId] = useState("");
+  const [taxOffice, setTaxOffice] = useState("");
+  const [city, setCity] = useState("");
   const [sector, setSector] = useState<string>("makina");
   const [employeeBand, setEmployeeBand] = useState<string>("11–50");
+  const [revenueBand, setRevenueBand] = useState<string>("50-250m");
+  const [exportCurrency, setExportCurrency] = useState<string>("yok");
+  const [currentSystem, setCurrentSystem] = useState<string>("excel");
   const [goals, setGoals] = useState("");
   const [contactName, setContactName] = useState("");
+  const [contactTitle, setContactTitle] = useState("");
   const [contactEmail, setContactEmail] = useState("");
   const [contactPhone, setContactPhone] = useState("");
   const [consent, setConsent] = useState(false);
@@ -89,10 +123,18 @@ export function DemoForm() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           companyName,
+          legalName: legalName.trim() || null,
+          taxId: taxId.trim() || null,
+          taxOffice: taxOffice.trim() || null,
+          city: city.trim() || null,
           sector,
           employeeBand,
+          revenueBand,
+          exportCurrency,
+          currentSystem,
           goals,
           contactName,
+          contactTitle: contactTitle.trim() || null,
           contactEmail,
           contactPhone: contactPhone.trim() || null,
           consent,
@@ -112,9 +154,17 @@ export function DemoForm() {
     }
   }
 
-  const step0Ok = companyName.trim().length >= 2;
-  const step1Ok = goals.trim().length >= 10;
-  const step2Ok =
+  /*
+   * VKN ON HANE, TCKN ON BİR. İkisi de kabul edilir çünkü şahıs
+   * şirketleri TCKN ile fatura keser. BOŞ BIRAKILABİLİR: demo bu alan
+   * olmadan da çalışır, yalnızca faturada örnek değer görünür.
+   */
+  const vknGecerli = taxId.trim() === "" || /^\d{10,11}$/.test(taxId.trim());
+
+  const step0Ok = companyName.trim().length >= 2 && vknGecerli;
+  const step1Ok = true;
+  const step2Ok = goals.trim().length >= 10;
+  const step3Ok =
     contactName.trim().length >= 2 && /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(contactEmail.trim()) && consent;
 
   if (busy) {
@@ -129,6 +179,8 @@ export function DemoForm() {
         <p className="mk-sub">
           Bu bir demo ekranı değil. Aşağıdakiler şu anda gerçekten oluyor;
           birkaç saniye sürüyor.
+          {exportCurrency !== "yok" &&
+            ` İhracat yaptığınız için ${exportCurrency} cinsinden açık bir alacak da kuruluyor.`}
         </p>
         <ol className="dm-steps">
           {KURULUM.map((s, i) => (
@@ -145,7 +197,7 @@ export function DemoForm() {
   return (
     <div className="dm">
       <div className="dm-rail" aria-hidden>
-        {["Şirket", "Öncelikler", "İletişim"].map((s, i) => (
+        {["Şirket", "İşin şekli", "Öncelikler", "İletişim"].map((s, i) => (
           <span key={s} className={i === step ? "on" : i < step ? "done" : ""}>
             {s}
           </span>
@@ -160,23 +212,69 @@ export function DemoForm() {
               ref={firstField}
               value={companyName}
               onChange={(e) => setCompanyName(e.target.value)}
-              placeholder="Örn. Yıldız Makina"
               maxLength={120}
             />
-            <em>Faturaların anteti ve ajanın size sesleneceği ad bu olur.</em>
+            <em>Ajanın size sesleneceği ve ekranda göreceğiniz ad.</em>
+          </label>
+
+          <label className="dm-field">
+            <span>
+              Ticari unvan <i>isteğe bağlı</i>
+            </span>
+            <input value={legalName} onChange={(e) => setLegalName(e.target.value)} maxLength={160} />
+            <em>
+              Faturanın antetinde bu yazar. Boş bırakırsanız şirket adından
+              türetilir.
+            </em>
+          </label>
+
+          <div className="dm-row">
+            <label className="dm-field">
+              <span>
+                Vergi / TC kimlik no <i>isteğe bağlı</i>
+              </span>
+              <input
+                inputMode="numeric"
+                value={taxId}
+                onChange={(e) => setTaxId(e.target.value.replace(/\D/g, ""))}
+                maxLength={11}
+                aria-invalid={!vknGecerli}
+              />
+              <em>
+                {vknGecerli
+                  ? "e-Faturanın zorunlu alanı: 10 hane VKN ya da 11 hane TCKN."
+                  : "10 hane (VKN) ya da 11 hane (TCKN) olmalı."}
+              </em>
+            </label>
+
+            <label className="dm-field">
+              <span>
+                Vergi dairesi <i>isteğe bağlı</i>
+              </span>
+              <input value={taxOffice} onChange={(e) => setTaxOffice(e.target.value)} maxLength={60} />
+              <em>Faturada ve e-Defterde görünür.</em>
+            </label>
+          </div>
+
+          <label className="dm-field">
+            <span>
+              Şehir <i>isteğe bağlı</i>
+            </span>
+            <input value={city} onChange={(e) => setCity(e.target.value)} maxLength={40} />
+            <em>Şirket adresi olarak kullanılır.</em>
           </label>
 
           <div className="dm-field">
             <span>Ne üretiyorsunuz?</span>
             <div className="dm-chips">
-              {SEKTORLER.map((s) => (
+              {SEKTORLER.map((x) => (
                 <button
-                  key={s.id}
+                  key={x.id}
                   type="button"
-                  className={sector === s.id ? "on" : ""}
-                  onClick={() => setSector(s.id)}
+                  className={sector === x.id ? "on" : ""}
+                  onClick={() => setSector(x.id)}
                 >
-                  {s.label}
+                  {x.label}
                 </button>
               ))}
             </div>
@@ -184,22 +282,6 @@ export function DemoForm() {
               Ürün kartları, müşteri ve makine adları buna göre gelir — ekranda
               kendi işinizin kelimelerini görürsünüz.
             </em>
-          </div>
-
-          <div className="dm-field">
-            <span>Kaç kişisiniz?</span>
-            <div className="dm-chips">
-              {BANTLAR.map((b) => (
-                <button
-                  key={b}
-                  type="button"
-                  className={employeeBand === b ? "on" : ""}
-                  onClick={() => setEmployeeBand(b)}
-                >
-                  {b}
-                </button>
-              ))}
-            </div>
           </div>
 
           <div className="dm-acts">
@@ -217,21 +299,84 @@ export function DemoForm() {
 
       {step === 1 && (
         <div className="dm-step">
-          <label className="dm-field">
-            <span>Bu ay sizi en çok ne uğraştırıyor?</span>
-            <textarea
-              value={goals}
-              onChange={(e) => setGoals(e.target.value)}
-              rows={5}
-              maxLength={600}
-              placeholder="Örn. İhracat faturalarında kur farkı takibi elle yapılıyor ve ay sonunda tutmuyor. Stok sayımı ile defter arasında sürekli fark çıkıyor."
-            />
+          <div className="dm-field">
+            <span>Kaç kişisiniz?</span>
+            <div className="dm-chips">
+              {BANTLAR.map((b) => (
+                <button
+                  key={b}
+                  type="button"
+                  className={employeeBand === b ? "on" : ""}
+                  onClick={() => setEmployeeBand(b)}
+                >
+                  {b}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="dm-field">
+            <span>Yıllık cironuz hangi bantta?</span>
+            <div className="dm-chips">
+              {CIROLAR.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={revenueBand === c.id ? "on" : ""}
+                  onClick={() => setRevenueBand(c.id)}
+                >
+                  {c.label}
+                </button>
+              ))}
+            </div>
             <em>
-              Ajan bunu okur ve neyi öne çıkaracağını buna göre seçer. Yetki
-              vermez, hesap değiştirmez — yalnızca hangi rakamın sizin için
-              önemli olduğunu bilir.
+              Açılış bilançosunun ölçeği buna göre kurulur. Beş kişilik bir
+              atölyeye 19 milyonluk sermaye göstermek, ürünün sizin ölçeğinizi
+              bilmediğini söyler.
             </em>
-          </label>
+          </div>
+
+          <div className="dm-field">
+            <span>İhracat yapıyor musunuz?</span>
+            <div className="dm-chips">
+              {IHRACAT.map((x) => (
+                <button
+                  key={x.id}
+                  type="button"
+                  className={exportCurrency === x.id ? "on" : ""}
+                  onClick={() => setExportCurrency(x.id)}
+                >
+                  {x.label}
+                </button>
+              ))}
+            </div>
+            <em>
+              {exportCurrency === "yok"
+                ? "İç piyasaya satan bir firmaya dövizli alacak göstermeyiz; kur riski sizin sorununuz değil."
+                : "Dövizli bir alacak ve dönem sonu kur değerlemesi (VUK 280) kurulur — kur farkınızı sorabilirsiniz."}
+            </em>
+          </div>
+
+          <div className="dm-field">
+            <span>Şu an ne kullanıyorsunuz?</span>
+            <div className="dm-chips">
+              {SISTEMLER.map((x) => (
+                <button
+                  key={x.id}
+                  type="button"
+                  className={currentSystem === x.id ? "on" : ""}
+                  onClick={() => setCurrentSystem(x.id)}
+                >
+                  {x.label}
+                </button>
+              ))}
+            </div>
+            <em>
+              Ajan cevabını buna göre çevirir: SAP&apos;den geçen birine
+              &ldquo;bunun SAP&apos;deki karşılığı&rdquo; demek işe yarar,
+              Excel&apos;den gelene aynı cümle bir şey ifade etmez.
+            </em>
+          </div>
 
           <div className="dm-acts">
             <button type="button" className="mk-pill-ghost" onClick={() => setStep(0)}>
@@ -252,32 +397,79 @@ export function DemoForm() {
       {step === 2 && (
         <div className="dm-step">
           <label className="dm-field">
-            <span>Adınız</span>
-            <input
-              ref={firstField}
-              value={contactName}
-              onChange={(e) => setContactName(e.target.value)}
-              maxLength={80}
+            <span>Bu ay sizi en çok ne uğraştırıyor?</span>
+            <textarea
+              value={goals}
+              onChange={(e) => setGoals(e.target.value)}
+              rows={5}
+              maxLength={600}
             />
+            <em>
+              Ajan bunu okur ve neyi öne çıkaracağını buna göre seçer. Yetki
+              vermez, hesap değiştirmez — yalnızca hangi rakamın sizin için
+              önemli olduğunu bilir. En az on karakter.
+            </em>
           </label>
+
+          <div className="dm-acts">
+            <button type="button" className="mk-pill-ghost" onClick={() => setStep(1)}>
+              Geri
+            </button>
+            <button
+              type="button"
+              className="mk-pill-lg mk-pill-blue"
+              disabled={!step2Ok}
+              onClick={() => setStep(3)}
+            >
+              Devam
+            </button>
+          </div>
+        </div>
+      )}
+
+      {step === 3 && (
+        <div className="dm-step">
+          <div className="dm-row">
+            <label className="dm-field">
+              <span>Adınız</span>
+              <input
+                ref={firstField}
+                value={contactName}
+                onChange={(e) => setContactName(e.target.value)}
+                maxLength={80}
+              />
+            </label>
+            <label className="dm-field">
+              <span>
+                Göreviniz <i>isteğe bağlı</i>
+              </span>
+              <input
+                value={contactTitle}
+                onChange={(e) => setContactTitle(e.target.value)}
+                maxLength={60}
+              />
+            </label>
+          </div>
+
           <label className="dm-field">
             <span>E-posta</span>
             <input
               type="email"
               value={contactEmail}
               onChange={(e) => setContactEmail(e.target.value)}
-              placeholder="ad@sirket.com"
               maxLength={160}
             />
+            <em>Ortamınıza yeniden girmek için bu adresi kullanırsınız.</em>
           </label>
+
           <label className="dm-field">
             <span>
               Telefon <i>isteğe bağlı</i>
             </span>
             <input
+              inputMode="tel"
               value={contactPhone}
               onChange={(e) => setContactPhone(e.target.value)}
-              placeholder="+90"
               maxLength={30}
             />
           </label>
@@ -294,13 +486,13 @@ export function DemoForm() {
           {error && <p className="dm-error">{error}</p>}
 
           <div className="dm-acts">
-            <button type="button" className="mk-pill-ghost" onClick={() => setStep(1)}>
+            <button type="button" className="mk-pill-ghost" onClick={() => setStep(2)}>
               Geri
             </button>
             <button
               type="button"
               className="mk-pill-lg mk-pill-blue"
-              disabled={!step2Ok}
+              disabled={!step3Ok}
               onClick={() => void submit()}
             >
               Ortamı kur
@@ -308,6 +500,7 @@ export function DemoForm() {
           </div>
         </div>
       )}
+
     </div>
   );
 }

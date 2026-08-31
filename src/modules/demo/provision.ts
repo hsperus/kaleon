@@ -86,10 +86,18 @@ export function demoSlug(companyName: string): string {
 
 export interface DemoInput {
   readonly companyName: string;
+  readonly legalName: string | null;
+  readonly taxId: string | null;
+  readonly taxOffice: string | null;
+  readonly city: string | null;
   readonly sector: string;
   readonly employeeBand: string;
+  readonly revenueBand: string;
+  readonly exportCurrency: string;
+  readonly currentSystem: string;
   readonly goals: string;
   readonly contactName: string;
+  readonly contactTitle: string | null;
   readonly contactEmail: string;
   readonly contactPhone: string | null;
   readonly consentText: string;
@@ -149,10 +157,18 @@ export async function provisionDemo(db: SharedDb, input: DemoInput): Promise<Dem
   const request = await db.demoRequest.create({
     data: {
       companyName: input.companyName,
+      legalName: input.legalName,
+      taxId: input.taxId,
+      taxOffice: input.taxOffice,
+      city: input.city,
       sector,
       employeeBand: input.employeeBand,
+      revenueBand: input.revenueBand,
+      exportCurrency: input.exportCurrency,
+      currentSystem: input.currentSystem,
       goals: input.goals,
       contactName: input.contactName,
+      contactTitle: input.contactTitle,
       contactEmail: input.contactEmail.toLocaleLowerCase("tr"),
       contactPhone: input.contactPhone,
       consentText: input.consentText,
@@ -171,6 +187,8 @@ export async function provisionDemo(db: SharedDb, input: DemoInput): Promise<Dem
       status: "active",
       sector,
       goals: input.goals,
+      currentSystem: input.currentSystem,
+      exportCurrency: input.exportCurrency,
       isDemo: true,
       expiresAt,
     },
@@ -179,6 +197,12 @@ export async function provisionDemo(db: SharedDb, input: DemoInput): Promise<Dem
   await seedDemoTenant(tenantClient(schema) as never, {
     companyName: input.companyName,
     sector,
+    legalName: input.legalName,
+    taxId: input.taxId,
+    taxOffice: input.taxOffice,
+    city: input.city,
+    revenueBand: input.revenueBand,
+    exportCurrency: input.exportCurrency,
   });
 
   await db.demoRequest.update({

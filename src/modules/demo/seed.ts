@@ -28,10 +28,53 @@ import { legalNameFor, sectorProfile, staffNames } from "./sectors.js";
 export const SEED_USER = "00000000-0000-0000-0000-0000000000de";
 
 export interface DemoProfile {
-  /** Şirketin görünen adı; unvan buna sektörün ekiyle kurulur. */
+  /** Şirketin görünen adı; unvan verilmezse buna sektörün eki eklenir. */
   readonly companyName: string;
   /** Sektör kimliği; bilinmiyorsa makina profiline düşer. */
   readonly sector?: string | null;
+  /** Ticari unvan — faturanın anteti. Verilirse olduğu gibi kullanılır. */
+  readonly legalName?: string | null;
+  /** VKN ve vergi dairesi: e-Faturanın zorunlu alanları. */
+  readonly taxId?: string | null;
+  readonly taxOffice?: string | null;
+  readonly city?: string | null;
+  /**
+   * Ciro bandı — açılış bilançosunun ÖLÇEĞİ.
+   *
+   * Beş kişilik bir atölyeye 19 milyonluk sermaye göstermek, ürünün
+   * onun ölçeğini bilmediğini söyler. Bakiyeler banda göre çarpanla
+   * ölçeklenir; oranlar korunur, büyüklük değişir.
+   */
+  readonly revenueBand?: string | null;
+  /** "yok" | "EUR" | "USD" — dövizli fatura yalnızca ihracatçıda. */
+  readonly exportCurrency?: string | null;
+  /** Kaç çalışan tohumlanacak. */
+  readonly employeeCount?: number;
+}
+
+/**
+ * Ciro bandından bilanço çarpanı.
+ *
+ * Varsayılan (1×) orta ölçekli bir imalatçıdır. Küçük atölyede
+ * rakamlar onda bire iner, büyük firmada beş katına çıkar — ORANLAR
+ * AYNI KALIR, yalnızca büyüklük değişir. Böylece bilanço her ölçekte
+ * denk ve tutarlı olur.
+ */
+export function scaleFor(revenueBand: string | null | undefined): number {
+  switch (revenueBand) {
+    case "0-10m":
+      return 0.15;
+    case "10-50m":
+      return 0.5;
+    case "50-250m":
+      return 1;
+    case "250m-1mr":
+      return 3;
+    case "1mr+":
+      return 8;
+    default:
+      return 1;
+  }
 }
 
 export async function seedDemoTenant(db: TenantDb, p: DemoProfile): Promise<void> {
@@ -44,12 +87,14 @@ export async function seedDemoTenant(db: TenantDb, p: DemoProfile): Promise<void
     where: { id: "singleton" },
     create: {
       id: "singleton",
-      legalName: legalNameFor(p.companyName, sector),
-      taxId: "1234567890",
-      taxOffice: "Beşiktaş",
+      // Girilen unvan olduğu gibi kullanılır; girilmemişse sektörün
+      // ekiyle kurulur. Fatura anteti kişinin kendi yazdığı olmalı.
+      legalName: p.legalName?.trim() || legalNameFor(p.companyName, sector),
+      taxId: p.taxId?.trim() || "1234567890",
+      taxOffice: p.taxOffice?.trim() || "Beşiktaş",
       addressLine: "Organize Sanayi Bölgesi 4. Cadde No: 12",
-      district: "Beşiktaş",
-      city: "İstanbul",
+      district: p.city?.trim() || "Beşiktaş",
+      city: p.city?.trim() || "İstanbul",
       postalCode: "34349",
       country: "TR",
       email: "muhasebe@example.com",
@@ -134,22 +179,40 @@ export async function seedDemoTenant(db: TenantDb, p: DemoProfile): Promise<void
        * Taşıt burada YOK: 18 Nisan'da alınıyor ve kendi kaydıyla
        * giriyor (kıst amortismanı da o yüzden çalışıyor).
        */
-      lines: [
-        { accountCode: "100", debit: 250_000, credit: 0, description: "Kasa açılış" },
-        { accountCode: "102", debit: 12_400_000, credit: 0, description: "Banka açılış" },
-        { accountCode: "150", debit: 3_200_000, credit: 0, description: "Hammadde stoğu" },
-        { accountCode: "152", debit: 1_800_000, credit: 0, description: "Mamul stoğu" },
-        { accountCode: "253", debit: 4_000_000, credit: 0, description: "Tesis, makine ve cihazlar" },
-        { accountCode: "255", debit: 320_000, credit: 0, description: "Demirbaşlar" },
-        {
-          accountCode: "320",
-          debit: 0,
-          credit: 2_900_000,
-          description: "Satıcılara borç",
-          partnerId: partner.id,
-        },
-        { accountCode: "500", debit: 0, credit: 19_070_000, description: "Ödenmiş sermaye" },
-      ],
+      /*
+       * BAKİYELER CİRO BANDINA GÖRE ÖLÇEKLENİR.
+       *
+       * Beş kişilik bir atölyeye 19 milyonluk sermaye göstermek,
+       * ürünün onun ölçeğini bilmediğini söyler. Çarpan her satıra
+       * aynı uygulanır: ORANLAR KORUNUR, bilanço her ölçekte denk
+       * kalır. Sermaye satırı hariç hepsi ölçeklenir ve sermaye
+       * FARKTAN hesaplanır — yuvarlama sonrası denksizlik olmasın.
+       */
+      lines: (() => {
+        const k = scaleFor(p.revenueBand);
+        const yuvarla = (v: number) => Math.round(v * k);
+        const aktif = [
+          { accountCode: "100", debit: yuvarla(250_000), credit: 0, description: "Kasa açılış" },
+          { accountCode: "102", debit: yuvarla(12_400_000), credit: 0, description: "Banka açılış" },
+          { accountCode: "150", debit: yuvarla(3_200_000), credit: 0, description: "Hammadde stoğu" },
+          { accountCode: "152", debit: yuvarla(1_800_000), credit: 0, description: "Mamul stoğu" },
+          { accountCode: "253", debit: yuvarla(4_000_000), credit: 0, description: "Tesis, makine ve cihazlar" },
+          { accountCode: "255", debit: yuvarla(320_000), credit: 0, description: "Demirbaşlar" },
+        ];
+        const borc = yuvarla(2_900_000);
+        const sermaye = aktif.reduce((t, l) => t + l.debit, 0) - borc;
+        return [
+          ...aktif,
+          {
+            accountCode: "320",
+            debit: 0,
+            credit: borc,
+            description: "Satıcılara borç",
+            partnerId: partner.id,
+          },
+          { accountCode: "500", debit: 0, credit: sermaye, description: "Ödenmiş sermaye" },
+        ];
+      })(),
     });
   }
 
@@ -268,6 +331,73 @@ export async function seedDemoTenant(db: TenantDb, p: DemoProfile): Promise<void
       userId: SEED_USER,
     });
   } else if (invoiced) {
+  }
+
+  /*
+   * ── 7b. İHRACAT: DÖVİZLİ ALACAK ──
+   *
+   * YALNIZCA İHRACATÇIDA. İç piyasaya satan bir firmaya dövizli bir
+   * alacak göstermek yanlış olur; kur riski onun sorunu değildir ve
+   * demo ona ait olmayan bir problemi öne çıkarmış olur.
+   *
+   * İhracatçıda ise kur farkı çoğu zaman esas faaliyet kârından
+   * büyüktür. Bu kayıt, dönem sonu kur değerlemesinin (VUK 280)
+   * üzerinde çalışacağı gerçek bir açık pozisyon bırakır: kişi
+   * "kur farkım ne kadar" diye sorabilsin.
+   *
+   * KUR DA YAZILIR. Değerleme, kuru bulunamayan bir tutarı
+   * değerlemeyi reddediyor — haklı olarak. Kur olmadan bu kayıt
+   * demoyu çalışmaz gösterirdi.
+   */
+  const doviz = p.exportCurrency;
+  if (doviz === "EUR" || doviz === "USD") {
+    const kur = doviz === "EUR" ? 38.4 : 35.2;
+    const tutar = doviz === "EUR" ? 126_000 : 140_000;
+
+    for (const [gun, oran] of [
+      ["2026-03-16", kur],
+      ["2026-12-31", kur * 1.21],
+    ] as const) {
+      await db.exchangeRate.upsert({
+        where: { currency_quotedAt: { currency: doviz, quotedAt: new Date(gun) } },
+        create: { currency: doviz, rate: oran, quotedAt: new Date(gun), source: "TCMB" },
+        update: {},
+      });
+    }
+
+    const varMi = await db.journalEntry.findFirst({
+      where: { sourceKind: "sales_invoice", sourceId: "INV-EXPORT-1" },
+    });
+    if (!varMi) {
+      await journal.post({
+        entryDate: new Date("2026-03-16"),
+        description: `İhracat faturası (${doviz})`,
+        sourceKind: "sales_invoice",
+        sourceId: "INV-EXPORT-1",
+        userId: SEED_USER,
+        lines: [
+          {
+            accountCode: "120",
+            debit: Math.round(tutar * kur),
+            credit: 0,
+            description: `İhracat faturası ${doviz} ${tutar}`,
+            partnerId: partner.id,
+            currency: doviz,
+            fxDebit: tutar,
+            fxCredit: 0,
+            fxRate: kur,
+          },
+          {
+            // 601: yurtdışı satış. 600'e yazılsaydı ihracat istisnası
+            // görünmez ve KDV beyanı yanlış çıkardı.
+            accountCode: "601",
+            debit: 0,
+            credit: Math.round(tutar * kur),
+            description: "Yurtdışı satış",
+          },
+        ],
+      });
+    }
   }
 
   // ── 8. Amortisman ──

@@ -59,10 +59,6 @@ export function Shell({ children }: { children: ReactNode }) {
       </header>
 
       {children}
-
-      <p className="mk-end-foot">
-        KAELON · TÜRK İMALAT SANAYİİ İÇİN · DENETİM KAYDI DEĞİŞTİRİLEMEZ
-      </p>
     </div>
   );
 }
