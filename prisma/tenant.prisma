@@ -2293,3 +2293,120 @@ model Budget {
 
   @@map("budgets")
 }
+
+/// Kontrol planı — hangi üründe hangi özellik, hangi toleransla.
+model InspectionPlan {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique
+  itemId    String   @map("item_id")
+  name      String
+  /// incoming | in-process | final
+  stage     String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdBy String   @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  characteristics InspectionCharacteristic[]
+  lots            InspectionLot[]
+
+  @@index([itemId, stage])
+  @@map("inspection_plans")
+}
+
+model InspectionCharacteristic {
+  id         String   @id @default(uuid()) @db.Uuid
+  planId     String   @map("plan_id") @db.Uuid
+  seq        Int
+  name       String
+  /// numeric (ölçülür) | attribute (bakılır)
+  kind       String
+  uom        String?
+  /// Tek yönlü tolerans olabilir: "en az 45 HRC" ya da "en fazla 3,2 µm".
+  /// İkisi birden null olan sayısal özellik hiçbir şey ölçmez.
+  lowerLimit Decimal? @map("lower_limit") @db.Decimal(18, 6)
+  upperLimit Decimal? @map("upper_limit") @db.Decimal(18, 6)
+  method     String?
+  /// Kritik özellikte şartlı kabul yapılamaz.
+  isCritical Boolean  @default(false) @map("is_critical")
+
+  plan    InspectionPlan     @relation(fields: [planId], references: [id], onDelete: Cascade)
+  results InspectionResult[]
+
+  @@unique([planId, seq])
+  @@map("inspection_characteristics")
+}
+
+model InspectionLot {
+  id           String   @id @default(uuid()) @db.Uuid
+  documentNo   String   @unique @map("document_no")
+  planId       String   @map("plan_id") @db.Uuid
+  itemId       String   @map("item_id")
+  batchNo      String?  @map("batch_no")
+  serialNo     String?  @map("serial_no")
+  referenceDoc String?  @map("reference_doc")
+  quantity     Decimal  @db.Decimal(18, 4)
+  inspectedAt  DateTime @map("inspected_at")
+  inspectedBy  String   @map("inspected_by") @db.Uuid
+  /// open | passed | failed | conditional
+  result       String   @default("open")
+  note         String?
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  plan            InspectionPlan     @relation(fields: [planId], references: [id])
+  results         InspectionResult[]
+  nonconformances Nonconformance[]
+
+  @@index([itemId, inspectedAt])
+  @@index([batchNo])
+  @@map("inspection_lots")
+}
+
+model InspectionResult {
+  id               String   @id @default(uuid()) @db.Uuid
+  lotId            String   @map("lot_id") @db.Uuid
+  characteristicId String   @map("characteristic_id") @db.Uuid
+  measured         Decimal? @db.Decimal(18, 6)
+  conforms         Boolean
+  note             String?
+
+  lot            InspectionLot            @relation(fields: [lotId], references: [id], onDelete: Cascade)
+  characteristic InspectionCharacteristic @relation(fields: [characteristicId], references: [id])
+
+  @@unique([lotId, characteristicId])
+  @@map("inspection_results")
+}
+
+/// Uygunsuzluk ve düzeltici faaliyet.
+///
+/// KÖK NEDEN OLMADAN KAPATILAMAZ: "kapandı" işaretleyip sebebini
+/// yazmamak, aynı hatanın üç ay sonra tekrar etmesini garanti eder.
+model Nonconformance {
+  id               String    @id @default(uuid()) @db.Uuid
+  documentNo       String    @unique @map("document_no")
+  /// inspection | customer | production | supplier
+  source           String
+  lotId            String?   @map("lot_id") @db.Uuid
+  itemId           String?   @map("item_id")
+  batchNo          String?   @map("batch_no")
+  partnerId        String?   @map("partner_id") @db.Uuid
+  description      String
+  quantity         Decimal?  @db.Decimal(18, 4)
+  /// minor | major | critical
+  severity         String
+  /// open | investigating | closed
+  status           String    @default("open")
+  rootCause        String?   @map("root_cause")
+  correctiveAction String?   @map("corrective_action")
+  /// Hurda, yeniden işleme, iade maliyeti.
+  costAmount       Decimal?  @map("cost_amount") @db.Decimal(18, 2)
+  openedBy         String    @map("opened_by") @db.Uuid
+  openedAt         DateTime  @default(now()) @map("opened_at")
+  closedBy         String?   @map("closed_by") @db.Uuid
+  closedAt         DateTime? @map("closed_at")
+
+  lot InspectionLot? @relation(fields: [lotId], references: [id])
+
+  @@index([status, severity])
+  @@index([itemId, openedAt])
+  @@map("nonconformances")
+}

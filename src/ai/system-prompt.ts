@@ -204,6 +204,9 @@ export function sessionContext(input: {
     `  ihtar, borç hatırlatma → dunning (plan_dunning_run)`,
     `  kredi limiti, risk, satış yapabilir miyiz → credit (get_credit_exposure)`,
     `  teslim tarihi, ne zaman gönderebiliriz → availability (check_availability)`,
+    `  kontrol planı, tolerans, muayene → inspection (get_inspection_plan)`,
+    `  uygunsuzluk, DÖF, hurda → nonconformance (list_open_nonconformances)`,
+    `  sertifika, analiz raporu → certificate (build_certificate_of_analysis)`,
   );
 
   if (input.glossary && input.glossary.length > 0) {
