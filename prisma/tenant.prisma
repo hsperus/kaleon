@@ -48,6 +48,10 @@ model Partner {
   einvoiceUser Boolean? @map("einvoice_user")
   /// Entegratörün posta kutusu etiketi (GB/PK).
   einvoiceAlias String? @map("einvoice_alias")
+  /// Bu cariyle anlaşılan vade, gün. Yeni faturanın vade tarihi buradan
+  /// türetilir. null = konuşulmamış; fatura girilirken vade SORULUR,
+  /// varsayılan bir sayı uydurulmaz.
+  paymentTermsDays Int? @map("payment_terms_days")
   isActive   Boolean  @default(true) @map("is_active")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
@@ -369,6 +373,9 @@ model Invoice {
   partnerId     String   @map("partner_id")
   documentNo    String   @map("document_no")
   issuedAt      DateTime @map("issued_at")
+  /// Ödeme vadesi. null = BİLİNMİYOR — ödeme koşusu bu faturaları ayrı
+  /// başlıkta ve tutarıyla bildirir, "bugün ödenmeli" saymaz.
+  dueDate       DateTime? @map("due_date") @db.Date
   currency      String
   /// matched | blocked | pending
   matchStatus   String   @default("pending") @map("match_status")
@@ -389,6 +396,7 @@ model Invoice {
   /// mesaj vermek içindir, tek savunma değildir.
   @@unique([partnerId, documentNo])
   @@index([matchStatus])
+  @@index([dueDate])
   @@map("invoices")
 }
 
@@ -1059,6 +1067,7 @@ model SalesInvoice {
   @@index([partnerId, issuedAt])
   @@index([salesOrderId])
   @@index([status])
+  @@index([dueDate])
   @@map("sales_invoices")
 }
 

@@ -84,7 +84,22 @@ function sampleFor(schema: Record<string, unknown>, name: string): unknown {
 }
 
 function valueFor(key: string, def: Record<string, unknown>): unknown {
-  const type = def["type"];
+  /*
+   * `type` DİZİ DE OLABİLİR.
+   *
+   * zod 4, nullable bir alanı `anyOf` yerine `{"type": ["number","null"]}`
+   * olarak yazıyor. Bu dal yokken dizi hiçbir karşılaştırmayı tutmuyor,
+   * akış en sona düşüyor ve sayısal alana METİN gönderiliyordu. Nullable
+   * metinlerde kaza eseri çalışıyordu — hata ancak ilk nullable SAYI
+   * eklendiğinde görüldü.
+   */
+  const rawType = def["type"];
+  if (Array.isArray(rawType)) {
+    // null kabul ediliyorsa null en güvenlisidir: "hepsi/varsayılan" demek.
+    if (rawType.includes("null")) return null;
+    return valueFor(key, { ...def, type: rawType[0] });
+  }
+  const type = rawType;
   const en = def["enum"] as unknown[] | undefined;
 
   // Enum varsa İLK SEÇENEK: uydurma bir değer şemayı geçemez.

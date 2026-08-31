@@ -194,6 +194,10 @@ export function sessionContext(input: {
     `  irsaliye → despatch · fatura → invoice · dekont → credit note`,
     `  iş emri → work order · makine → machine · arıza → breakdown`,
     `  onay → approval · izin → leave · mesai → overtime · vardiya → shift`,
+    `  nakit akışı, nakit durumu, para yeter mi → cash flow (project_cash_flow)`,
+    `  ödeme planı, kime ödeyelim, ödeme koşusu → payment run (plan_payment_run)`,
+    `  vade → due date (set_payable_due_date) · borç, ödenecek → payable`,
+    `  alacak, tahsilat → receivable (get_receivables_aging)`,
   );
 
   if (input.glossary && input.glossary.length > 0) {

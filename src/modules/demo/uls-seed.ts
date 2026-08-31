@@ -107,6 +107,60 @@ const TEDARIKCILER = [
   { code: "S-2001", name: "Petrol Ofisi Havacılık A.Ş.", vkn: "7250056789", city: "İstanbul", district: "Arnavutköy" },
   { code: "S-2002", name: "Çelebi Hava Servisi A.Ş.", vkn: "2160067890", city: "İstanbul", district: "Arnavutköy" },
   { code: "S-2003", name: "Turkish Technic A.Ş.", vkn: "8720078901", city: "İstanbul", district: "Pendik" },
+  { code: "S-2004", name: "DHMİ Genel Müdürlüğü", vkn: "2940089012", city: "İstanbul", district: "Arnavutköy" },
+  { code: "S-2005", name: "Anadolu Sigorta A.Ş.", vkn: "0680090123", city: "İstanbul", district: "Şişli" },
+] as const;
+
+/**
+ * Cari vadeleri. Havacılıkta vade tedarikçi gücüne göre değişir:
+ * yakıtçı ve havalimanı otoritesi kısa vade dayatır, MRO uzun verir.
+ * Bu sayı yeni faturanın vadesini türetir; uydurulmaz, girilir.
+ */
+const VADELER: Record<string, number> = {
+  "S-2001": 15,
+  "S-2002": 30,
+  "S-2003": 60,
+  "S-2004": 7,
+  "S-2005": 45,
+  "F-1001": 45,
+  "F-1002": 30,
+  "F-1003": 45,
+  "F-1004": 30,
+};
+
+/**
+ * Açık tedarikçi faturaları — ödeme koşusunun ve nakit akışının konusu.
+ *
+ * KASITLI OLARAK ÇEŞİTLİ: gecikmiş, yaklaşan, bloke, vadesi girilmemiş
+ * ve dövizli faturalar bir arada. Hepsi "temiz" olsaydı, ödeme koşusu
+ * yalnızca kolay hâlini gösterirdi ve asıl işini — neyi ELEDİĞİNİ —
+ * hiç göstermezdi.
+ */
+const GELEN_FATURALAR = [
+  // Gecikmiş: yer hizmeti faturası, 22 gün önce vadesi dolmuş.
+  { no: "GF-2026-4471", cari: "S-2002", kesim: "2026-07-10", vade: "2026-08-09",
+    kalem: "ULD-KIRA", miktar: 1_240, fiyat: 42, para: "TRY", durum: "matched" },
+  // Gecikmiş ve büyük: temmuz yakıt ikmali.
+  { no: "GF-2026-4488", cari: "S-2001", kesim: "2026-07-18", vade: "2026-08-02",
+    kalem: "JETA1", miktar: 620_000, fiyat: 38.4, para: "TRY", durum: "matched" },
+  // Yaklaşan: havalimanı konma ve park ücretleri.
+  { no: "GF-2026-4502", cari: "S-2004", kesim: "2026-08-25", vade: "2026-09-01",
+    kalem: "ULD-KIRA", miktar: 5_600, fiyat: 42, para: "TRY", durum: "matched" },
+  // Yaklaşan: ağustos yakıt.
+  { no: "GF-2026-4515", cari: "S-2001", kesim: "2026-08-20", vade: "2026-09-04",
+    kalem: "JETA1", miktar: 1_400_000, fiyat: 38.4, para: "TRY", durum: "matched" },
+  // İleri vadeli: gövde ve sorumluluk sigortası primi.
+  { no: "GF-2026-4520", cari: "S-2005", kesim: "2026-08-12", vade: "2026-09-26",
+    kalem: "OXY-BTL", miktar: 92, fiyat: 18_600, para: "TRY", durum: "matched" },
+  // BLOKE: sayılan miktar irsaliyeden düşük, üç yönlü mutabakat tuttu.
+  { no: "GF-2026-4530", cari: "S-2002", kesim: "2026-08-14", vade: "2026-09-13",
+    kalem: "DEICE", miktar: 24_000, fiyat: 96, para: "TRY", durum: "blocked" },
+  // VADESİ GİRİLMEMİŞ: entegratörden vadesiz geldi, kimse girmedi.
+  { no: "GF-2026-4544", cari: "S-2002", kesim: "2026-08-18", vade: null,
+    kalem: "ULD-KIRA", miktar: 3_100, fiyat: 42, para: "TRY", durum: "matched" },
+  // DÖVİZLİ: motor borescope bakımı, MRO faturaları USD kesilir.
+  { no: "GF-2026-4551", cari: "S-2003", kesim: "2026-08-08", vade: "2026-10-07",
+    kalem: "HYD-5606", miktar: 210, fiyat: 118, para: "USD", durum: "matched" },
 ] as const;
 
 /**
@@ -723,6 +777,105 @@ export async function seedUls(db: TenantDb): Promise<UlsResult> {
       exchangeRate: kur.rate,
     });
     return `fatura: ${sevk.documentNo} → ${fat.documentNo} (${h.rota}, ${h.kg.toLocaleString("tr-TR")} kg)`;
+  });
+
+  /*
+   * ── 17a. BANKA HESAPLARI ──
+   *
+   * NAKİT PROJEKSİYONUNUN AÇILIŞ SATIRI. Hesap yoksa `openingCash`
+   * elle verilmek zorunda kalıyor ve tool "banka bakiyesi okunamadı"
+   * diyor — doğru davranış ama kullanılabilir bir demo değil.
+   *
+   * Hem TL hem USD hesap var: navlun geliri USD, yakıt ve yer
+   * hizmeti gideri TL. Tek para birimli bir havayolu yoktur.
+   */
+  await step("banka", async () => {
+    const hesaplar = [
+      { bank: "Garanti BBVA", externalId: "ULS-TRY-001", currency: "TRY",
+        iban: "TR33 0006 2000 0000 0012 3456 78", available: 84_600_000, blocked: 0 },
+      { bank: "İş Bankası", externalId: "ULS-TRY-002", currency: "TRY",
+        iban: "TR64 0006 4000 0011 2345 6789 01", available: 21_350_000, blocked: 6_200_000 },
+      { bank: "Garanti BBVA", externalId: "ULS-USD-001", currency: "USD",
+        iban: "TR12 0006 2000 0000 0098 7654 32", available: 3_180_000, blocked: 0 },
+      { bank: "Yapı Kredi", externalId: "ULS-EUR-001", currency: "EUR",
+        iban: "TR90 0006 7010 0000 0055 4433 22", available: 412_000, blocked: 0 },
+    ];
+    let yeni = 0;
+    for (const h of hesaplar) {
+      const acc = await db.bankAccount.upsert({
+        where: { externalId_currency: { externalId: h.externalId, currency: h.currency } },
+        create: { bank: h.bank, externalId: h.externalId, iban: h.iban, currency: h.currency },
+        update: {},
+      });
+      // Bakiye anlık görüntüdür: bankanın bildirdiği AN yazılır, bizim
+      // yazdığımız an değil. Aynı an ikinci kez yazılmaz.
+      const anda = d("2026-08-31");
+      const varMi = await db.bankBalanceSnapshot.findUnique({
+        where: { accountId_asOf: { accountId: acc.id, asOf: anda } },
+      });
+      if (varMi) continue;
+      await db.bankBalanceSnapshot.create({
+        data: { accountId: acc.id, asOf: anda, available: h.available, blocked: h.blocked },
+      });
+      yeni += 1;
+    }
+    return `banka: ${hesaplar.length} hesap (TRY/USD/EUR) · ${yeni} yeni bakiye`;
+  });
+
+  /*
+   * ── 17b. AÇIK BORÇLAR VE VADELER ──
+   *
+   * ÖDEME KOŞUSUNUN VE NAKİT AKIŞININ HAM MADDESİ. Bunlar olmadan
+   * `plan_payment_run` boş liste, `project_cash_flow` düz çizgi
+   * döndürür — tool çalışır görünür ama hiçbir şey göstermez.
+   *
+   * Faturalar doğrudan yazılıyor: gerçek hayatta gelen fatura
+   * entegratörden düşer, satın alma zincirinden geçmez. Vadesi
+   * `vade` alanında AÇIKÇA duruyor; carinin vadesinden hesaplanıp
+   * yazılsaydı, seed uydurma bir tarihi gerçek gibi kaydederdi.
+   */
+  await step("vade", async () => {
+    let vadeYazilan = 0;
+    for (const [kod, gun] of Object.entries(VADELER)) {
+      const r = await db.partner.updateMany({
+        where: { code: kod, paymentTermsDays: null },
+        data: { paymentTermsDays: gun },
+      });
+      vadeYazilan += r.count;
+    }
+
+    let yeni = 0;
+    for (const f of GELEN_FATURALAR) {
+      if (await db.invoice.findFirst({ where: { documentNo: f.no } })) continue;
+      const cari = await db.partner.findUnique({ where: { code: f.cari } });
+      if (!cari) continue;
+      await db.invoice.create({
+        data: {
+          partnerId: cari.id,
+          documentNo: f.no,
+          issuedAt: d(f.kesim),
+          dueDate: f.vade === null ? null : d(f.vade),
+          currency: f.para,
+          matchStatus: f.durum,
+          // Bloke faturanın farkı kayıtlı olmalı: "neden bloke" sorusunun
+          // cevabı belgede durmazsa bloke çözülemez.
+          totalVariance: f.durum === "blocked" ? 184_320 : null,
+          lines: {
+            create: [
+              {
+                lineNo: 10,
+                itemId: f.kalem,
+                quantity: f.miktar,
+                unitPrice: f.fiyat,
+                currency: f.para,
+              },
+            ],
+          },
+        },
+      });
+      yeni += 1;
+    }
+    return `vade: ${yeni} gelen fatura (1 bloke, 1 vadesiz, 1 dövizli) · ${vadeYazilan} cariye vade`;
   });
 
   // ── 18. İade dekontu ── navlun düzeltmesi.

@@ -28,6 +28,7 @@ CREATE TABLE "partners" (
     "phone" TEXT,
     "einvoice_user" BOOLEAN,
     "einvoice_alias" TEXT,
+    "payment_terms_days" INTEGER,
     "is_active" BOOLEAN NOT NULL DEFAULT true,
     "created_at" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updated_at" TIMESTAMP(3) NOT NULL,
@@ -240,6 +241,7 @@ CREATE TABLE "invoices" (
     "partner_id" TEXT NOT NULL,
     "document_no" TEXT NOT NULL,
     "issued_at" TIMESTAMP(3) NOT NULL,
+    "due_date" DATE,
     "currency" TEXT NOT NULL,
     "match_status" TEXT NOT NULL DEFAULT 'pending',
     "total_variance" DECIMAL(18,4),
@@ -1393,6 +1395,9 @@ CREATE INDEX "goods_receipts_po_id_po_line_no_idx" ON "goods_receipts"("po_id", 
 CREATE INDEX "invoices_match_status_idx" ON "invoices"("match_status");
 
 -- CreateIndex
+CREATE INDEX "invoices_due_date_idx" ON "invoices"("due_date");
+
+-- CreateIndex
 CREATE UNIQUE INDEX "invoices_partner_id_document_no_key" ON "invoices"("partner_id", "document_no");
 
 -- CreateIndex
@@ -1541,6 +1546,9 @@ CREATE INDEX "sales_invoices_sales_order_id_idx" ON "sales_invoices"("sales_orde
 
 -- CreateIndex
 CREATE INDEX "sales_invoices_status_idx" ON "sales_invoices"("status");
+
+-- CreateIndex
+CREATE INDEX "sales_invoices_due_date_idx" ON "sales_invoices"("due_date");
 
 -- CreateIndex
 CREATE INDEX "sales_invoice_lines_delivery_id_idx" ON "sales_invoice_lines"("delivery_id");

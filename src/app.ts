@@ -13,6 +13,8 @@ import { revaluationTools } from "./modules/finance/revaluation-tools.js";
 import { rosterTools } from "./modules/hr/roster-tools.js";
 import { discoveryTools } from "./modules/discovery/tools.js";
 import { masterDataCrudTools } from "./modules/master-data/crud-tools.js";
+import { cashFlowTools } from "./modules/finance/cashflow-tools.js";
+import { CashFlowRepository } from "./db/cashflow-repository.js";
 import { batchTools } from "./modules/inventory/batch-tools.js";
 import { procurementTools } from "./modules/procurement/procurement-tools.js";
 import { leaveTools } from "./modules/hr/leave-tools.js";
@@ -185,6 +187,12 @@ export function buildRegistry(db: DataSource, repos: Repositories = {}): ToolReg
      * düzeltemiyor, ücret değiştiremiyordu.
      */
     ...(repos.tenantDb ? masterDataCrudTools(repos.tenantDb) : []),
+    /*
+     * NAKİT AKIŞI VE ÖDEME KOŞUSU. "Önümüzdeki ay nakit sıkışır mıyız"
+     * ve "kime ödeyelim" sorularının sistemde cevabı yoktu; bilanço
+     * dünü anlatır, gelecek haftanın banka bakiyesini söylemez.
+     */
+    ...(repos.tenantDb ? cashFlowTools(new CashFlowRepository(repos.tenantDb), db) : []),
     // Kur değerlemesi HEM defteri HEM kur tablosunu okur; ikisi de
     // yoksa tool hiç kurulmaz — yarım bir değerleme yanlış sayı üretir.
     ...(repos.revaluation && repos.valuation
