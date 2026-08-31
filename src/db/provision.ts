@@ -257,10 +257,28 @@ async function schemaHasLedger(shared: SharedClient, schema: string): Promise<bo
 }
 
 /** KVKK silme talebi — tenant'ın tüm işletmesel verisi tek komutla gider. */
+/**
+ * Şemayı düşürür — slug ya da şema adıyla.
+ *
+ * ESKİDEN YALNIZCA ŞEMA ADI KABUL EDİYORDU ve bu bir tuzaktı:
+ * `provisionTenantSchema` ikisini de alıyor, bu almıyordu. Kuran ve
+ * düşüren fonksiyonun farklı şey beklemesi, her çağıranı yanıltıyor.
+ *
+ * BEDELİ ÖLÇÜLDÜ. Geliştirme veritabanında 36 YETİM ŞEMA birikmişti:
+ * her temizlik çağrısı slug gönderiyor, `assertSafeSchemaName` haklı
+ * olarak reddediyor, hata `.catch()` içinde yutuluyor ve tenant kaydı
+ * silinirken şema kalıyordu. Üretimdeki gecelik demo temizliği de aynı
+ * hatayı taşıyordu — kayıt silinir, şema sonsuza kadar kalırdı. En kötü
+ * sonuç: kimsenin bulamayacağı, dolayısıyla asla silinmeyecek bir şema.
+ *
+ * Artık ikisi de kabul ediliyor ve asimetri kapandı.
+ */
 export async function dropTenantSchema(
   shared: SharedClient,
-  schema: string,
+  slugOrSchema: string,
 ): Promise<void> {
-  assertSafeSchemaName(schema);
+  const schema = slugOrSchema.startsWith("tenant_")
+    ? (assertSafeSchemaName(slugOrSchema), slugOrSchema)
+    : tenantSchemaName(slugOrSchema);
   await shared.$executeRawUnsafe(`DROP SCHEMA IF EXISTS "${schema}" CASCADE`);
 }

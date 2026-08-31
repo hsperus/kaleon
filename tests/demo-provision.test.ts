@@ -283,3 +283,26 @@ describe.skipIf(!enabled)("demo kurulumu kalıcılığı", () => {
     await expect(assertWithinLimits(shared, hash)).rejects.toThrow(/bize yazın|yarını bekleyin/);
   });
 });
+
+describe("şema düşürme — kuran ve düşüren aynı şeyi kabul eder", () => {
+  it("dropTenantSchema HEM SLUG HEM ŞEMA ADI kabul eder", async () => {
+    // Asimetri bir tuzaktı: provision ikisini de alıyordu, drop
+    // yalnızca şema adını. Slug gönderen her çağıran sessizce
+    // başarısız oluyor ve yetim şema bırakıyordu.
+    const { tenantSchemaName } = await import("../src/db/provision.js");
+    expect(tenantSchemaName("demo-abc-123")).toBe("tenant_demo_abc_123");
+    // İkisi de aynı şemaya çözülmeli.
+    const { dropTenantSchema } = await import("../src/db/provision.js");
+    const cagrilar: string[] = [];
+    const sahte = {
+      $executeRawUnsafe: async (sql: string) => {
+        cagrilar.push(sql);
+        return 0;
+      },
+    } as never;
+    await dropTenantSchema(sahte, "demo-abc-123");
+    await dropTenantSchema(sahte, "tenant_demo_abc_123");
+    expect(cagrilar[0]).toBe(cagrilar[1]);
+    expect(cagrilar[0]).toContain("tenant_demo_abc_123");
+  });
+});

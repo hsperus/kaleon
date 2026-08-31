@@ -51,7 +51,10 @@ async function main(): Promise<void> {
      * hiçbir kayıtla ilişkilendirilemeyen bir şema kalırdı — kimsenin
      * bulamayacağı ve dolayısıyla asla silinmeyecek bir şema.
      */
-    await dropTenantSchema(db, t.slug);
+    // ŞEMA ADIYLA: slug göndermek sessizce başarısız oluyordu ve
+    // tenant kaydı silinirken şema kalıyordu. `dropTenantSchema`
+    // artık ikisini de kabul ediyor ama açık olan doğrusu bu.
+    await dropTenantSchema(db, t.schemaName);
     await db.session.deleteMany({ where: { tenantId: t.id } });
     await db.membership.deleteMany({ where: { tenantId: t.id } });
     // Talep kaydı kalır ama artık var olmayan tenant'a işaret etmez.
