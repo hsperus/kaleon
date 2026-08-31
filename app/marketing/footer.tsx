@@ -24,6 +24,7 @@ const BOLUMLER = [
 ];
 
 const BASLA = [
+  { href: "/rehber", label: "Kullanıcı rehberi" },
   { href: "/deneyin", label: "Şirketinizle deneyin" },
   { href: "/uygulama", label: "Giriş" },
 ];

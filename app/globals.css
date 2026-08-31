@@ -1618,7 +1618,19 @@ button.role, select.role {
   /* Koyu tema yazıcıya taşmasın: kâğıt beyazdır. */
   html, body { background: #fff !important; color: #000 !important }
 
-  body > *:not(.doc-veil) { display: none !important }
+  /*
+   * BELGE AÇIKKEN sayfanın geri kalanı basılmaz.
+   *
+   * `body:has(.doc-veil)` KOŞULU ŞART. Koşulsuz yazıldığında kural her
+   * yazdırmada işliyordu: belge açık olmayan bir sayfayı yazdıran
+   * kullanıcı BOMBOŞ bir kâğıt alıyordu — çünkü `.doc-veil` yok ve
+   * kural gövdedeki her şeyi gizliyor.
+   *
+   * Fark edilmesi zordu çünkü tek yazdırma yolu belge önizlemesiydi;
+   * kullanıcı rehberi eklenince ortaya çıktı ve rehberin PDF'i tek
+   * boş sayfa olarak çıktı.
+   */
+  body:has(.doc-veil) > *:not(.doc-veil) { display: none !important }
 
   .doc-veil {
     position: static;
@@ -3735,4 +3747,256 @@ button.role, select.role {
 
 @media (prefers-reduced-motion: reduce) {
   .v-glow { animation: none }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+ * KULLANICI REHBERİ
+ *
+ * Ekranda okunur, kâğıda basılır. İkisi de birinci sınıf: rehberin
+ * PDF'ini isteyen kullanıcı Ctrl+P diyecek ve çıkan şey ekranda
+ * gördüğünün aynısı olmalı.
+ *
+ * Bu yüzden ölçüler MİLİMETRE değil piksel — ekran ölçüsü — ama
+ * yazdırma kuralında sayfa kırılımları, tekrarlanan başlıklar ve
+ * A4 kenar boşlukları ayrıca tanımlı.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+.gd {
+  position: relative;
+  z-index: 1;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: clamp(96px, 12vw, 140px) 24px 120px;
+  color: var(--fg-2);
+  font-size: 15.5px;
+  line-height: 1.68;
+}
+.gd p { margin: 0 0 14px }
+.gd strong { color: var(--fg); font-weight: 600 }
+.gd em { font-style: italic; color: var(--fg-2) }
+.gd code {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: .85em; background: var(--panel); border: 1px solid var(--hair);
+  border-radius: 4px; padding: 1px 5px; color: var(--fg-2);
+}
+.gd q { color: var(--fg); font-style: italic }
+.gd-dim { color: var(--fg-4) }
+
+/* ── Kapak ── */
+.gd-cover { border-bottom: 1px solid var(--hair-2); padding-bottom: 40px; margin-bottom: 44px }
+.gd-kicker {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 11.5px; letter-spacing: .16em; text-transform: uppercase;
+  color: var(--fg-4); margin: 0 0 20px;
+}
+.gd-cover h1 {
+  margin: 0 0 20px; font-size: clamp(34px, 5.4vw, 56px); font-weight: 640;
+  letter-spacing: -.038em; line-height: 1.05; color: var(--fg); text-wrap: balance;
+}
+.gd-lede { font-size: 18px; line-height: 1.55; color: var(--fg-2); max-width: 62ch }
+
+.gd-facts {
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1px; background: var(--hair); border: 1px solid var(--hair);
+  margin: 32px 0 18px;
+}
+.gd-facts > div { background: var(--panel); padding: 14px 16px }
+.gd-facts dt { font-size: 11.5px; color: var(--fg-4); margin: 0 0 4px }
+.gd-facts dd {
+  margin: 0; font-size: 26px; font-weight: 600; letter-spacing: -.02em;
+  color: var(--fg); font-variant-numeric: tabular-nums;
+}
+.gd-stamp { font-size: 12.5px; color: var(--fg-5); margin: 0 }
+
+/* ── İçindekiler ── */
+.gd-toc { margin-bottom: 56px }
+.gd-toc h2 { font-size: 13px; letter-spacing: .1em; text-transform: uppercase; color: var(--fg-4); margin: 0 0 14px; font-weight: 500 }
+.gd-toc ol { list-style: none; margin: 0; padding: 0; columns: 2; column-gap: 40px }
+.gd-toc li { break-inside: avoid; margin: 0 0 8px }
+.gd .gd-toc a { display: flex; gap: 12px; font-size: 14.5px; color: var(--fg-2) }
+.gd .gd-toc a:hover { color: var(--blue) }
+.gd-toc-n {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px; color: var(--fg-5); flex: 0 0 auto;
+}
+
+/* ── Bölüm ── */
+.gd-sec { margin-top: 64px; scroll-margin-top: 72px }
+.gd-sec > h2 {
+  display: flex; align-items: baseline; gap: 14px;
+  margin: 0 0 18px; padding-bottom: 12px; border-bottom: 1px solid var(--hair-2);
+  font-size: clamp(24px, 3.2vw, 32px); font-weight: 640;
+  letter-spacing: -.028em; color: var(--fg);
+}
+.gd-n {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 14px; font-weight: 500; color: var(--blue); flex: 0 0 auto;
+}
+.gd-sec h3 {
+  margin: 34px 0 10px; font-size: 19px; font-weight: 620;
+  letter-spacing: -.02em; color: var(--fg);
+}
+.gd-sec h4 { margin: 0 0 6px; font-size: 15.5px; font-weight: 600; color: var(--fg) }
+
+.gd-list { margin: 0 0 16px; padding-left: 20px }
+.gd-list li { margin: 8px 0 }
+.gd-numbered { list-style: decimal }
+
+/* ── Tablo ── */
+.gd-table-wrap { overflow-x: auto; border: 1px solid var(--hair); margin: 16px 0 20px }
+.gd-table { width: 100%; border-collapse: collapse; min-width: 480px; font-size: 14px }
+.gd-table th {
+  text-align: left; font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 10.5px; font-weight: 500; letter-spacing: .09em; text-transform: uppercase;
+  color: var(--fg-4); background: var(--panel-2); padding: 11px 14px;
+  border-bottom: 1px solid var(--hair-2); white-space: nowrap;
+}
+.gd-table td { padding: 12px 14px; border-bottom: 1px solid var(--hair); vertical-align: top }
+.gd-table tr:last-child td { border-bottom: 0 }
+.gd-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap }
+
+/* ── Vurgu kutusu ── */
+.gd-callout {
+  border: 1px solid var(--hair); border-left: 3px solid var(--blue);
+  background: var(--panel); padding: 18px 20px; margin: 22px 0;
+}
+.gd-callout p:last-child { margin-bottom: 0 }
+
+/* ── Süreç ── */
+.gd-surec { margin-top: 44px }
+.gd-surec > h3 {
+  margin-top: 0; font-size: 21px;
+  padding-bottom: 8px; border-bottom: 1px solid var(--hair);
+}
+.gd-surec-ozet { color: var(--fg-3); font-size: 14.5px; margin-bottom: 20px }
+
+.gd-adimlar { list-style: none; margin: 0; padding: 0 }
+.gd-adimlar > li {
+  padding: 16px 0; border-top: 1px solid var(--hair);
+  /* Bir adım sayfa arasında bölünmemeli: yarısı bir sayfada,
+     yarısı diğerinde olan bir talimat okunmaz. */
+  break-inside: avoid;
+}
+.gd-adim-bas { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px }
+.gd-adim-no {
+  font-family: ui-monospace, "SF Mono", Menlo, monospace;
+  font-size: 12px; color: var(--blue); flex: 0 0 auto;
+  width: 20px;
+}
+.gd-adim-bas h4 { margin: 0; flex: 1 }
+.gd-onay {
+  font-size: 10.5px; letter-spacing: .05em; text-transform: uppercase;
+  color: var(--part, #e3a950); border: 1px solid currentColor; border-radius: 3px;
+  padding: 2px 6px; flex: 0 0 auto; opacity: .85;
+}
+.gd-adimlar p { margin: 0 0 8px; font-size: 14.5px; padding-left: 30px }
+.gd-ornek { display: flex; flex-direction: column; gap: 3px; padding-left: 30px }
+.gd-ornek-et {
+  font-size: 10.5px; letter-spacing: .08em; text-transform: uppercase; color: var(--fg-5);
+}
+.gd-ornek q {
+  display: block; background: var(--panel-2); border-left: 2px solid var(--hair-2);
+  padding: 8px 12px; font-size: 14px;
+}
+
+.gd-tuzak {
+  border: 1px solid rgba(240, 115, 106, .25); border-left: 3px solid var(--red);
+  background: rgba(240, 115, 106, .05); padding: 16px 18px; margin-top: 20px;
+}
+.gd-tuzak p { margin: 0; font-size: 14.5px }
+
+.gd-sorgu-grup { margin-top: 30px }
+.gd-sorgu-grup h3 { margin-top: 0 }
+
+.gd-sinirlar { display: flex; flex-direction: column; gap: 1px; background: var(--hair); border: 1px solid var(--hair) }
+.gd-sinir { background: var(--panel); padding: 18px 20px; break-inside: avoid }
+.gd-sinir p { margin: 0; font-size: 14.5px; color: var(--fg-3) }
+
+.gd-foot {
+  margin-top: 72px; padding-top: 20px; border-top: 1px solid var(--hair-2);
+  font-size: 12.5px; color: var(--fg-5);
+}
+.gd-foot p { margin: 0 0 6px }
+
+@media (max-width: 640px) {
+  .gd-toc ol { columns: 1 }
+  .gd-adimlar p, .gd-ornek { padding-left: 0 }
+}
+
+/* ═══ REHBERİN YAZDIRILMASI ═══
+ *
+ * Kullanıcı "PDF" dediğinde bunu basacak. Ürünün belge üretimiyle
+ * aynı yol: tarayıcının kendi motoru, ayrı bir kütüphane yok.
+ *
+ * RENKLER TEK TEK DEĞİL TOKEN SEVİYESİNDE ÇEVRİLİYOR.
+ *
+ * İlk denemede her öğenin rengi ayrı ayrı ezilmişti ve sonuç şuydu:
+ * metin siyaha döndü ama ARKA PLAN siyah kaldı — yani yazı görünmez
+ * oldu. `.mk` kabı kendi `--bg`sini taşıyor ve o ezilmediği sürece
+ * altındaki her şey koyu kalıyor.
+ *
+ * Token'ları çevirince bütün türevler kendiliğinden uyuyor; yeni bir
+ * bileşen eklendiğinde de ayrıca uğraşmak gerekmiyor.
+ */
+@media print {
+  /* Rehber sayfasında kabuk (üst çubuk, ayak, zemin) basılmaz. */
+  body:has(.gd) .mk-top,
+  body:has(.gd) .mk-bg,
+  body:has(.gd) .ft { display: none !important }
+
+  html:has(.gd), body:has(.gd) { background: #fff !important }
+
+  /* KÂĞIT PALETİ — tek yerde. */
+  .mk:has(.gd) {
+    --bg: #fff;
+    --panel: #fff;
+    --panel-2: #f5f6f8;
+    --fg: #16181c;
+    --fg-2: #2b3138;
+    --fg-3: #454b53;
+    --fg-4: #5f666e;
+    --fg-5: #7b828a;
+    --fg-6: #9aa0a6;
+    --hair: #e4e6ea;
+    --hair-2: #c4c9cf;
+    --blue: #0a63c9;
+    --blue-soft: #0a63c9;
+    --red: #c4362b;
+    background: #fff !important;
+    color: #16181c;
+    min-height: 0;
+  }
+
+  .gd {
+    max-width: none; margin: 0; padding: 0;
+    font-size: 10.5pt; line-height: 1.55;
+  }
+
+  .gd-cover { page-break-after: always }
+  .gd-cover h1 { font-size: 28pt }
+  .gd-lede { font-size: 12pt }
+
+  /* Her ana bölüm yeni sayfada başlar: rehber kâğıtta da bölümlü
+     okunmalı, bir bölümün sonu diğerinin başıyla sıkışmamalı. */
+  .gd-sec { page-break-before: always; margin-top: 0 }
+  .gd-sec > h2 { border-color: var(--fg) }
+  .gd-cover { border-color: var(--fg) }
+
+  .gd-table-wrap { overflow: visible }
+  /* Uzun tabloda başlık her sayfada tekrar eder; ikinci sayfadaki
+     rakamların hangi sütuna ait olduğu belli olmalı. */
+  .gd-table thead { display: table-header-group }
+  .gd-table tr { break-inside: avoid }
+
+  /* Kutu ortadan bölünmez: başlığı bir sayfada, metni diğerinde
+     olan bir uyarı okunmaz — ve okunmayan uyarı, uyarı değildir. */
+  .gd-callout, .gd-tuzak, .gd-sinir { break-inside: avoid }
+  .gd-callout { background: #f5f9ff }
+  .gd-tuzak { background: #fdf5f4; border-color: #f0d9d6 }
+  /* Başlık tek başına sayfa sonunda kalmasın. */
+  .gd-sec h3, .gd-sec h4, .gd-surec > h3 { break-after: avoid }
+  .gd-onay { color: #8a5d09 }
+  .gd .gd-toc a, .gd a { color: var(--fg); text-decoration: none }
+
+  @page { size: A4 portrait; margin: 18mm 16mm }
 }
