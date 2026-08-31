@@ -44,6 +44,9 @@ import { AssetRepository } from "../db/asset-repository.js";
 import { CreditNoteRepository } from "../db/credit-note-repository.js";
 import { PayrollRepository } from "../db/payroll-repository.js";
 import { WatchRepository } from "../db/watch-repository.js";
+import { RevaluationRepository } from "../db/revaluation-repository.js";
+import { PrismaUploadStore } from "../db/upload-store.js";
+import { importerFor } from "../db/importers.js";
 import { InMemoryOperationsRepository } from "../modules/operations/repository.js";
 import {
   InMemoryApprovalRepository,
@@ -163,6 +166,16 @@ async function main(): Promise<void> {
     creditNotes: new CreditNoteRepository(db),
     payroll: new PayrollRepository(db),
     watches: new WatchRepository(db),
+    // BU İKİSİ UNUTULMUŞTU ve dört tool duman testinin dışında kaldı.
+    // Aşağıdaki kapsam kontrolü artık bunu yakalıyor.
+    revaluation: new RevaluationRepository(db),
+    tenantDb: db,
+    // İÇE AKTARMA DA UNUTULMUŞTU. Kullanıcının en çok kullanacağı veri
+    // girişi yolu, duman testinin hiç bakmadığı yerdeydi.
+    imports: {
+      uploads: new PrismaUploadStore(db),
+      importerFor: (objectId) => importerFor(objectId, db),
+    },
   });
 
   const principal = createPrincipal({
@@ -173,6 +186,29 @@ async function main(): Promise<void> {
   });
 
   const tools = [...registry.all()].sort((a, b) => a.name.localeCompare(b.name));
+
+  /*
+   * KAPSAM KONTROLÜ — DUMAN TESTİNİN KENDİ KÖR NOKTASI.
+   *
+   * Bu script depoları ELLE bağlıyor. Yeni bir depo eklendiğinde
+   * buraya eklenmezse, o depoya bağlı tool'lar kayda hiç girmez ve
+   * test "hepsi çalışıyor" der — oysa bakmadığı yerler vardır.
+   *
+   * Gerçekten oldu: kur değerlemesi ve kadro tool'ları eklendiğinde
+   * buraya eklenmedi; dört tool aylarca sınanmadan durabilirdi.
+   *
+   * `KAELON_SMOKE_EXPECT` ile beklenen sayı verilirse, eksik kapsam
+   * artık sessiz kalmaz.
+   */
+  if (process.env["KAELON_SMOKE_LIST"]) console.log(tools.map((t) => t.name).join("\n"));
+  const beklenen = Number(process.env["KAELON_SMOKE_EXPECT"] ?? 0);
+  if (beklenen > 0 && tools.length < beklenen) {
+    console.error(
+      `\nKAPSAM EKSİK: ${tools.length} tool sınanıyor ama ${beklenen} bekleniyor.\n` +
+        `Yeni bir depo eklendiyse smoke.ts içindeki listeye de eklenmeli.`,
+    );
+    process.exitCode = 1;
+  }
   const reads = tools.filter((t) => t.authority === 0);
   const writes = tools.filter((t) => t.authority > 0);
 
