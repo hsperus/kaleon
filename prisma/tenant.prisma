@@ -2576,3 +2576,58 @@ model StorageBin {
   @@unique([locationId, code])
   @@map("storage_bins")
 }
+
+/// Çok adımlı işlem planı.
+///
+/// "Şu üç müşteriye fatura kes ve e-Fatura gönder" dendiğinde her adım
+/// AYRI onay turuna giriyordu; ara adımlardan biri düşerse geri kalanı
+/// sessizce kayboluyordu. Plan bunu tersine çevirir: bir onay, sıralı
+/// koşu, adım adım sonuç.
+model OperationPlan {
+  id                String    @id @default(uuid()) @db.Uuid
+  documentNo        String    @unique @map("document_no")
+  title             String
+  /// Planı doğuran soru — "bu plan neden yapıldı" sorusunun cevabı.
+  question          String?
+  /// draft | approved | running | completed | failed | cancelled
+  status            String    @default("draft")
+  /// Adımların EN YÜKSEK yetkisi. Plan yetki yükseltmez: bir L3
+  /// adımı L2 onaylanmış planın içine gizlemek mümkün olmamalı.
+  requiredAuthority Int       @map("required_authority")
+  createdBy         String    @map("created_by") @db.Uuid
+  createdAt         DateTime  @default(now()) @map("created_at")
+  approvedBy        String?   @map("approved_by") @db.Uuid
+  approvedAt        DateTime? @map("approved_at")
+  finishedAt        DateTime? @map("finished_at")
+  conversationId    String?   @map("conversation_id")
+
+  steps OperationPlanStep[]
+
+  @@index([status, createdAt])
+  @@index([createdBy, createdAt])
+  @@map("operation_plans")
+}
+
+model OperationPlanStep {
+  id            String    @id @default(uuid()) @db.Uuid
+  planId        String    @map("plan_id") @db.Uuid
+  seq           Int
+  tool          String
+  input         Json
+  description   String
+  /// pending | done | failed | skipped
+  ///
+  /// "skipped" AYRI BİR DURUMDUR: önceki adım düştüğü için hiç
+  /// denenmemiş adım, denenip başarısız olmuş adımla aynı şey
+  /// değildir. Kullanıcıya neyin hâlâ yapılabilir olduğunu söyler.
+  status        String    @default("pending")
+  resultSummary String?   @map("result_summary")
+  errorCode     String?   @map("error_code")
+  ranAt         DateTime? @map("ran_at")
+
+  plan OperationPlan @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@unique([planId, seq])
+  @@index([planId, status])
+  @@map("operation_plan_steps")
+}

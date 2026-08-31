@@ -27,6 +27,10 @@ import { supplierTools } from "./modules/procurement/supplier-tools.js";
 import { SupplierRepository } from "./db/supplier-repository.js";
 import { routingTools } from "./modules/operations/routing-tools.js";
 import { RoutingRepository } from "./db/routing-repository.js";
+import { planTools } from "./modules/planning/plan-tools.js";
+import { PlanRepository } from "./db/plan-repository.js";
+import { memoryTools } from "./modules/conversation/memory-tools.js";
+import type { ConversationRepository } from "./modules/conversation/repository.js";
 import { batchTools } from "./modules/inventory/batch-tools.js";
 import { procurementTools } from "./modules/procurement/procurement-tools.js";
 import { leaveTools } from "./modules/hr/leave-tools.js";
@@ -137,6 +141,16 @@ export interface Repositories {
    * sunmamak doğrudur.
    */
   readonly audit?: AuditSink;
+  /**
+   * Konuşma geçmişi — AJANIN HAFIZASI.
+   *
+   * Depo zaten vardı ve arama da vardı, ama yalnızca arayüzün kenar
+   * çubuğu için. Ajanın erişimi yoktu; yani hafıza diskteydi, modelin
+   * elinde değildi.
+   */
+  readonly conversations?: ConversationRepository;
+  /** Çok adımlı işlem planları. */
+  readonly plans?: PlanRepository;
   /** Stok sayımı. */
   readonly stockCounts?: StockCountRepository;
   /** Malzeme ihtiyaç planlaması. */
@@ -258,6 +272,17 @@ export function buildRegistry(db: DataSource, repos: Repositories = {}): ToolReg
     ...(repos.watches && repos.audit
       ? watchTools(repos.watches, () => registry, () => repos.audit!)
       : []),
+    /*
+     * ÇOK ADIMLI İŞLEM PLANI. Her adım ayrı onay turuna giriyordu ve
+     * ara adım düşerse gerisi sessizce kayboluyordu. Plan tool'ları
+     * da registry'yi TEMBEL alıyor: adımları çağırmak için ona
+     * ihtiyaçları var ama kendileri onun içinde kuruluyor.
+     */
+    ...(repos.plans && repos.audit
+      ? planTools(repos.plans, () => registry, () => repos.audit!)
+      : []),
+    // KONUŞMA HAFIZASI: "geçen ay konuştuğumuz gibi" artık çalışıyor.
+    ...(repos.conversations ? memoryTools(repos.conversations) : []),
     ...(repos.payroll ? payrollTools(repos.payroll) : []),
     ...(repos.stockCounts ? stockCountTools(repos.stockCounts) : []),
     ...(repos.mrp ? mrpTools(repos.mrp) : []),

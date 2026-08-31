@@ -44,6 +44,8 @@ import { AssetRepository } from "../db/asset-repository.js";
 import { CreditNoteRepository } from "../db/credit-note-repository.js";
 import { PayrollRepository } from "../db/payroll-repository.js";
 import { WatchRepository } from "../db/watch-repository.js";
+import { PlanRepository } from "../db/plan-repository.js";
+import { InMemoryConversationRepository } from "../modules/conversation/repository.js";
 import { RevaluationRepository } from "../db/revaluation-repository.js";
 import { PrismaUploadStore } from "../db/upload-store.js";
 import { importerFor } from "../db/importers.js";
@@ -207,6 +209,10 @@ async function main(): Promise<void> {
     creditNotes: new CreditNoteRepository(db),
     payroll: new PayrollRepository(db),
     watches: new WatchRepository(db),
+    // Hafıza ve plan tool'ları da duman testine girsin: bağlanmayan
+    // her depo, tool'larını testin dışında bırakır.
+    conversations: new InMemoryConversationRepository(),
+    plans: new PlanRepository(db),
     // BU İKİSİ UNUTULMUŞTU ve dört tool duman testinin dışında kaldı.
     // Aşağıdaki kapsam kontrolü artık bunu yakalıyor.
     revaluation: new RevaluationRepository(db),

@@ -20,6 +20,7 @@ import { InMemoryAuditSink, type AuditEntry, type AuditSink } from "../kernel/au
 import { PostgresAuditSink } from "../db/audit-sink.js";
 import { InMemoryDataSource } from "../data/memory.js";
 import { letterheadFrom, type Letterhead } from "../modules/documents/letterhead.js";
+import { PlanRepository } from "../db/plan-repository.js";
 import { buildRegistry } from "../app.js";
 import type { ToolRegistry } from "../kernel/registry.js";
 import Anthropic from "@anthropic-ai/sdk";
@@ -336,6 +337,9 @@ function buildRegistryForTenant(tenant: TenantContext, isDemo = false): ToolRegi
     periods: new PeriodRepository(db),
     revaluation: new RevaluationRepository(db),
     tenantDb: db,
+    // Ajanın hafızası ve çok adımlı plan koşumu.
+    conversations: conversationsFor(tenant, isDemo),
+    plans: new PlanRepository(db),
     batches: new BatchRepository(db),
     procurement: new ProcurementRepository(db),
     leave: new LeaveRepository(db),

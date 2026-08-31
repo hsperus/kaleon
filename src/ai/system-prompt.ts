@@ -213,6 +213,8 @@ export function sessionContext(input: {
     `  rota, üretim adımları, kaç saat sürer → routing (get_routing_load)`,
     `  standart maliyet, maliyet sapması → variance (get_cost_variance)`,
     `  raf, göz, depoda nerede → bin (get_bin_contents)`,
+    `  geçen ay konuştuğumuz, daha önce sormuştum → search_conversations`,
+    `  toplu iş, birden çok adım → operation plan (create_operation_plan)`,
   );
 
   if (input.glossary && input.glossary.length > 0) {
