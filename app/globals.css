@@ -224,6 +224,33 @@ button.role, select.role {
 .reply { display: flex; flex-direction: column; gap: 12px; animation: blurIn .6s var(--spring-soft) both; }
 .reply .txt { font-size: 15.5px; line-height: 1.68; white-space: pre-wrap; }
 
+/*
+ * AKAN CEVAP.
+ *
+ * Bitmiş cevapla aynı tipografi — yalnızca rengi bir tık soluk ve
+ * sonunda yanıp sönen bir imleç var. Farklı bir yazı tipi ya da
+ * boyut kullanılsaydı, akış bitip yerini `answer` aldığında metin
+ * gözle görülür biçimde yerinden oynardı.
+ */
+.drafting {
+  font-size: 15.5px;
+  line-height: 1.68;
+  white-space: pre-wrap;
+  color: color-mix(in oklab, var(--ink) 78%, transparent);
+  margin: 0;
+}
+.caret {
+  display: inline-block;
+  width: 2px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: text-bottom;
+  background: var(--accent, currentColor);
+  animation: caretBlink 1.05s steps(1, end) infinite;
+}
+@keyframes caretBlink { 0%, 55% { opacity: 1 } 56%, 100% { opacity: 0 } }
+@media (prefers-reduced-motion: reduce) { .caret { animation: none } }
+
 .think { display: flex; flex-direction: column; gap: 9px; }
 .think i {
   display: block; height: 11px; border-radius: 6px;

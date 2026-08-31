@@ -114,6 +114,16 @@ interface Turn {
   /** Şu an çalışan tool — kullanıcı boş ekrana bakmasın. */
   readonly running: string | null;
   /**
+   * Modelden akan, henüz tamamlanmamış metin.
+   *
+   * `answer` ile aynı şey DEĞİLDİR ve olmamalıdır: `answer` bitmiş ve
+   * doğrulanmış cevaptır — kopyalanır, dışa aktarılır, geçmişe yazılır.
+   * `streaming` ise yazılırken görünen taslaktır ve tur bitince
+   * `answer`'a yerini bırakıp silinir. Tek alanda toplansaydı, akış
+   * yarıda kesildiğinde yarım bir cevap "cevap" diye kaydedilirdi.
+   */
+  readonly streaming: string | null;
+  /**
    * Bu turda üretilen belgeler.
    *
    * TURUN İÇİNDE DURUR, panelde değil. Panel canlı bir veri
@@ -415,7 +425,7 @@ export default function Page() {
       setValue("");
       setTurns((t) => [
         ...t,
-        { question, answer: null, toolCalls: [], risks: [], running: null, pending: [], completed: [], docs: [] },
+        { question, answer: null, toolCalls: [], risks: [], running: null, streaming: null, pending: [], completed: [], docs: [] },
       ]);
 
       const patch = (fn: (t: Turn) => Turn) =>
@@ -463,7 +473,15 @@ export default function Page() {
               conversationIdRef.current = ev.id;
               setConversationId(ev.id);
             } else if (ev.type === "tool_start") {
-              patch((t) => ({ ...t, running: ev.tool }));
+              /*
+               * AKAN METİN TOOL BAŞLAYINCA TEMİZLENİR.
+               *
+               * Model önce "bakıyorum, önce açık faturaları çekeyim"
+               * gibi bir cümle yazıp sonra tool çağırıyor. O cümle
+               * ekranda kalsaydı, gelen asıl cevabın önüne yapışır ve
+               * kullanıcı iki farklı cevabı arka arkaya okurdu.
+               */
+              patch((t) => ({ ...t, running: ev.tool, streaming: "" }));
             } else if (ev.type === "tool_end") {
               patch((t) => ({
                 ...t,
@@ -517,10 +535,19 @@ export default function Page() {
                   },
                 ],
               }));
+            } else if (ev.type === "text_delta") {
+              // Parça parça yaz: ilk kelime saniyeler önce görünsün.
+              patch((t) => ({ ...t, streaming: (t.streaming ?? "") + ev.text }));
             } else if (ev.type === "text") {
-              patch((t) => ({ ...t, answer: ev.text, running: null }));
+              // Tam metin YETKİLİDİR: akış yarım kalmış olabilir.
+              patch((t) => ({ ...t, answer: ev.text, streaming: null, running: null }));
             } else if (ev.type === "error") {
-              patch((t) => ({ ...t, answer: `İstek tamamlanamadı: ${ev.message}`, running: null }));
+              patch((t) => ({
+                ...t,
+                answer: `İstek tamamlanamadı: ${ev.message}`,
+                streaming: null,
+                running: null,
+              }));
             }
           }
         }
@@ -719,6 +746,8 @@ export default function Page() {
             toolCalls: [],
             risks: [],
             running: null,
+            // Geçmiş tur akmıyor: cevabı zaten tamamlanmış.
+            streaming: null,
             pending: [],
             completed: [],
             // Geçmiş konuşmada belge yeniden kurulmaz: fatura o andaki
@@ -1181,10 +1210,28 @@ export default function Page() {
                   </div>
                 )}
                 {t.answer === null ? (
-                  <div className="think">
-                    <i />
-                    <i />
-                  </div>
+                  /*
+                   * AKIŞ VARSA NOKTALAR DEĞİL METİN GÖSTERİLİR.
+                   *
+                   * Üç zıplayan nokta "bir şey oluyor" der; akan metin
+                   * NE olduğunu söyler. Cevap henüz bitmediği için
+                   * imleç yanıp söner ve zengin biçimlendirme
+                   * uygulanmaz — yarım bir markdown tablosu, tamamlanana
+                   * kadar bozuk görünürdü.
+                   */
+                  t.streaming ? (
+                    <div className="reply">
+                      <p className="drafting">
+                        {t.streaming}
+                        <span className="caret" />
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="think">
+                      <i />
+                      <i />
+                    </div>
+                  )
                 ) : (
                   <div className="reply">
                     <RichText

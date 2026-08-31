@@ -18,21 +18,42 @@ import { CONVERSATION_MODEL } from "../src/ai/model.js";
 
 const BUDGET: BudgetPolicy = { warnUsd: 1, softCapUsd: 2, capUsd: 3 };
 
-/** Hiç ağa çıkmayan sahte istemci — test para harcamaz. */
-function fakeClient() {
+const CEVAP = {
+  content: [{ type: "text", text: "ok" }],
+  stop_reason: "end_turn",
+  usage: {
+    input_tokens: 10,
+    output_tokens: 5,
+    cache_read_input_tokens: 0,
+    cache_creation_input_tokens: 0,
+  },
+};
+
+/**
+ * Hiç ağa çıkmayan sahte istemci — test para harcamaz.
+ *
+ * AKIŞI DA TAKLİT EDER. Gateway artık `.stream()` kullanıyor; yalnızca
+ * `.create()` taşıyan bir sahte, gerçekte olmayan bir hatayı
+ * ("stream is not a function") her testte üretirdi. Parçalar da
+ * yayınlanıyor ki `onTextDelta` sözleşmesi testte gerçekten koşsun.
+ */
+function fakeClient(parcalar: readonly string[] = ["o", "k"]) {
   return {
     beta: {
       messages: {
-        create: async () => ({
-          content: [{ type: "text", text: "ok" }],
-          stop_reason: "end_turn",
-          usage: {
-            input_tokens: 10,
-            output_tokens: 5,
-            cache_read_input_tokens: 0,
-            cache_creation_input_tokens: 0,
-          },
-        }),
+        stream: () => {
+          const dinleyiciler: ((t: string) => void)[] = [];
+          return {
+            on(olay: string, cb: (t: string) => void) {
+              if (olay === "text") dinleyiciler.push(cb);
+              return this;
+            },
+            async finalMessage() {
+              for (const p of parcalar) for (const d of dinleyiciler) d(p);
+              return CEVAP;
+            },
+          };
+        },
       },
     },
   } as never;
@@ -152,5 +173,62 @@ describe("maliyet hesabı", () => {
       cacheReadTokens: 0,
       cacheWriteTokens: 0,
     })).toBe(0);
+  });
+});
+
+/**
+ * AKIŞ SÖZLEŞMESİ.
+ *
+ * Cevap tek blok hâlinde geliyordu: soğuk önbellekte ~20 saniye
+ * boyunca ekranda hiçbir şey yoktu. Toplam süre aynı kalsa bile ilk
+ * kelimenin ne zaman göründüğü ayrı bir şeydir ve kullanıcı bunu
+ * "çok uzun sürdü" diye bildirdi.
+ *
+ * Burada test edilen şey hız değil — hızı test edemeyiz. Test edilen
+ * şey, parçaların çağırana GERÇEKTEN ULAŞMASI: geri çağrı bağlanmasa
+ * ya da sessizce düşürülse, ekran yine boş kalırdı ve hiçbir test
+ * bunu görmezdi.
+ */
+describe("metin akışı", () => {
+  it("parçalar geldikçe onTextDelta çağrılır", async () => {
+    const gateway = new LlmGateway({
+      client: fakeClient(["Nakit ", "akışı ", "hazır."]),
+      ledger: new InMemoryLedger(),
+      systemPrompt: "test",
+      budget: BUDGET,
+    });
+
+    const parcalar: string[] = [];
+    const r = await gateway.complete({
+      messages: [{ role: "user", content: "nakit akışı" }],
+      tools: [],
+      task: "lookup",
+      tenantId: "t1",
+      userId: "u1",
+      correlationId: "c1",
+      onTextDelta: (t) => parcalar.push(t),
+    });
+
+    expect(parcalar).toEqual(["Nakit ", "akışı ", "hazır."]);
+    // Tam mesaj yine dönüyor: akış, sonucun yerini ALMAZ.
+    expect(r.message.stop_reason).toBe("end_turn");
+  });
+
+  it("geri çağrı verilmezse akış yine kurulur ve sonuç değişmez", async () => {
+    const gateway = new LlmGateway({
+      client: fakeClient(["a", "b"]),
+      ledger: new InMemoryLedger(),
+      systemPrompt: "test",
+      budget: BUDGET,
+    });
+    const r = await gateway.complete({
+      messages: [{ role: "user", content: "selam" }],
+      tools: [],
+      task: "lookup",
+      tenantId: "t1",
+      userId: "u1",
+      correlationId: "c2",
+    });
+    expect(r.usage.outputTokens).toBe(5);
   });
 });

@@ -135,6 +135,17 @@ export type RunEvent =
     }
   | { readonly type: "text"; readonly text: string }
   /**
+   * Modelden gelen metin parçası — cevap yazılırken.
+   *
+   * `text` olayının yerini ALMAZ, önünden gider: parçalar akarken
+   * ekranda cevap oluşur, tur bitince `text` olayı tam ve
+   * yetkili metni gönderir. İkisinden biri yetmezdi — yalnızca
+   * parçalarla kalınsaydı yarım kalan bir akış yarım bir cevap
+   * bırakırdı; yalnızca `text` ile kalınsaydı ekran onlarca saniye
+   * boş dururdu.
+   */
+  | { readonly type: "text_delta"; readonly text: string }
+  /**
    * Bir yazma işlemi hazırlandı ve ONAY BEKLİYOR — henüz çalışmadı.
    *
    * Arayüz bunu alınca formu açar. `tool_end` olarak yayınlansaydı
@@ -271,6 +282,7 @@ export async function runConversation(
       tenantId: req.tenant.tenantId,
       userId: req.principal.userId,
       correlationId: req.correlationId,
+      onTextDelta: (parca) => req.onEvent?.({ type: "text_delta", text: parca }),
     });
     costUsd += turnCost;
     if (warn) budgetWarning = warn;

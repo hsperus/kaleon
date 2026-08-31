@@ -67,6 +67,18 @@ export interface CompleteRequest {
    * referanslar geçerli kalır, model yeni bir şey hazırlayamaz.
    */
   readonly noToolCalls?: boolean;
+  /**
+   * Metin parçaları geldikçe çağrılır.
+   *
+   * ÖLÇÜLDÜ: cevap tek blok hâlinde geliyordu. Soğuk önbellekte ~20
+   * saniye, sıcakta ~3 saniye boyunca ekranda hiçbir şey olmuyordu ve
+   * kullanıcı "çok uzun sürdü" dedi — haklıydı. Toplam süre aynı olsa
+   * bile, ilk kelimenin ne zaman göründüğü bambaşka bir deneyimdir.
+   *
+   * Verilmezse akış yine kurulur ama parça yayınlanmaz; davranış
+   * değişmez.
+   */
+  readonly onTextDelta?: (text: string) => void;
 }
 
 export interface CompleteResult {
@@ -143,9 +155,27 @@ export class LlmGateway implements Completer {
       );
     };
 
+    /*
+     * HER İSTEK AKIŞLIDIR.
+     *
+     * `.create()` cevabın tamamı üretilene kadar bekler; uzun
+     * çıktılarda bu hem istek zaman aşımı riski hem de boş ekrandır.
+     * `.stream()` aynı isteği kurar, parçaları yayar ve
+     * `finalMessage()` ile tamamlanmış mesajı verir — kullanım
+     * sayaçları ve durdurma sebebi dahil. Yani aşağıdaki mantığın
+     * hiçbiri değişmiyor, yalnızca bekleme görünür hâle geliyor.
+     */
+    const cagir = async (
+      params: Anthropic.Beta.Messages.MessageCreateParamsNonStreaming,
+    ): Promise<Anthropic.Beta.BetaMessage> => {
+      const akis = this.#deps.client.beta.messages.stream(params, WORKSPACE_HEADER);
+      if (req.onTextDelta) akis.on("text", (parca) => req.onTextDelta!(parca));
+      return akis.finalMessage();
+    };
+
     let message: Anthropic.Beta.BetaMessage;
     try {
-      message = await this.#deps.client.beta.messages.create({
+      message = await cagir({
         model: CONVERSATION_MODEL,
         max_tokens: MAX_TOKENS[req.task],
         // Sabit önek: tools → system sırasıyla render edilir; buradaki
@@ -164,7 +194,7 @@ export class LlmGateway implements Completer {
         output_config: { effort: EFFORT_POLICY[req.task] },
         fallbacks: "default",
         betas: [FALLBACK_BETA],
-      }, WORKSPACE_HEADER);
+      });
     } catch (e) {
       if (isGrammarError(e)) {
         // Strict'siz tekrar: tool listesi aynı, gramer kısıtı yok.
@@ -179,8 +209,7 @@ export class LlmGateway implements Completer {
           toolCount: req.tools.length,
           error: e instanceof Error ? e.message : String(e),
         });
-        message = await this.#deps.client.beta.messages.create(
-          {
+        message = await cagir({
             model: CONVERSATION_MODEL,
             max_tokens: MAX_TOKENS[req.task],
             system: [
@@ -197,9 +226,7 @@ export class LlmGateway implements Completer {
             output_config: { effort: EFFORT_POLICY[req.task] },
             fallbacks: "default",
             betas: [FALLBACK_BETA],
-          },
-          WORKSPACE_HEADER,
-        );
+        });
         // Buradan sonra normal yol işler: kullanım kaydı, maliyet,
         // bütçe uyarısı. Ayrı bir dönüş yolu açmak, defterin
         // tutulmadığı bir istek türü yaratırdı.
