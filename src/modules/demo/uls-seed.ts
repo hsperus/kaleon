@@ -780,6 +780,59 @@ export async function seedUls(db: TenantDb): Promise<UlsResult> {
   });
 
   /*
+   * ── 16a. MASRAF MERKEZLERİ VE BÜTÇE ──
+   *
+   * Bir havayolunun gider yapısı departmana göre keskin ayrışır:
+   * yakıt uçuşun, bakım tekniğin, yer hizmeti harekâtın. Merkez
+   * olmadan hepsi tek bir "gider" yığınıdır ve hangi tarafın
+   * pahalılaştığı görülmez.
+   */
+  await step("masraf-merkezi", async () => {
+    const merkezler = [
+      { code: "UCS", name: "Uçuş Operasyonu", parentCode: null, managerEmployeeCode: "P-001" },
+      { code: "UCS-YKT", name: "Yakıt", parentCode: "UCS", managerEmployeeCode: null },
+      { code: "UCS-EKP", name: "Uçuş Ekibi", parentCode: "UCS", managerEmployeeCode: "P-001" },
+      { code: "TEK", name: "Teknik / Bakım", parentCode: null, managerEmployeeCode: "P-004" },
+      { code: "YER", name: "Yer Hizmetleri", parentCode: null, managerEmployeeCode: null },
+      { code: "IDR", name: "İdari ve Mali", parentCode: null, managerEmployeeCode: null },
+    ];
+    let yeni = 0;
+    for (const m of merkezler) {
+      const varMi = await db.costCenter.findUnique({ where: { code: m.code } });
+      if (varMi) continue;
+      await db.costCenter.create({ data: m });
+      yeni += 1;
+    }
+
+    /*
+     * BÜTÇE YILLIK GİRİLİYOR, AYA BÖLÜNMÜYOR.
+     *
+     * Havacılıkta gider mevsimseldir: bakım kışın yoğunlaşır, yakıt
+     * yaz tarifesinde artar. Aylık bütçe uydurmak, her ay yanlış bir
+     * "aşım" alarmı üretirdi.
+     */
+    const butceler = [
+      { costCenterCode: "UCS-YKT", accountGroup: "730", amount: 620_000_000 },
+      { costCenterCode: "UCS-EKP", accountGroup: "770", amount: 42_000_000 },
+      { costCenterCode: "TEK", accountGroup: "730", amount: 185_000_000 },
+      { costCenterCode: "YER", accountGroup: "760", amount: 48_000_000 },
+      { costCenterCode: "IDR", accountGroup: "770", amount: 26_000_000 },
+    ];
+    let butceYeni = 0;
+    for (const b of butceler) {
+      const varMi = await db.budget.findFirst({
+        where: { costCenterCode: b.costCenterCode, accountGroup: b.accountGroup, year: 2026, month: null },
+      });
+      if (varMi) continue;
+      await db.budget.create({
+        data: { ...b, year: 2026, month: null, currency: "TRY", setBy: SEED_USER },
+      });
+      butceYeni += 1;
+    }
+    return `masraf merkezi: ${merkezler.length} merkez (${yeni} yeni) · ${butceYeni} yeni bütçe`;
+  });
+
+  /*
    * ── 16b. İHTAR KADEMELERİ ──
    *
    * Kademeler KONFİGÜRASYONDUR, demo verisi değil — ama tanımlı

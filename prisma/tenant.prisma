@@ -1531,12 +1531,20 @@ model JournalLine {
   /// fark hesaplanamaz, sadece kaybolurdu.
   fxRate      Decimal @default(1) @map("fx_rate") @db.Decimal(18, 6)
 
+  /// Masraf merkezi — YALNIZCA gider hesaplarında (6xx, 7xx).
+  /// Bilanço hesabına merkez yazmak raporu ikiye böler: aynı tutar
+  /// hem "departman gideri" hem "varlık" olarak görünür.
+  /// null: geçmiş kayıt ya da bilanço hesabı. Geriye dönük
+  /// doldurulmaz — uydurulan bir merkez, uydurma bir rapordur.
+  costCenterCode String? @map("cost_center_code")
+
   entry JournalEntry @relation(fields: [entryId], references: [id], onDelete: Cascade)
 
   @@unique([entryId, lineNo])
   @@index([accountCode, entryId])
   @@index([partnerId])
   @@index([currency, accountCode])
+  @@index([costCenterCode, accountCode])
   @@map("journal_lines")
 }
 
@@ -2217,4 +2225,50 @@ model DunningNotice {
 
   @@index([partnerId, issuedAt])
   @@map("dunning_notices")
+}
+
+/// Masraf merkezi — giderin hangi departmana ait olduğu.
+///
+/// SAP'de CO modülünün temeli; bizde hiç yoktu ve bu yüzden "hangi
+/// departman ne harcadı" sorusunun cevabı da yoktu.
+model CostCenter {
+  id                  String   @id @default(uuid()) @db.Uuid
+  code                String   @unique
+  name                String
+  /// Sorumlusu — "bu merkez kimin bütçesi" sorusunun cevabı.
+  managerEmployeeCode String?  @map("manager_employee_code")
+  /// Ağaç: üretim → kaynakhane, montaj.
+  parentCode          String?  @map("parent_code")
+  isActive            Boolean  @default(true) @map("is_active")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  budgets Budget[]
+
+  @@index([parentCode])
+  @@map("cost_centers")
+}
+
+/// Bütçe — masraf merkezi × hesap GRUBU × dönem.
+///
+/// Hesap kodu değil grubu: "770 Genel Yönetim Giderleri" bütçelenir,
+/// "770.01.003" değil. Kod seviyesinde bütçe, hiç kimsenin
+/// dolduramayacağı bir tablo olur.
+model Budget {
+  id             String   @id @default(uuid()) @db.Uuid
+  costCenterCode String   @map("cost_center_code")
+  /// Üç haneli TDHP grubu.
+  accountGroup   String   @map("account_group")
+  year           Int
+  /// 1-12; null = yıllık bütçe, aya bölünmemiş.
+  month          Int?
+  amount         Decimal  @db.Decimal(18, 2)
+  currency       String   @default("TRY")
+  note           String?
+  setBy          String   @map("set_by") @db.Uuid
+  updatedAt      DateTime @updatedAt @map("updated_at")
+
+  costCenter CostCenter @relation(fields: [costCenterCode], references: [code], onDelete: Cascade)
+
+  @@map("budgets")
 }

@@ -79,6 +79,7 @@ export class JournalRepository {
               credit: new Prisma.Decimal(l.credit),
               description: l.description,
               partnerId: l.partnerId ?? null,
+              costCenterCode: l.costCenterCode ?? null,
               // Döviz tarafı `balance` içinde `settleFx` tarafından
               // tamamlanır ve doğrulanır; burada varsayılan yok —
               // varsayılan olsaydı doğrulama atlanabilirdi.

@@ -55,6 +55,16 @@ export interface DraftLine {
   /** Cari kırılımı — 120/320 gibi hesaplarda zorunlu. */
   readonly partnerId?: string | null;
 
+  /**
+   * Masraf merkezi — YALNIZCA gider hesaplarında (6xx, 7xx).
+   *
+   * Bilanço hesabına merkez yazmak raporu ikiye böler: aynı tutar
+   * hem "departman gideri" hem "varlık" olarak görünür. Veritabanı
+   * kısıtı bunu reddeder; burada isteğe bağlı olması, geçmiş
+   * çağıranların bozulmaması için.
+   */
+  readonly costCenterCode?: string | null;
+
   /*
    * İŞLEM PARA BİRİMİ.
    *

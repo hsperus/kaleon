@@ -530,6 +530,14 @@ export function accountingTools(repo: JournalRepository) {
               .string()
               .nullable()
               .describe("120/320 gibi cari hesaplarda ZORUNLU. Diğerlerinde null."),
+            costCenterCode: z
+              .string()
+              .nullable()
+              .describe(
+                "Masraf merkezi kodu. YALNIZCA gider hesaplarında (6xx, 7xx); " +
+                  "bilanço hesabında null olmalı. Gider satırında merkez yazılmazsa " +
+                  "o tutar bütçe raporuna hiç girmez.",
+              ),
           }),
         )
         .min(2)

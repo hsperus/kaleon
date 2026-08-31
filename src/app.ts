@@ -17,6 +17,8 @@ import { cashFlowTools } from "./modules/finance/cashflow-tools.js";
 import { CashFlowRepository } from "./db/cashflow-repository.js";
 import { reconciliationTools } from "./modules/finance/reconciliation-tools.js";
 import { ReconciliationRepository } from "./db/reconciliation-repository.js";
+import { controllingTools } from "./modules/accounting/controlling-tools.js";
+import { ControllingRepository } from "./db/controlling-repository.js";
 import { batchTools } from "./modules/inventory/batch-tools.js";
 import { procurementTools } from "./modules/procurement/procurement-tools.js";
 import { leaveTools } from "./modules/hr/leave-tools.js";
@@ -201,6 +203,12 @@ export function buildRegistry(db: DataSource, repos: Repositories = {}): ToolReg
      * yoktu — boru vardı, süreç yoktu.
      */
     ...(repos.tenantDb ? reconciliationTools(new ReconciliationRepository(repos.tenantDb)) : []),
+    /*
+     * MALİYET MUHASEBESİ (CO). Gider bir departmana bağlanamıyordu:
+     * "hangi departman ne harcadı, bütçeyi aştık mı" sorusunun
+     * sistemde hiçbir cevabı yoktu.
+     */
+    ...(repos.tenantDb ? controllingTools(new ControllingRepository(repos.tenantDb)) : []),
     // Kur değerlemesi HEM defteri HEM kur tablosunu okur; ikisi de
     // yoksa tool hiç kurulmaz — yarım bir değerleme yanlış sayı üretir.
     ...(repos.revaluation && repos.valuation

@@ -198,6 +198,10 @@ export function sessionContext(input: {
     `  ödeme planı, kime ödeyelim, ödeme koşusu → payment run (plan_payment_run)`,
     `  vade → due date (set_payable_due_date) · borç, ödenecek → payable`,
     `  alacak, tahsilat → receivable (get_receivables_aging)`,
+    `  masraf merkezi, departman gideri → cost center (list_cost_centers)`,
+    `  bütçe, bütçe aşımı → budget (get_budget_vs_actual, set_budget)`,
+    `  banka mutabakatı, ekstre → reconciliation (list_unreconciled)`,
+    `  ihtar, borç hatırlatma → dunning (plan_dunning_run)`,
   );
 
   if (input.glossary && input.glossary.length > 0) {
