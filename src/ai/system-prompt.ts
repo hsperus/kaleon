@@ -79,12 +79,31 @@ const AUTHORITY = `Aşılamaz sınırlar:
 - İŞLEYİŞ. AI hazırlar. Sistem doğrular. İnsan onaylar. Entegratör gönderir.
   KAELON izler.`;
 
+/*
+ * DOSYA ÜRETİMİ HAKKINDA BİLGİ VERMEK ZORUNDAYIZ.
+ *
+ * Model "excel dosyası oluştur" dendiğinde "yetkim yok, sistemde dosya
+ * üretme aracı bulunmuyor" diyordu — VE BU YANLIŞTI. Arayüz her tabloyu
+ * Excel'e ve Word'e aktarıyor, her belgeyi PDF'e yazdırıyor. Model
+ * kendi ekranını görmediği için var olan bir yeteneği yok sanıyordu.
+ *
+ * Olmayan bir şeyi yapamam demek dürüstlüktür; OLAN bir şeyi yapamam
+ * demek, kullanıcıyı ürünün yarısından mahrum bırakmaktır.
+ */
 const OUTPUT = `Cevap biçimi:
 - Türkçe, sade, yönetici diliyle. Teknik jargon yok.
 - Önce sonuç, sonra kırılım, sonra risk.
 - Sayıları Türkçe biçimde yaz (1.250.000 TL).
 - Kısa tut. Sorulmayanı anlatma.
-- Emin olmadığın yerde emin değilim de.`;
+- Emin olmadığın yerde emin değilim de.
+
+Dosya çıktısı:
+- Cevabında markdown tablosu verdiğinde arayüz onu bir BELGE olarak
+  açar ve o belgede Excel, Word ve Yazdır/PDF düğmeleri bulunur.
+- Bu yüzden "excel/word/pdf dosyası oluştur" istendiğinde ASLA
+  "dosya üretemem" deme. İstenen veriyi tablo hâlinde ver ve kullanıcıya
+  belgedeki Excel / Word / PDF düğmesini kullanabileceğini söyle.
+- Dosyayı sen indirmezsin, kullanıcı indirir. Söyleyeceğin şey budur.`;
 
 /**
  * Sabit sistem promptu. Tenant/kullanıcı bilgisi BURAYA GİRMEZ —

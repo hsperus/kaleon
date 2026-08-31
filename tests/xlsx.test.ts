@@ -129,3 +129,58 @@ describe("CRC32", () => {
     expect(crc32(Buffer.alloc(0))).toBe(0);
   });
 });
+
+describe("Word çıktısı", () => {
+  /**
+   * NEDEN OOXML DEĞİL: gerçek bir `.docx` zip paketi, birden çok XML
+   * parçası ve ilişki dosyası ister — ve bu üründe kazandıracağı tek
+   * şey uzantı olurdu. Word `application/msword` tipiyle gelen HTML'i
+   * açar, tabloyu biçimli gösterir. Uzantıyı `.doc` bırakmak
+   * dürüstlüktür: `.docx` olduğunu iddia etmiyoruz.
+   */
+  it("BOM İLE BAŞLAR — yoksa Word Türkçe karakteri bozar", async () => {
+    const { buildWord } = await import("../src/export/word.js");
+    const buf = buildWord("Kadro", [
+      { name: "Çalışanlar", columns: [{ header: "Ad" }], rows: [["Ayşe Yılmaz"]] },
+    ]);
+    expect([buf[0], buf[1], buf[2]]).toEqual([0xef, 0xbb, 0xbf]);
+    expect(buf.toString("utf8")).toContain("Ayşe Yılmaz");
+  });
+
+  it("HTML KAÇIRILIR — hücre içeriği kod değildir", async () => {
+    const { buildWord } = await import("../src/export/word.js");
+    const html = buildWord("X", [
+      {
+        name: "S",
+        columns: [{ header: "Ad" }],
+        rows: [["<script>alert(1)</script>"]],
+      },
+    ]).toString("utf8");
+    expect(html).not.toContain("<script>");
+    expect(html).toContain("&lt;script&gt;");
+  });
+
+  it("SAYILAR SAĞA YASLANIR — tutar sütunu okunabilsin", async () => {
+    const { buildWord } = await import("../src/export/word.js");
+    const html = buildWord("X", [
+      {
+        name: "S",
+        columns: [{ header: "Ad" }, { header: "Tutar", format: "money" }],
+        rows: [["Ayşe", 42_000]],
+      },
+    ]).toString("utf8");
+    expect(html).toContain("text-align:right");
+    // Türkçe biçim: binlik nokta.
+    expect(html).toContain("42.000");
+  });
+
+  it("her sayfa kendi başlığıyla gelir", async () => {
+    const { buildWord } = await import("../src/export/word.js");
+    const html = buildWord("Bilanço", [
+      { name: "Aktif", columns: [{ header: "Hesap" }], rows: [["100 Kasa"]] },
+      { name: "Pasif", columns: [{ header: "Hesap" }], rows: [["500 Sermaye"]] },
+    ]).toString("utf8");
+    expect(html).toContain("<h2>Aktif</h2>");
+    expect(html).toContain("<h2>Pasif</h2>");
+  });
+});

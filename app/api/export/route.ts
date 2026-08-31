@@ -15,6 +15,7 @@
 import { z } from "zod";
 import { createContext, UnauthenticatedError } from "../../../src/server/context.js";
 import { buildXlsx, type Column, type Sheet } from "../../../src/export/xlsx.js";
+import { buildWord } from "../../../src/export/word.js";
 import { log } from "../../../src/server/log.js";
 
 export const runtime = "nodejs";
@@ -39,7 +40,27 @@ const Body = z.object({
     )
     .min(1)
     .max(MAX_SHEETS),
+  /*
+   * Biçim. Varsayılan Excel — mevcut istemciler alanı hiç göndermiyor
+   * ve göndermediklerinde davranış değişmemeli.
+   */
+  format: z.enum(["xlsx", "doc"]).default("xlsx"),
 });
+
+/** Biçim başına içerik tipi ve uzantı. */
+const BICIM = {
+  xlsx: {
+    uzanti: "xlsx",
+    tip: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  },
+  doc: {
+    // `.docx` DEMİYORUZ. Word bu dosyayı açar ve biçimli gösterir ama
+    // gerçek bir OOXML paketi değildir; uzantıyı olduğu gibi bırakmak
+    // dürüstlüğün ta kendisi.
+    uzanti: "doc",
+    tip: "application/msword",
+  },
+} as const;
 
 /**
  * Türkçe biçimli metni sayıya çevirir.
@@ -115,10 +136,13 @@ export async function POST(req: Request): Promise<Response> {
     return { name: s.name, columns, rows };
   });
 
-  const file = buildXlsx(sheets);
+  const bicim = parsed.data.format;
+  const file =
+    bicim === "doc" ? buildWord(parsed.data.title, sheets) : buildXlsx(sheets);
   const totalRows = parsed.data.sheets.reduce((n, s) => n + s.rows.length, 0);
 
-  log.info("excel dışa aktarıldı", {
+  log.info("dosya dışa aktarıldı", {
+    format: bicim,
     tenantId: ctx.tenant.tenantId,
     userId: ctx.principal.userId,
     route: "/api/export",
@@ -130,14 +154,14 @@ export async function POST(req: Request): Promise<Response> {
   // Dosya adı ASCII'ye indirgenir ve ayrıca UTF-8 olarak verilir:
   // eski istemciler Türkçe karakterli adı bozuk indirir.
   const safe = parsed.data.title.replace(/[^\w\s.-]+/g, "-").replace(/\s+/g, "-").slice(0, 60);
-  const encoded = encodeURIComponent(`${parsed.data.title}.xlsx`);
+  const { uzanti, tip } = BICIM[bicim];
+  const encoded = encodeURIComponent(`${parsed.data.title}.${uzanti}`);
 
   return new Response(new Uint8Array(file), {
     status: 200,
     headers: {
-      "Content-Type":
-        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "Content-Disposition": `attachment; filename="${safe || "kaelon"}.xlsx"; filename*=UTF-8''${encoded}`,
+      "Content-Type": tip,
+      "Content-Disposition": `attachment; filename="${safe || "kaelon"}.${uzanti}"; filename*=UTF-8''${encoded}`,
       "Content-Length": String(file.length),
       "Cache-Control": "no-store",
     },

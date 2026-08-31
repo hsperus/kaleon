@@ -19,7 +19,7 @@ import {
   DocumentSheet,
   TableActions,
   TableBody,
-  downloadXlsx,
+  downloadFile,
   sheetFromTable,
   type DocMeta,
   type DocTable,
@@ -218,10 +218,10 @@ function TableBlock({
       <TableActions
         onOpen={() => onOpen({ meta, table: doc, block: table })}
         busy={busy}
-        onExport={() => {
+        onExport={(format) => {
           setBusy(true);
           setErr(null);
-          void downloadXlsx(meta.title, [sheetFromTable(meta.title, doc)])
+          void downloadFile(meta.title, [sheetFromTable(meta.title, doc)], format)
             .then(setErr)
             .finally(() => setBusy(false));
         }}

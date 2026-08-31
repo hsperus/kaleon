@@ -75,14 +75,15 @@ export function sheetFromTable(name: string, table: DocTable): ExportSheet {
   };
 }
 
-async function downloadXlsx(
+async function downloadFile(
   title: string,
   sheets: readonly ExportSheet[],
+  format: "xlsx" | "doc",
 ): Promise<string | null> {
   const res = await fetch("/api/export", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ title, sheets }),
+    body: JSON.stringify({ title, sheets, format }),
   });
 
   if (!res.ok) {
@@ -96,7 +97,7 @@ async function downloadXlsx(
   const url = URL.createObjectURL(blob);
   const a = window.document.createElement("a");
   a.href = url;
-  a.download = `${title}.xlsx`;
+  a.download = `${title}.${format}`;
   window.document.body.appendChild(a);
   a.click();
   a.remove();
@@ -213,21 +214,28 @@ export function DocumentSheet({
             </div>
           )}
           <div className="doc-bar-acts">
+            {/* Excel VE Word aynı yükten üretilir; ikisi de yalnızca
+                aktarılabilir bir tablo varsa görünür. */}
             {sheets && sheets.length > 0 && (
-              <button
-                type="button"
-                className="doc-act"
-                disabled={busy}
-                onClick={() => {
-                  setBusy(true);
-                  setNote(null);
-                  void downloadXlsx(meta.title, sheets)
-                    .then(setNote)
-                    .finally(() => setBusy(false));
-                }}
-              >
-                Excel
-              </button>
+              <>
+                {(["xlsx", "doc"] as const).map((f) => (
+                  <button
+                    key={f}
+                    type="button"
+                    className="doc-act"
+                    disabled={busy}
+                    onClick={() => {
+                      setBusy(true);
+                      setNote(null);
+                      void downloadFile(meta.title, sheets, f)
+                        .then(setNote)
+                        .finally(() => setBusy(false));
+                    }}
+                  >
+                    {f === "xlsx" ? "Excel" : "Word"}
+                  </button>
+                ))}
+              </>
             )}
             <button type="button" className="doc-act" onClick={() => window.print()}>
               PDF olarak kaydet
@@ -307,7 +315,7 @@ export function TableActions({
   busy,
 }: {
   onOpen: () => void;
-  onExport: () => void;
+  onExport: (format: "xlsx" | "doc") => void;
   busy: boolean;
 }) {
   return (
@@ -315,11 +323,17 @@ export function TableActions({
       <button type="button" className="tbl-act" onClick={onOpen}>
         Belge
       </button>
-      <button type="button" className="tbl-act" onClick={onExport} disabled={busy}>
+      {/* Excel ve Word sohbetin İÇİNDEKİ tabloda da var: belgeyi
+          açmadan indirebilmek, en sık istenen şeyi bir tık uzağa
+          koyar. PDF için belge açılır — yazdırma biçemi orada. */}
+      <button type="button" className="tbl-act" onClick={() => onExport("xlsx")} disabled={busy}>
         {busy ? "…" : "Excel"}
+      </button>
+      <button type="button" className="tbl-act" onClick={() => onExport("doc")} disabled={busy}>
+        Word
       </button>
     </div>
   );
 }
 
-export { downloadXlsx };
+export { downloadFile };
