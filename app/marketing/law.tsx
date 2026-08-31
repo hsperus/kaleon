@@ -69,6 +69,10 @@ export function Law() {
           </p>
         </div>
       </div>
+      <a className="mk-more k-rise-sm" href="/mevzuat">
+        Her kuralın işlenmiş örneğini gör <span aria-hidden>→</span>
+      </a>
+
     </section>
   );
 }

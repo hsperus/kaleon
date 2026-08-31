@@ -86,6 +86,10 @@ export function Migration() {
           doldurur ve altı ay sonra kimse hangi kaydın gerçek olduğunu bilemez.
         </p>
       </div>
+      <a className="mk-more k-rise-sm" href="/gecis">
+        Geçiş akışını adım adım gör <span aria-hidden>→</span>
+      </a>
+
     </section>
   );
 }

@@ -110,6 +110,10 @@ export function Capabilities() {
           </div>
         </article>
       </div>
+      <a className="mk-more k-rise-sm" href="/ne-yapar">
+        Belge, grafik ve onay formunu ayrıntılı gör <span aria-hidden>→</span>
+      </a>
+
     </section>
   );
 }

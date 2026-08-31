@@ -33,7 +33,7 @@ export function Hero() {
           <a className="mk-pill-lg" href="/deneyin">
             Şirketinizle deneyin
           </a>
-          <a className="mk-pill-ghost" href="#ne-yapar">
+          <a className="mk-pill-ghost" href="/ne-yapar">
             Ne yapabildiğini gör
           </a>
         </div>

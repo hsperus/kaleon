@@ -56,7 +56,11 @@ export function Roles() {
           <br />
           <span className="dim">İnsan onaylar.</span>
         </h2>
-      </section>
+        <a className="mk-more k-rise-sm" href="/roller">
+        Rol–modül matrisini gör <span aria-hidden>→</span>
+      </a>
+
+    </section>
     </>
   );
 }

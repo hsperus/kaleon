@@ -17,10 +17,10 @@
  */
 
 const BOLUMLER = [
-  { href: "/#ne-yapar", label: "Ne yapar" },
-  { href: "/#gecis", label: "Geçiş" },
-  { href: "/#mevzuat", label: "Mevzuat" },
-  { href: "/#roller", label: "Roller" },
+  { href: "/ne-yapar", label: "Ne yapar" },
+  { href: "/gecis", label: "Geçiş" },
+  { href: "/mevzuat", label: "Mevzuat" },
+  { href: "/roller", label: "Roller" },
 ];
 
 const BASLA = [

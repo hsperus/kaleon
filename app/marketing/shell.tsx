@@ -17,11 +17,19 @@
 import { useEffect, type ReactNode } from "react";
 import { Footer } from "./footer.js";
 
+/*
+ * MENÜ GERÇEK SAYFALARA GİDER, ÇAPAYA DEĞİL.
+ *
+ * Önce `#ne-yapar` gibi çıplak çapalardı ve yalnızca ana sayfada
+ * çalışıyordu: `/deneyin` üzerindeyken menüye tıklayan kişi hiçbir yere
+ * gitmiyordu — bağlantı ölüydü ve bu, ürünün bozuk olduğu izlenimini
+ * veren türden bir sessizlik.
+ */
 const LINKS = [
-  { href: "#ne-yapar", label: "Ne yapar" },
-  { href: "#gecis", label: "Geçiş" },
-  { href: "#mevzuat", label: "Mevzuat" },
-  { href: "#roller", label: "Roller" },
+  { href: "/ne-yapar", label: "Ne yapar" },
+  { href: "/gecis", label: "Geçiş" },
+  { href: "/mevzuat", label: "Mevzuat" },
+  { href: "/roller", label: "Roller" },
 ];
 
 export function Shell({ children }: { children: ReactNode }) {
