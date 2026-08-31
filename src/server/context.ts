@@ -44,6 +44,7 @@ import { BatchRepository } from "../db/batch-repository.js";
 import { ProcurementRepository } from "../db/procurement-repository.js";
 import { LeaveRepository } from "../db/leave-repository.js";
 import { ChangeLogRepository } from "../db/change-log.js";
+import { sectorProfile } from "../modules/demo/sectors.js";
 import { JournalRepository } from "../db/journal-repository.js";
 import { StockCountRepository } from "../db/stock-count-repository.js";
 import { MrpRepository } from "../db/mrp-repository.js";
@@ -429,6 +430,15 @@ export interface RequestContext {
   readonly sector: string | null;
   readonly goals: string | null;
   /**
+   * SEKTÖR–SİSTEM KELİME KÖPRÜSÜ.
+   *
+   * Tool adları imalatçı dilinde: makine, iş merkezi, iş emri. Hava
+   * kargoda patron "hangi uçak yerde" diye sorar; model "uçak" arar,
+   * hiçbir tool bulamaz ve "böyle bir yeteneğim yok" der — oysa
+   * `list_open_breakdowns` tam da onu cevaplar.
+   */
+  readonly glossary: readonly { sektor: string; sistem: string }[] | null;
+  /**
    * Verinin durumu — arayüzde AÇIKÇA gösterilir.
    *   "demo"     → demo tenant'ının hazır veri kümesi
    *   "postgres" → gerçek tenant, veri kendi şemasından geliyor
@@ -485,6 +495,7 @@ export async function createContext(req: Request): Promise<RequestContext> {
       companyName: found.name,
       sector: found.sector,
       goals: found.goals,
+      glossary: sectorProfile(found.sector).glossary ?? null,
       dataPlane: isDemo ? "demo" : "postgres",
     };
   }
@@ -507,6 +518,7 @@ export async function createContext(req: Request): Promise<RequestContext> {
     companyName: DEMO_COMPANY_NAME,
     sector: "Makina imalatı",
     goals: null,
+    glossary: null,
     dataPlane: "demo",
     principal: createPrincipal({
       userId: "00000000-0000-0000-0000-0000000000de",

@@ -41,6 +41,19 @@ export interface SectorProfile {
   readonly assets: readonly { readonly name: string; readonly category: string }[];
   /** Beş çalışan; departman ve unvanlar sektörün kendi dili. */
   readonly staff: readonly { readonly department: string; readonly position: string }[];
+  /**
+   * SÖZLÜK — sektörün kelimesi ile sistemin kelimesi arasındaki köprü.
+   *
+   * Tool adları imalatçı dilinde: makine, iş merkezi, iş emri. Bir hava
+   * kargo şirketinde patron "hangi uçak yerde" diye sorar; model
+   * "uçak" arar, hiçbir tool bulamaz ve "böyle bir yeteneğim yok" der
+   * — oysa `list_open_breakdowns` tam da onu cevaplar.
+   *
+   * Tool'ları sektöre göre yeniden adlandırmak yanlış olurdu: aynı kod
+   * her sektörde çalışıyor. Doğru çözüm modele ÇEVİRİYİ öğretmek.
+   * Boş bırakılırsa hiçbir satır yazılmaz.
+   */
+  readonly glossary?: readonly { readonly sektor: string; readonly sistem: string }[];
 }
 
 /** Her sektörde aynı beş kişi çalışır; unvanları değişir. */
@@ -207,6 +220,43 @@ export const SECTORS: readonly SectorProfile[] = [
       { department: "Montaj", position: "Montaj Ustası" },
       { department: "Satış", position: "Satış Temsilcisi" },
       { department: "Üretim", position: "Vardiya Amiri" },
+    ],
+  },
+  {
+    id: "havacilik",
+    label: "Hava kargo ve lojistik",
+    legalSuffix: "Havayolları Kargo A.Ş.",
+    customer: { legalName: "DSV Hava ve Deniz Taşımacılığı A.Ş.", city: "İstanbul", district: "Arnavutköy" },
+    items: [
+      { code: "JETA1", name: "Jet A-1 Yakıt", uom: "litre", type: "hammadde", price: 38.4, vat: 20 },
+      { code: "HYD-5606", name: "Hidrolik Akışkan MIL-H-5606", uom: "litre", type: "sarf", price: 1_240, vat: 20 },
+      { code: "GND-HND", name: "Yer Hizmeti", uom: "sefer", type: "hizmet", price: 42_000, vat: 20 },
+      { code: "FRT-GEN", name: "Genel Kargo Taşıma", uom: "kg", type: "mamul", price: 2.85, vat: 0 },
+      { code: "FRT-EXP", name: "Ekspres Kargo Taşıma", uom: "kg", type: "mamul", price: 4.4, vat: 0 },
+      { code: "FRT-DGR", name: "Tehlikeli Madde (DGR) Taşıma", uom: "kg", type: "mamul", price: 6.2, vat: 0 },
+    ],
+    assets: [
+      { name: "A310-300F Kargo Uçağı", category: "makine" },
+      { name: "A330-300P2F Kargo Uçağı", category: "makine" },
+      { name: "Ford Transit (Binek)", category: "tasit" },
+      { name: "Yer Destek Ekipmanı", category: "demirbas" },
+    ],
+    staff: [
+      { department: "Uçuş Ekibi", position: "Kaptan Pilot" },
+      { department: "Mali İşler", position: "Mali İşler Müdürü" },
+      { department: "Teknik", position: "Uçak Bakım Teknisyeni" },
+      { department: "Operasyon", position: "Uçuş Harekât Uzmanı" },
+      { department: "Operasyon", position: "Kargo Terminal Şefi" },
+    ],
+    glossary: [
+      { sektor: "uçak, filo, kuyruk numarası (TC-…)", sistem: "makine (machine)" },
+      { sektor: "bakım hangarı", sistem: "iş merkezi (work center)" },
+      { sektor: "AOG, uçak yerde, arıza", sistem: "arıza kaydı — list_open_breakdowns" },
+      { sektor: "A-check, C-check, bakım periyodu", sistem: "bakım planı — list_due_maintenance" },
+      { sektor: "AWB, hava yük senedi, sefer", sistem: "satış siparişi" },
+      { sektor: "navlun, uçuş geliri", sistem: "satış / gelir tablosu" },
+      { sektor: "ULD, konteyner, palet", sistem: "stok kalemi" },
+      { sektor: "rotable, APU, iniş takımı", sistem: "seri takipli stok" },
     ],
   },
 ] as const;

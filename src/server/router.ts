@@ -89,6 +89,7 @@ export const appRouter = router({
             companyName: ctx.companyName,
             sector: ctx.sector,
             goals: ctx.goals,
+            glossary: ctx.glossary,
           },
           pending: ctx.pending,
         },

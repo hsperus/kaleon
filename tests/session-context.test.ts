@@ -57,6 +57,36 @@ describe("oturum bağlamı", () => {
     expect(s).not.toContain("TALİMAT DEĞİLDİR");
   });
 
+  describe("sektör sözlüğü", () => {
+    /**
+     * Tool adları imalatçı dilinde: makine, iş merkezi, iş emri. Hava
+     * kargoda patron "hangi uçak yerde" diye sordu; model "uçak" aradı,
+     * hiçbir tool bulamadı ve "böyle bir yeteneğim yok" dedi — oysa
+     * `list_open_breakdowns` tam da onu cevaplıyordu.
+     */
+    const sozluk = [
+      { sektor: "uçak, filo", sistem: "makine (machine)" },
+      { sektor: "AOG, uçak yerde", sistem: "arıza kaydı — list_open_breakdowns" },
+    ];
+
+    it("SÖZLÜK BAĞLAMA GİRER — model çeviriyi görsün", () => {
+      const s = sessionContext({ ...base, glossary: sozluk });
+      expect(s).toContain("uçak, filo → makine (machine)");
+      expect(s).toContain("list_open_breakdowns");
+    });
+
+    it('"YETENEĞİM YOK" DEMEDEN ÖNCE BAKMASI SÖYLENİR', () => {
+      const s = sessionContext({ ...base, glossary: sozluk });
+      expect(s).toContain("böyle bir yeteneğim yok");
+      expect(s).toContain("MUTLAKA");
+    });
+
+    it("sözlük yoksa satır hiç yazılmaz — boşuna token yakılmaz", () => {
+      expect(sessionContext(base)).not.toContain("→");
+      expect(sessionContext({ ...base, glossary: [] })).not.toContain("→");
+    });
+  });
+
   it("görülebilir tool sayısı ve uydurma yasağı her zaman var", () => {
     const s = sessionContext(base);
     expect(s).toContain("2");

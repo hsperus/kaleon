@@ -65,6 +65,8 @@ export interface RunRequest {
     /** Sektör ve öncelikler — cevabın tonunu belirler, rakamını değil. */
     sector?: string | null;
     goals?: string | null;
+    /** Sektör–sistem kelime köprüsü. */
+    glossary?: readonly { sektor: string; sistem: string }[] | null;
   };
   readonly now?: () => Date;
   /** İlerleme olayları. Verilmezse döngü sessiz çalışır. */
@@ -200,6 +202,7 @@ export async function runConversation(
         companyName: req.display.companyName,
         sector: req.display.sector ?? null,
         goals: req.display.goals ?? null,
+        glossary: req.display.glossary ?? null,
         localDate: now().toLocaleDateString("tr-TR"),
         visibleTools: catalog.names,
       }),
