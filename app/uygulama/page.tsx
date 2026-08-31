@@ -328,8 +328,40 @@ export default function Page() {
     };
   }, [role, reloadKey]);
 
+  /*
+   * EN ALTA İN — AMA YERLEŞİM OTURDUKTAN SONRA.
+   *
+   * Önce doğrudan `scrollTo` çağrılıyordu ve etki, tablo/kart
+   * yerleşmeden önce koşuyordu: `scrollHeight` henüz eski değerdeydi
+   * ve kaydırma hiçbir şey yapmıyordu. Konuşma açıldığında ekran en
+   * üstte kalıyor, son cevabı görmek için elle aşağı inmek
+   * gerekiyordu.
+   *
+   * ÇİFT `requestAnimationFrame`: ilki React'in DOM'u yazmasını,
+   * ikincisi tarayıcının yerleşimi hesaplamasını bekler.
+   *
+   * AKIŞ SIRASINDA YUMUŞAK, AÇILIŞTA ANİ. Var olan bir konuşmayı
+   * açarken yumuşak kaydırma, kullanıcıyı bir saniye boyunca yanlış
+   * yere baktırır.
+   *
+   * `"instant"` KASITLI, `"auto"` DEĞİL. `.stage` üzerinde CSS'te
+   * `scroll-behavior: smooth` tanımlı ve `behavior: "auto"` "CSS ne
+   * diyorsa onu yap" demek — yani yine yumuşak. Ani kaydırmayı
+   * yalnızca `"instant"` garanti eder.
+   */
   useEffect(() => {
-    stageRef.current?.scrollTo({ top: stageRef.current.scrollHeight, behavior: "smooth" });
+    const el = stageRef.current;
+    if (!el) return;
+    let ikinci = 0;
+    const ilk = requestAnimationFrame(() => {
+      ikinci = requestAnimationFrame(() => {
+        el.scrollTo({ top: el.scrollHeight, behavior: busy ? "smooth" : "instant" });
+      });
+    });
+    return () => {
+      cancelAnimationFrame(ilk);
+      cancelAnimationFrame(ikinci);
+    };
   }, [turns, busy]);
 
   /**

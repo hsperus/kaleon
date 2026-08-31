@@ -172,11 +172,29 @@ button.role, select.role {
   cursor: pointer;
 }
 
+/*
+ * KAYDIRMA ALANINDA `justify-content` KULLANILMAZ.
+ *
+ * Burada `justify-content: flex-end` vardı ve sohbeti alta yaslıyordu.
+ * İçerik kutuyu aştığı anda TAŞAN KISIM BAŞLANGIÇ KENARININ DIŞINA
+ * çıkıyor ve kaydırma alanına HİÇ DAHİL EDİLMİYOR: `scrollHeight`
+ * `clientHeight`'a eşit kalıyor, yukarı kaydırma diye bir şey olmuyor
+ * ve yukarıda kalan mesajlar kalıcı olarak ulaşılamaz hâle geliyor.
+ *
+ * Ölçüldü: 411 piksellik kutuda ilk mesajın üst kenarı −205'te, yani
+ * ekranın 205 piksel üstünde ve hiçbir şekilde görülemiyor. Kullanıcı
+ * "ekranda ne varsa o gözüküyor, üstündekilere geçemiyorum" diyor —
+ * tarifi birebir bu.
+ *
+ * Doğrusu içeriği `margin-top: auto` ile itmek. Yer varsa alta yaslar;
+ * içerik taştığında marj sıfıra iner ve kaydırma normal çalışır.
+ */
 .stage {
   flex: 1; overflow-y: auto; overflow-x: hidden; overscroll-behavior: contain;
-  display: flex; flex-direction: column; justify-content: flex-end;
+  display: flex; flex-direction: column;
   padding: 0 24px 24px; scroll-behavior: smooth;
 }
+.stage > .col { margin-top: auto }
 .col { width: 100%; max-width: 700px; margin: 0 auto; display: flex; flex-direction: column; }
 .tail { flex: 0 0 auto; }
 
@@ -2947,8 +2965,10 @@ button.role, select.role {
    akar — bu yüzden `.stage` alta yaslı. Ama henüz konuşma yokken alta
    yaslamak, büyük bir ekranda selamlamayı dibe iter ve üstünde koca
    bir boşluk bırakır. Karşılama bir sohbet değil, bir kapıdır. */
-.stage.welcome { justify-content: center }
-.stage.welcome .col { flex: 0 0 auto }
+/* Karşılama ekranı ortalanır — yine `margin` ile, `justify-content`
+   ile değil. Aynı tuzak: ortalanmış bir kutuda taşan içeriğin ÜSTÜ DE
+   ALTI DA ulaşılamaz olur. */
+.stage.welcome > .col { margin: auto 0; flex: 0 0 auto }
 
 /* ═══════════════════════════════════════════════════════════════════
  * İLK GİRİŞ KARŞILAMASI
