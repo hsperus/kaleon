@@ -27,7 +27,8 @@
     "demo:data": "node --env-file-if-exists=.env --import tsx src/scripts/demo-data.ts",
     "smoke": "node --env-file-if-exists=.env --import tsx src/scripts/smoke.ts",
     "demo:prune": "node --env-file-if-exists=.env --import tsx src/scripts/demo-prune.ts",
-    "setup": "node --env-file-if-exists=.env --import tsx src/scripts/setup-tenant.ts"
+    "setup": "node --env-file-if-exists=.env --import tsx src/scripts/setup-tenant.ts",
+    "seed:uls": "node --env-file-if-exists=.env --import tsx src/scripts/seed-uls.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.122.0",

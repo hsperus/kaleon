@@ -190,3 +190,63 @@ describe("bilanço", () => {
     expect(b.totalAssets).toBe(0);
   });
 });
+
+describe("geçmiş yıl sonuçları", () => {
+  /**
+   * BU TESTİN SEBEBİ SOMUT.
+   *
+   * Bilanço yalnızca CARİ DÖNEM sonucunu özkaynağa taşıyordu. Şirketin
+   * ilk yılında doğru sonuç verir, ikinci yılında vermez: beş yıllık
+   * bir defterde tablo, geçmiş dört yılın toplam sonucu kadar açık
+   * verir ve kimse sebebini bulamaz — çünkü MİZAN DENKTİR. Mizan
+   * fişleri denetler, bilanço ZAMANI.
+   *
+   * Bulunduğu yer: beş uçaklı bir filoda 2019'dan işleyen amortisman
+   * 940 milyon lira gider yazmıştı ve hiçbir özkaynak kalemine
+   * bağlanmıyordu.
+   */
+  // `row` yardımcısı bakiyeyi borç/alacağa kendisi dağıtır; gelir
+  // tablosu hesapları `statement: "gelir"` ile işaretlenir ve bilanço
+  // gövdesine girmez — sonuç yalnızca özkaynağa taşınır.
+  const sermaye = row("500", "Sermaye", 1_000_000);
+  const banka = row("102", "Bankalar", 700_000);
+  const gider = row("770", "Genel Yönetim Gideri", 300_000, "gelir");
+
+  it("GEÇMİŞ YIL ZARARI ÖZKAYNAĞA TAŞINIR — bilanço denk kalır", () => {
+    // Cari dönem sonucu sıfır; tüm zarar geçmiş yıllardan.
+    const bs = balanceSheet([sermaye, banka, gider], 0, -300_000);
+    const akt = bs.assets.reduce((t, g) => t + g.amount, 0);
+    const pas = bs.liabilities.reduce((t, g) => t + g.amount, 0);
+    expect(akt).toBe(pas);
+    expect(bs.liabilities.some((g) => g.label === "Geçmiş Yıllar Zararları")).toBe(true);
+  });
+
+  it("geçmiş yıl kârı 570'e yazılır", () => {
+    const bs = balanceSheet([sermaye, banka, gider], 0, 120_000);
+    const grup = bs.liabilities.find((g) => g.label === "Geçmiş Yıllar Kârları");
+    expect(grup?.lines[0]?.code).toBe("570");
+  });
+
+  it("KAPANIŞ FİŞİ ATILMIŞSA İKİNCİ KEZ EKLENMEZ", () => {
+    // 580 zaten doluysa bilanço onu görür; üzerine bir de hesaplayıp
+    // eklemek zararı iki katına çıkarırdı.
+    const kapanmis = row("580", "Geçmiş Yıllar Zararları", 300_000);
+    const bs = balanceSheet([sermaye, banka, kapanmis], 0, -300_000);
+    const kalemler = bs.liabilities.flatMap((g) => g.lines).filter((l) => l.code === "580");
+    expect(kalemler).toHaveLength(1);
+  });
+
+  it("geçmiş yıl sonucu sıfırsa satır hiç yazılmaz", () => {
+    const bs = balanceSheet([sermaye, banka], 0, 0);
+    expect(bs.liabilities.some((g) => g.label.startsWith("Geçmiş Yıllar"))).toBe(false);
+  });
+
+  it("cari dönem VE geçmiş yıl birlikte taşınır", () => {
+    const bs = balanceSheet([sermaye, banka, gider], -80_000, -220_000);
+    const akt = bs.assets.reduce((t, g) => t + g.amount, 0);
+    const pas = bs.liabilities.reduce((t, g) => t + g.amount, 0);
+    expect(akt).toBe(pas);
+    expect(bs.liabilities.some((g) => g.label === "Dönem Net Zararı")).toBe(true);
+    expect(bs.liabilities.some((g) => g.label === "Geçmiş Yıllar Zararları")).toBe(true);
+  });
+});

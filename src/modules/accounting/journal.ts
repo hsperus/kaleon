@@ -332,6 +332,22 @@ export function incomeSummary(rows: readonly TrialBalanceRow[]): {
  * bilanço kurulursa aktif ile pasif arasında tam olarak dönem kârı
  * kadar fark kalır ve tablo "bozuk" görünür. Bu, bilanço yazan
  * herkesin bir kez düştüğü tuzaktır.
+ *
+ * GEÇMİŞ YIL SONUÇLARI DA TAŞINIR — VE BU İKİNCİ TUZAKTIR.
+ *
+ * İlk sürümde yalnızca CARİ DÖNEM sonucu özkaynağa ekleniyordu.
+ * Şirketin ilk yılında bu doğru sonuç verir; ikinci yılında vermez.
+ * Beş yıllık bir defterde bilanço, geçmiş dört yılın toplam sonucu
+ * kadar açık verir ve kimse sebebini bulamaz — çünkü MİZAN DENKTİR.
+ * Fark tam da burada: mizan fişleri denetler, bilanço ZAMANI.
+ *
+ * Bulunduğu yer somut: beş uçaklı bir filoda 2019'dan beri işleyen
+ * amortisman 940 milyon lira gider yazmıştı ve hiçbir özkaynak
+ * kalemine bağlanmıyordu.
+ *
+ * TDHP'de doğru yer 570/580'dir: geçmiş yılların sonucu oraya
+ * aktarılır. Kapanış fişi atılmışsa hesap zaten doludur ve ikinci kez
+ * eklenmez; atılmamışsa bilanço onu kendisi hesaplar.
  * ═══════════════════════════════════════════════════════════════════ */
 
 export interface BalanceGroup {
@@ -449,11 +465,16 @@ const round2 = (n: number): number => Math.round(n * 100) / 100;
  * Bilanço kurar.
  *
  * @param rows Mizan satırları (bilanço hesapları süzülür).
- * @param periodResult Dönem net kârı/zararı — gelir tablosundan gelir.
+ * @param periodResult Cari dönem net kârı/zararı — gelir tablosundan.
+ * @param priorResult  Cari dönemden ÖNCEKİ tüm dönemlerin toplam
+ *                     sonucu. Kapanış fişleriyle 570/580'e zaten
+ *                     aktarılmışsa bu değer verilse bile ikinci kez
+ *                     eklenmez.
  */
 export function balanceSheet(
   rows: readonly TrialBalanceRow[],
   periodResult: number,
+  priorResult = 0,
 ): BalanceSheet {
   const sheet = rows.filter((r) => r.statement === "bilanco");
   const used = new Set<string>();
@@ -495,6 +516,31 @@ export function balanceSheet(
         name: r.accountName,
         amount: sideAmount(r, "pasif"),
       })),
+    });
+  }
+
+  /*
+   * GEÇMİŞ YIL SONUÇLARI. Kapanış fişi atılmışsa 570/580 zaten
+   * doludur ve buraya ikinci kez eklenmez; atılmamışsa hesaplanır.
+   * Aksi hâlde bilanço, geçmiş yılların toplam sonucu kadar açık
+   * verir — mizan denk olduğu için de sebebi görünmez.
+   */
+  const priorPosted = sheet.some(
+    (r) => (r.accountCode === "570" || r.accountCode === "580") && r.balance !== 0,
+  );
+  const prior = priorPosted ? 0 : round2(priorResult);
+  if (prior !== 0) {
+    liabilities.push({
+      code: "O",
+      label: prior >= 0 ? "Geçmiş Yıllar Kârları" : "Geçmiş Yıllar Zararları",
+      amount: prior,
+      lines: [
+        {
+          code: prior >= 0 ? "570" : "580",
+          name: prior >= 0 ? "Geçmiş Yıllar Kârları" : "Geçmiş Yıllar Zararları",
+          amount: prior,
+        },
+      ],
     });
   }
 

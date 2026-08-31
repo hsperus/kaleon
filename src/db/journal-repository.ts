@@ -221,14 +221,25 @@ export class JournalRepository {
     // 1970 öncesi kayıt olmaz; "başlangıç" için güvenli alt sınır.
     const dawn = new Date(Date.UTC(1900, 0, 1));
 
-    const [cumulative, thisYear] = await Promise.all([
+    /*
+     * ÜÇ SORGU, ÜÇÜ DE GEREKLİ.
+     *
+     * `cumulative` bilanço hesaplarının o güne kadarki bakiyesi.
+     * `thisYear` cari dönem sonucu. `prior` ise CARİ YILDAN ÖNCEKİ
+     * tüm dönemlerin toplam sonucu — bu üçüncüsü eksikti ve bilanço,
+     * geçmiş yılların sonucu kadar açık veriyordu.
+     */
+    const dayBeforeYear = new Date(yearStart.getTime() - 86_400_000);
+    const [cumulative, thisYear, prior] = await Promise.all([
       this.trialBalance(dawn, asOf),
       this.trialBalance(yearStart, asOf),
+      this.trialBalance(dawn, dayBeforeYear),
     ]);
 
     const result = incomeSummary(thisYear.rows);
+    const priorResult = incomeSummary(prior.rows);
     return {
-      sheet: buildBalanceSheet(cumulative.rows, result.netProfit),
+      sheet: buildBalanceSheet(cumulative.rows, result.netProfit, priorResult.netProfit),
       periodFrom: yearStart.toISOString().slice(0, 10),
       trialBalanced: cumulative.balanced,
     };
