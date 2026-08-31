@@ -8,6 +8,7 @@
  * eşzamanlı iki yazımdan biri hata alır, ikisi de aynı sıraya oturamaz.
  */
 
+import { excerptAround } from "../modules/conversation/repository.js";
 import { Prisma } from "./generated/tenant/index.js";
 import type { TenantDb } from "./client.js";
 import type { ConversationTurn } from "../ai/runner.js";
@@ -93,6 +94,59 @@ export class PrismaConversationRepository implements ConversationRepository {
     }));
   }
 
+  /**
+   * Konuşmalarda arama.
+   *
+   * BAŞLIKTA VE MESAJ İÇERİĞİNDE arar. Yalnızca başlığa bakmak
+   * neredeyse işe yaramaz: başlık ilk sorudan türetiliyor ve aranan
+   * şey çoğu zaman konuşmanın ortasında geçiyor — "hangi konuşmada
+   * Daimler'den bahsetmiştim" sorusu başlıkla cevaplanamaz.
+   *
+   * SAHİPLİK KOŞULU SORGUNUN İÇİNDE. Sonradan filtrelemek, bir hata
+   * durumunda başkasının konuşmasını sızdırırdı.
+   *
+   * EŞLEŞEN PARÇA DA DÖNER: kullanıcı neden eşleştiğini görmeli,
+   * yoksa liste rastgele görünür.
+   */
+  async search(
+    userId: string,
+    query: string,
+    limit = 20,
+  ): Promise<readonly (ConversationSummary & { snippet: string | null })[]> {
+    const q = query.trim();
+    if (q.length < 2) return [];
+
+    const rows = await this.#db.conversation.findMany({
+      where: {
+        userId,
+        OR: [
+          { title: { contains: q, mode: "insensitive" } },
+          { messages: { some: { content: { contains: q, mode: "insensitive" } } } },
+        ],
+      },
+      orderBy: { updatedAt: "desc" },
+      take: Math.min(limit, 50),
+      select: {
+        id: true,
+        title: true,
+        updatedAt: true,
+        messages: {
+          where: { content: { contains: q, mode: "insensitive" } },
+          orderBy: { seq: "asc" },
+          take: 1,
+          select: { content: true },
+        },
+      },
+    });
+
+    return rows.map((r) => ({
+      id: r.id,
+      title: r.title,
+      updatedAt: r.updatedAt.toISOString(),
+      snippet: r.messages[0] ? excerptAround(r.messages[0].content, q) : null,
+    }));
+  }
+
   async remove(conversationId: string, userId: string): Promise<boolean> {
     try {
       // Sahiplik koşulu silme sorgusunun içinde: başkasının konuşması,
@@ -107,3 +161,4 @@ export class PrismaConversationRepository implements ConversationRepository {
     }
   }
 }
+

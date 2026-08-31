@@ -230,6 +230,18 @@ export const appRouter = router({
     return rows.map((c) => ({ id: c.id, title: c.title, updatedAt: c.updatedAt }));
   }),
 
+  /**
+   * Konuşmalarda arama — başlıkta ve mesaj içeriğinde.
+   *
+   * İki karakterden kısa sorgu boş döner: tek harf neredeyse her
+   * konuşmayla eşleşir ve sonuç listesi anlamsız olur.
+   */
+  searchConversations: procedure
+    .input(z.object({ query: z.string().trim().max(120) }))
+    .query(async ({ ctx, input }) =>
+      ctx.conversations.search(ctx.principal.userId, input.query, 20),
+    ),
+
   /** Bir konuşmanın turları. Sahiplik depo katmanında doğrulanır. */
   conversation: procedure
     .input(z.object({ id: z.string().min(1).max(64) }))

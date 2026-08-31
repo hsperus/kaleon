@@ -28,6 +28,12 @@ export interface ConversationSummary {
   readonly updatedAt: string;
 }
 
+/** Arama sonucu: eşleşen konuşma ve eşleşmenin çevresinden bir alıntı. */
+export interface ConversationHit extends ConversationSummary {
+  /** Eşleşme yalnızca başlıktaysa null. */
+  readonly snippet: string | null;
+}
+
 export interface ConversationRepository {
   /** Yeni konuşma açar ve kimliğini döndürür. */
   create(userId: string, title: string): Promise<string>;
@@ -37,8 +43,31 @@ export interface ConversationRepository {
   appendTurn(conversationId: string, turn: ConversationTurn): Promise<void>;
   /** Kullanıcının konuşmaları, en yeniden eskiye. */
   list(userId: string, limit?: number): Promise<readonly ConversationSummary[]>;
+  /**
+   * Başlıkta VE mesaj içeriğinde arar.
+   *
+   * Yalnızca başlığa bakmak neredeyse işe yaramaz: başlık ilk sorudan
+   * türetiliyor ve aranan şey çoğu zaman konuşmanın ortasında geçiyor.
+   */
+  search(userId: string, query: string, limit?: number): Promise<readonly ConversationHit[]>;
   /** Sahibi doğrulanmış silme. */
   remove(conversationId: string, userId: string): Promise<boolean>;
+}
+
+/**
+ * Eşleşmenin çevresinden kısa bir alıntı.
+ *
+ * Baştan kesmek işe yaramaz: aranan kelime 900. karakterdeyse
+ * kullanıcı neden eşleştiğini göremez. Eşleşmenin ETRAFINDAN kesilir.
+ */
+export function excerptAround(content: string, query: string, radius = 60): string {
+  const flat = content.replace(/\s+/g, " ").trim();
+  const i = flat.toLocaleLowerCase("tr").indexOf(query.toLocaleLowerCase("tr"));
+  if (i < 0) return flat.slice(0, radius * 2);
+
+  const bas = Math.max(0, i - radius);
+  const son = Math.min(flat.length, i + query.length + radius);
+  return (bas > 0 ? "…" : "") + flat.slice(bas, son) + (son < flat.length ? "…" : "");
 }
 
 /**
@@ -102,6 +131,40 @@ export class InMemoryConversationRepository implements ConversationRepository {
       .map(([id, c]) => ({ id, title: c.title, updatedAt: c.updatedAt }))
       .sort((a, b) => b.updatedAt.localeCompare(a.updatedAt))
       .slice(0, limit);
+  }
+
+  async search(userId: string, query: string, limit = 20): Promise<readonly ConversationHit[]> {
+    const q = query.trim().toLocaleLowerCase("tr");
+    if (q.length < 2) return [];
+
+    const hits: ConversationHit[] = [];
+    for (const [id, c] of this.#conversations) {
+      if (c.userId !== userId) continue;
+
+      const basliktaVar = c.title.toLocaleLowerCase("tr").includes(q);
+      // Soru VE cevap birlikte aranır: kullanıcı kendi yazdığını da,
+      // aldığı cevabı da hatırlayabilir.
+      const tur = c.turns.find(
+        (t) =>
+          t.question.toLocaleLowerCase("tr").includes(q) ||
+          t.answer.toLocaleLowerCase("tr").includes(q),
+      );
+      if (!basliktaVar && !tur) continue;
+
+      const kaynak = tur
+        ? tur.question.toLocaleLowerCase("tr").includes(q)
+          ? tur.question
+          : tur.answer
+        : null;
+      hits.push({
+        id,
+        title: c.title,
+        updatedAt: c.updatedAt,
+        snippet: kaynak ? excerptAround(kaynak, query) : null,
+      });
+    }
+
+    return hits.sort((a, b) => b.updatedAt.localeCompare(a.updatedAt)).slice(0, limit);
   }
 
   async remove(conversationId: string, userId: string): Promise<boolean> {

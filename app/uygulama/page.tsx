@@ -240,6 +240,18 @@ export default function Page() {
    * istemci farklı çıkar ve React uyumsuzluk hatası verirdi.
    */
   const [welcome, setWelcome] = useState(false);
+  /*
+   * SOHBET ARAMA.
+   *
+   * Başlıkta ve mesaj içeriğinde arar. Yalnızca başlığa bakmak işe
+   * yaramazdı: başlık ilk sorudan türetiliyor ve aranan şey çoğu zaman
+   * konuşmanın ortasında geçiyor — "hangi konuşmada Daimler'den
+   * bahsetmiştim" sorusu başlıkla cevaplanamaz.
+   */
+  const [query, setQuery] = useState("");
+  const [hits, setHits] = useState<
+    { id: string; title: string; updatedAt: string; snippet: string | null }[] | null
+  >(null);
   useEffect(() => {
     if (authState === "in" && !karsilamaGorulduMu()) setWelcome(true);
   }, [authState]);
@@ -305,6 +317,50 @@ export default function Page() {
   useEffect(() => {
     stageRef.current?.scrollTo({ top: stageRef.current.scrollHeight, behavior: "smooth" });
   }, [turns, busy]);
+
+  /**
+   * Listeyi SESSİZCE tazeler — açık listeyi boşaltmadan.
+   *
+   * `openHistory` önce `[]` yazıyor ki çekmece "yükleniyor" hâlinde
+   * açılsın. Sürekli görünen bir kenar çubuğunda aynı şeyi yapmak,
+   * her soru sonrası listenin bir an boşalıp geri gelmesi demek.
+   */
+  const refreshHistory = useCallback(async () => {
+    try {
+      const rows = await client(role).conversations.query();
+      setHistory((eski) => (eski === null ? eski : [...rows]));
+    } catch {
+      // Tazeleme başarısızsa eski liste durur; boşaltmak daha kötü.
+    }
+  }, [role]);
+
+  /*
+   * Yazdıkça arar ama HER TUŞTA DEĞİL: 220 ms sessizlikten sonra.
+   * Her tuşta sorgu atmak, "Daimler" yazarken yedi ayrı arama demek —
+   * altısının sonucu daha gelmeden geçersiz oluyor.
+   */
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) {
+      setHits(null);
+      return;
+    }
+    let iptal = false;
+    const t = setTimeout(() => {
+      client(role)
+        .searchConversations.query({ query: q })
+        .then((rows) => {
+          if (!iptal) setHits([...rows]);
+        })
+        .catch(() => {
+          if (!iptal) setHits([]);
+        });
+    }, 220);
+    return () => {
+      iptal = true;
+      clearTimeout(t);
+    };
+  }, [query, role]);
 
   const ask = useCallback(
     async (question: string) => {
@@ -427,9 +483,18 @@ export default function Page() {
       } finally {
         setBusy(false);
         inputRef.current?.focus();
+        /*
+         * GEÇMİŞİ TAZELE.
+         *
+         * Konuşma sunucuda ilk soruda oluşuyor ama kenar çubuğu
+         * açılışta bir kez yükleniyordu. Kullanıcı soru soruyor,
+         * "Yeni sohbet"e basıyor ve eskisi listede GÖRÜNMÜYORDU —
+         * kaybolduğunu sanıyordu. Kayıt duruyordu; liste bayattı.
+         */
+        void refreshHistory();
       }
     },
-    [busy, role],
+    [busy, role, refreshHistory],
   );
 
   /**
@@ -534,7 +599,10 @@ export default function Page() {
     setUpload(null);
     uploadRef.current = null;
     inputRef.current?.focus();
-  }, []);
+    // Az önceki konuşma listeye girsin: kullanıcı "nereye gitti"
+    // diye sormadan önce orada olmalı.
+    void refreshHistory();
+  }, [refreshHistory]);
 
   /** Geçmişi açar ve listeyi tazeler. */
   const openHistory = useCallback(async () => {
@@ -804,7 +872,41 @@ export default function Page() {
                 <span aria-hidden>+</span> Yeni sohbet
               </button>
             </div>
-            {history.length === 0 ? (
+
+            <div className="history-search">
+              <input
+                type="search"
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                aria-label="Sohbetlerde ara"
+                placeholder="Sohbetlerde ara"
+              />
+            </div>
+            {hits !== null ? (
+              <div className="history-list">
+                <div className="history-head">
+                  {hits.length === 0 ? "SONUÇ YOK" : `${hits.length} SONUÇ`}
+                </div>
+                {hits.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`history-item hit${c.id === conversationId ? " on" : ""}`}
+                    onClick={() => void loadConversation(c.id)}
+                  >
+                    <span className="t">{c.title}</span>
+                    {/* Neden eşleştiğini göstermeyen bir sonuç listesi
+                        rastgele görünür. */}
+                    {c.snippet && <span className="s">{c.snippet}</span>}
+                  </button>
+                ))}
+                {hits.length === 0 && (
+                  <p className="history-empty">
+                    &ldquo;{query.trim()}&rdquo; hiçbir sohbette geçmiyor.
+                  </p>
+                )}
+              </div>
+            ) : history.length === 0 ? (
               <>
                 <div className="history-head">KONUŞMALAR</div>
                 <p className="history-empty">Henüz konuşma yok.</p>
