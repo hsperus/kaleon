@@ -41,18 +41,6 @@ export interface SectorProfile {
   readonly assets: readonly { readonly name: string; readonly category: string }[];
   /** Beş çalışan; departman ve unvanlar sektörün kendi dili. */
   readonly staff: readonly { readonly department: string; readonly position: string }[];
-  /**
-   * Boş ekranda önerilen dört soru.
-   *
-   * NEDEN VAR: yeni kurulan bir şirkette brifing haklı olarak boştur —
-   * uyarılacak bir şey yoktur. Ama boş bir ekran, ürünün ne
-   * yapabildiğini de göstermez. Uydurma alarm üretmek yerine
-   * SORULABİLECEKLERİ gösteriyoruz.
-   *
-   * SORULAR SEKTÖRÜN DİLİNDE. Bir tekstilciye "kaplin stoğu" sormayı
-   * önermek, ürünün onun işini bilmediğini söyler.
-   */
-  readonly starters: readonly { readonly label: string; readonly question: string }[];
 }
 
 /** Her sektörde aynı beş kişi çalışır; unvanları değişir. */
@@ -85,12 +73,6 @@ export const SECTORS: readonly SectorProfile[] = [
       { department: "Satış", position: "Satış Temsilcisi" },
       { department: "Üretim", position: "Vardiya Amiri" },
     ],
-    starters: [
-      { label: "Bu ay kâr ettik mi?", question: "Bu ay kâr ettik mi?" },
-      { label: "Bilançoyu çıkar", question: "31 Aralık itibarıyla bilançoyu çıkar" },
-      { label: "Kaplin stoğu ne durumda?", question: "Kaplin Grubu KP-08 stoğu ne durumda?" },
-      { label: "Ağustos bordrosu ne tuttu?", question: "Ağustos bordrosu ne tuttu?" },
-    ],
   },
   {
     id: "plastik",
@@ -117,12 +99,6 @@ export const SECTORS: readonly SectorProfile[] = [
       { department: "Kalıphane", position: "Kalıpçı" },
       { department: "Satış", position: "Satış Temsilcisi" },
       { department: "Üretim", position: "Vardiya Amiri" },
-    ],
-    starters: [
-      { label: "Bu ay kâr ettik mi?", question: "Bu ay kâr ettik mi?" },
-      { label: "Bilançoyu çıkar", question: "31 Aralık itibarıyla bilançoyu çıkar" },
-      { label: "Granül stoğu yeter mi?", question: "PP Granül Doğal stoğu ne durumda?" },
-      { label: "Ağustos bordrosu ne tuttu?", question: "Ağustos bordrosu ne tuttu?" },
     ],
   },
   {
@@ -151,12 +127,6 @@ export const SECTORS: readonly SectorProfile[] = [
       { department: "Satış", position: "İhracat Sorumlusu" },
       { department: "Üretim", position: "Vardiya Amiri" },
     ],
-    starters: [
-      { label: "Bu ay kâr ettik mi?", question: "Bu ay kâr ettik mi?" },
-      { label: "Bilançoyu çıkar", question: "31 Aralık itibarıyla bilançoyu çıkar" },
-      { label: "İplik stoğu ne durumda?", question: "Pamuk İplik Ne 30/1 stoğu ne durumda?" },
-      { label: "Ağustos bordrosu ne tuttu?", question: "Ağustos bordrosu ne tuttu?" },
-    ],
   },
   {
     id: "gida",
@@ -183,12 +153,6 @@ export const SECTORS: readonly SectorProfile[] = [
       { department: "Kalite", position: "Gıda Mühendisi" },
       { department: "Satış", position: "Satış Temsilcisi" },
       { department: "Üretim", position: "Vardiya Amiri" },
-    ],
-    starters: [
-      { label: "Bu ay kâr ettik mi?", question: "Bu ay kâr ettik mi?" },
-      { label: "Bilançoyu çıkar", question: "31 Aralık itibarıyla bilançoyu çıkar" },
-      { label: "Un stoğu ne durumda?", question: "Buğday Unu Tip 650 stoğu ne durumda?" },
-      { label: "Ağustos bordrosu ne tuttu?", question: "Ağustos bordrosu ne tuttu?" },
     ],
   },
   {
@@ -217,12 +181,6 @@ export const SECTORS: readonly SectorProfile[] = [
       { department: "Satış", position: "Teknik Satış" },
       { department: "Üretim", position: "Vardiya Amiri" },
     ],
-    starters: [
-      { label: "Bu ay kâr ettik mi?", question: "Bu ay kâr ettik mi?" },
-      { label: "Bilançoyu çıkar", question: "31 Aralık itibarıyla bilançoyu çıkar" },
-      { label: "Astar boya maliyeti ne?", question: "Astar Boya AS-12 birim maliyeti ne?" },
-      { label: "Ağustos bordrosu ne tuttu?", question: "Ağustos bordrosu ne tuttu?" },
-    ],
   },
   {
     id: "mobilya",
@@ -249,12 +207,6 @@ export const SECTORS: readonly SectorProfile[] = [
       { department: "Montaj", position: "Montaj Ustası" },
       { department: "Satış", position: "Satış Temsilcisi" },
       { department: "Üretim", position: "Vardiya Amiri" },
-    ],
-    starters: [
-      { label: "Bu ay kâr ettik mi?", question: "Bu ay kâr ettik mi?" },
-      { label: "Bilançoyu çıkar", question: "31 Aralık itibarıyla bilançoyu çıkar" },
-      { label: "MDF stoğu ne durumda?", question: "MDF Levha 18mm stoğu ne durumda?" },
-      { label: "Ağustos bordrosu ne tuttu?", question: "Ağustos bordrosu ne tuttu?" },
     ],
   },
 ] as const;

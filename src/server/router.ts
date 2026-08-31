@@ -34,12 +34,12 @@ import { confirmPendingAction } from "../kernel/invoke.js";
 import { TOOL_LABELS, actionLabel } from "../ai/tool-labels.js";
 import { MODEL_CONNECTED, ROLE_LABEL } from "./context.js";
 import { GOLDEN_QUESTIONS } from "../eval/golden.js";
-import { sectorProfile } from "../modules/demo/sectors.js";
+import { sharedClient } from "../db/client.js";
 import { buildBriefing } from "../modules/briefing/engine.js";
 
 export const appRouter = router({
   /** Oturum bilgisi: kim, hangi rolde, hangi tool'ları görebiliyor. */
-  session: procedure.query(({ ctx }) => {
+  session: procedure.query(async ({ ctx }) => {
     const catalog = ctx.registry.catalogFor(ctx.principal);
     return {
       userId: ctx.principal.userId,
@@ -57,16 +57,6 @@ export const appRouter = router({
       // Arayüz yönetim düğmesini bu bayrağa göre gösterir. Yetki kontrolü
       // yine sunucuda; bayrak yalnızca gereksiz bir düğmeyi gizler.
       canManageUsers: holds(ctx.principal, "admin:user.manage"),
-      /*
-       * BOŞ EKRAN İÇİN ÖNERİLEN SORULAR.
-       *
-       * Yeni kurulan bir şirkette brifing haklı olarak boştur —
-       * uyarılacak bir şey yoktur. Uydurma alarm üretmek yerine
-       * SORULABİLECEKLERİ gösteriyoruz, ve sorular sektörün kendi
-       * dilinde: tekstilciye "kaplin stoğu" sormayı önermek, ürünün
-       * onun işini bilmediğini söyler.
-       */
-      starters: sectorProfile(ctx.sector).starters,
     };
   }),
 

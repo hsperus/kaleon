@@ -27,6 +27,7 @@ import { LoginScreen } from "../login.js";
 import { AdminPanel } from "../admin.js";
 import type { RunEvent } from "../../src/ai/runner.js";
 import { formatDuration, toolLabel } from "../../src/ai/tool-labels.js";
+import { Welcome, karsilamaGorulduMu, karsilamaGoruldu } from "../welcome.js";
 
 type Role =
   | "patron" | "cfo" | "ik_muduru" | "uretim_muduru"
@@ -60,7 +61,6 @@ interface Session {
   readonly modelConnected: boolean;
   readonly maxAuthority: number;
   readonly identitySource: "session" | "dev-header";
-  readonly starters?: readonly { label: string; question: string }[];
   readonly dataPlane: "demo" | "postgres";
   readonly displayName: string;
   /** Belge antedinde görünür. */
@@ -234,6 +234,15 @@ export default function Page() {
     { id: string; title: string; updatedAt: string }[] | null
   >(null);
   const [showAdmin, setShowAdmin] = useState(false);
+  /*
+   * KARŞILAMA. Sunucu render'ında `localStorage` yok; başlangıç
+   * değeri false ve ilk etkide okunuyor. Doğrudan okunsaydı sunucu ile
+   * istemci farklı çıkar ve React uyumsuzluk hatası verirdi.
+   */
+  const [welcome, setWelcome] = useState(false);
+  useEffect(() => {
+    if (authState === "in" && !karsilamaGorulduMu()) setWelcome(true);
+  }, [authState]);
   /*
    * GENİŞ EKRANDA GEÇMİŞ ÖRTÜ DEĞİL, SÜTUNDUR.
    *
@@ -633,6 +642,15 @@ export default function Page() {
 
   return (
     <div className="shell" style={{ position: "relative" }}>
+      {welcome && (
+        <Welcome
+          name={session?.displayName ?? ""}
+          onDone={() => {
+            karsilamaGoruldu();
+            setWelcome(false);
+          }}
+        />
+      )}
       <header className="topbar">
         {/* Üst çubuk tam genişlikte olduğu için marka soldaki sütunun
             tam üstüne denk gelir; kenar çubuğuna ikinci bir başlık
@@ -643,10 +661,6 @@ export default function Page() {
             {session?.displayName ?? "…"} · <b>{session?.roleLabel ?? "…"}</b>
           </div>
         )}
-        <span className="audit" title="Her işlem değiştirilemez bir kayda yazılır">
-          <i />
-          DENETİM KAYDI AÇIK
-        </span>
         <div className="spacer" />
         {/* TEK SESSİZ DURUM İŞARETİ.
             Üst çubukta iki amber hap duruyordu ve ekranı bir demo sayfasına
@@ -835,7 +849,10 @@ export default function Page() {
         </>
       )}
 
-      <div className={`stage${panels.length ? " shifted" : ""}`} ref={stageRef}>
+      <div
+        className={`stage${panels.length ? " shifted" : ""}${chatting ? "" : " welcome"}`}
+        ref={stageRef}
+      >
         <div className="col">
           {!chatting && (
             <div className="hero">
@@ -854,24 +871,6 @@ export default function Page() {
             <Signals signals={briefing.signals} onAsk={(q) => void ask(q)} />
           )}
 
-          {/*
-            BOŞ BRİFİNG SESSİZ KALMAZ AMA ALARM DA UYDURMAZ.
-
-            Yeni kurulan bir şirkette uyarılacak bir şey olmaması iyi
-            haberdir; ekranı doldurmak için sahte bir kritik konu
-            üretmek, ürünün ilk verdiği bilginin yalan olması demektir.
-            Onun yerine ne sorulabileceğini gösteriyoruz — ve sorular
-            şirketin kendi sektöründen.
-          */}
-          {!chatting && briefing && briefing.signals.length === 0 && session?.starters && (
-            <div className="starters in" style={{ animationDelay: ".2s" }}>
-              {session.starters.map((s2) => (
-                <button key={s2.question} type="button" onClick={() => void ask(s2.question)}>
-                  {s2.label}
-                </button>
-              ))}
-            </div>
-          )}
 
           <div className="stream">
             {turns.map((t, i) => (
