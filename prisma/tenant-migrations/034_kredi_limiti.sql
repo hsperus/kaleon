@@ -38,20 +38,3 @@ ALTER TABLE "partners" ADD CONSTRAINT "partners_credit_block_needs_reason"
 
 CREATE INDEX "partners_credit_blocked_idx" ON "partners"("credit_blocked")
   WHERE "credit_blocked" = true;
-
--- ── SATIN ALMA SİPARİŞİNDE TERMİN ──
---
--- ATP'nin ikinci ayağı: "yolda ne var, ne zaman gelecek".
---
--- Sipariş satırında TERMİN TARİHİ YOKTU. Miktar biliniyordu, tarih
--- bilinmiyordu — ve tarihsiz bir bekleyen mal, teslim taahhüdüne
--- giremez. "Yolda 500 adet var" cümlesi, ne zaman geleceği
--- bilinmiyorsa müşteriye söylenemez.
---
--- NULL KALABİLİR ve kalması anlamlıdır: tedarikçi termin vermemişse
--- uydurmak yerine boş bırakılır. ATP tarihsiz satırları hesaba
--- KATMAZ ve bunu açıkça söyler.
-ALTER TABLE "purchase_order_lines" ADD COLUMN "promised_date" DATE;
-
-CREATE INDEX "purchase_order_lines_promised_idx"
-  ON "purchase_order_lines"("item_id", "promised_date");

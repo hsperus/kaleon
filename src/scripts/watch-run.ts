@@ -148,9 +148,24 @@ async function main(): Promise<void> {
   }
 
   await disconnectAll();
-  // Sorunlu izleme varsa çıkış kodu sıfır DEĞİL: zamanlayıcı bunu
-  // görebilmeli ve sistem yöneticisi haberdar olmalı.
-  process.exitCode = sorunlu.length > 0 ? 1 : 0;
+
+  /*
+   * SORUNLU İZLEME, BAŞARISIZ KOŞU DEĞİLDİR.
+   *
+   * Önce sorunlu izleme varsa çıkış kodu 1 dönüyordu ve systemd her
+   * saat "Failed to start kaelon-watch.service" yazıyordu. Oysa koşu
+   * çalıştı: yirmi izlemeden ikisinin sahibi ayrılmışsa, o bir
+   * bulgudur, arıza değil.
+   *
+   * Bu, başka yerlerde kaçındığımız hatanın ta kendisi: her saat
+   * gelen bir alarm, birkaç haftada tamamen görünmez olur ve gerçek
+   * arıza da onunla birlikte kaybolur.
+   *
+   * Çıkış kodu yalnızca KOŞUNUN KENDİSİ çökerse sıfır dışıdır —
+   * bunu da yakalanmamış istisna zaten yapar. Bulgular günlüğe
+   * yazılıyor ve tetiklenen izlemeler brifingde görünüyor.
+   */
+  process.exitCode = 0;
 }
 
 await main();
