@@ -25,6 +25,8 @@ import { inspectionTools } from "./modules/quality/inspection-tools.js";
 import { QualityRepository } from "./db/quality-repository.js";
 import { supplierTools } from "./modules/procurement/supplier-tools.js";
 import { SupplierRepository } from "./db/supplier-repository.js";
+import { routingTools } from "./modules/operations/routing-tools.js";
+import { RoutingRepository } from "./db/routing-repository.js";
 import { batchTools } from "./modules/inventory/batch-tools.js";
 import { procurementTools } from "./modules/procurement/procurement-tools.js";
 import { leaveTools } from "./modules/hr/leave-tools.js";
@@ -233,6 +235,12 @@ export function buildRegistry(db: DataSource, repos: Repositories = {}): ToolReg
      * turda aynı puanla yarışıyordu.
      */
     ...(repos.tenantDb ? supplierTools(new SupplierRepository(repos.tenantDb)) : []),
+    /*
+     * ROTA, STANDART MALİYET VE RAF. Operasyonlar iş emrine gömülüydü:
+     * karşılaştırılacak bir "doğru" olmadığı için yanlış girilen bir
+     * süre kimsenin fark etmediği bir hata olarak kalıyordu.
+     */
+    ...(repos.tenantDb ? routingTools(new RoutingRepository(repos.tenantDb)) : []),
     // Kur değerlemesi HEM defteri HEM kur tablosunu okur; ikisi de
     // yoksa tool hiç kurulmaz — yarım bir değerleme yanlış sayı üretir.
     ...(repos.revaluation && repos.valuation

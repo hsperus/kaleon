@@ -192,6 +192,7 @@ model Location {
   isActive Boolean @default(true) @map("is_active")
 
   @@map("locations")
+  storageBins StorageBin[]
 }
 
 enum LocationKind {
@@ -334,6 +335,9 @@ model StockMovement {
   @@index([reversalOf])
   @@index([at])
   @@map("stock_movements")
+  /// Raf / göz kodu. null: raf yönetimi kullanılmayan depo ya da
+  /// geçmiş hareket. Geriye dönük doldurulmaz.
+  binCode String? @map("bin_code")
 }
 
 // ─────────────────── Document Intelligence / Procurement ───────────────────
@@ -2475,4 +2479,100 @@ model PurchaseInfoRecord {
   @@unique([partnerId, itemId, currency])
   @@index([itemId])
   @@map("purchase_info_records")
+}
+
+/// Rota — bir ürünün hangi iş merkezlerinde, hangi sürelerde üretildiği.
+///
+/// Operasyonlar iş emrine GÖMÜLÜYDÜ: her yeni iş emrinde aynı dizi
+/// elle yazılıyordu ve bir süre yanlış girildiğinde karşılaştırılacak
+/// bir "doğru" olmadığı için kimse fark etmiyordu.
+model Routing {
+  id        String   @id @default(uuid()) @db.Uuid
+  code      String   @unique
+  itemId    String   @map("item_id")
+  name      String
+  isActive  Boolean  @default(true) @map("is_active")
+  createdBy String   @map("created_by") @db.Uuid
+  createdAt DateTime @default(now()) @map("created_at")
+
+  operations RoutingOperation[]
+
+  @@index([itemId, isActive])
+  @@map("routings")
+}
+
+model RoutingOperation {
+  id            String  @id @default(uuid()) @db.Uuid
+  routingId     String  @map("routing_id") @db.Uuid
+  seq           Int
+  workCenterId  String  @map("work_center_id")
+  description   String
+  /// HAZIRLIK PARTİ BAŞINA, İŞLEME ADET BAŞINA.
+  ///
+  /// Tek bir "süre" alanı olsaydı 10 adetlik parti ile 1000 adetlik
+  /// parti aynı birim süreyle hesaplanırdı. Küçük partide birim
+  /// maliyeti belirleyen şey hazırlıktır.
+  setupMinutes  Decimal @default(0) @map("setup_minutes") @db.Decimal(10, 2)
+  runMinutesPerUnit Decimal @default(0) @map("run_minutes_per_unit") @db.Decimal(10, 4)
+
+  routing Routing @relation(fields: [routingId], references: [id], onDelete: Cascade)
+
+  @@unique([routingId, seq])
+  @@map("routing_operations")
+}
+
+/// Üretim versiyonu — BOM ve rota eşleşmesi.
+model ProductionVersion {
+  id          String    @id @default(uuid()) @db.Uuid
+  code        String    @unique
+  itemId      String    @map("item_id")
+  bomRevision String    @map("bom_revision")
+  routingCode String    @map("routing_code")
+  name        String
+  validFrom   DateTime  @map("valid_from") @db.Date
+  validTo     DateTime? @map("valid_to") @db.Date
+  isDefault   Boolean   @default(false) @map("is_default")
+
+  @@map("production_versions")
+}
+
+/// Standart maliyet — rota ve BOM'dan hesaplanan ön maliyet.
+///
+/// Üç bileşen AYRI: hangi bileşende sapıldığı, toplam sapmadan çok
+/// daha kullanışlı bir bilgidir.
+model StandardCost {
+  id           String   @id @default(uuid()) @db.Uuid
+  itemId       String   @map("item_id")
+  year         Int
+  materialCost Decimal  @default(0) @map("material_cost") @db.Decimal(18, 4)
+  laborCost    Decimal  @default(0) @map("labor_cost") @db.Decimal(18, 4)
+  overheadCost Decimal  @default(0) @map("overhead_cost") @db.Decimal(18, 4)
+  currency     String   @default("TRY")
+  setBy        String   @map("set_by") @db.Uuid
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  @@unique([itemId, year])
+  @@map("standard_costs")
+}
+
+/// Raf / göz — lokasyonun içindeki adres.
+///
+/// Lokasyon vardı, adres yoktu: "IST-TEK deposunda 640 litre var"
+/// biliniyordu ama hangi rafta olduğu bilinmiyordu. 200 m²'lik bir
+/// depoda bu, malı aramak demektir.
+model StorageBin {
+  id          String   @id @default(uuid()) @db.Uuid
+  locationId  String   @map("location_id") @db.Uuid
+  code        String
+  description String?
+  /// Kapasite bilinmiyorsa null, SIFIR DEĞİL: sıfır kapasite "buraya
+  /// hiçbir şey konamaz" demektir ve o ayrı bir durumdur.
+  capacity    Decimal? @db.Decimal(18, 4)
+  capacityUom String?  @map("capacity_uom")
+  isActive    Boolean  @default(true) @map("is_active")
+
+  location Location @relation(fields: [locationId], references: [id], onDelete: Cascade)
+
+  @@unique([locationId, code])
+  @@map("storage_bins")
 }

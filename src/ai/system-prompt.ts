@@ -210,6 +210,9 @@ export function sessionContext(input: {
     `  çerçeve sözleşme, yıllık anlaşma → contract (list_purchase_contracts)`,
     `  tedarikçi performansı, kim geciktiriyor → scorecard (get_supplier_scorecard)`,
     `  fiyat geçmişi, kaça almıştık → price history (get_price_history)`,
+    `  rota, üretim adımları, kaç saat sürer → routing (get_routing_load)`,
+    `  standart maliyet, maliyet sapması → variance (get_cost_variance)`,
+    `  raf, göz, depoda nerede → bin (get_bin_contents)`,
   );
 
   if (input.glossary && input.glossary.length > 0) {
