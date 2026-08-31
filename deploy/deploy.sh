@@ -56,8 +56,12 @@ log "Servis yeniden başlatılıyor"
 $SSH bash -s <<'REMOTE'
 set -euo pipefail
 install -m 644 /opt/kaelon/deploy/kaelon.service /etc/systemd/system/kaelon.service
+# İzleme koşusu: nöbetçi kuralları kimse bakmıyorken de çalışsın.
+install -m 644 /opt/kaelon/deploy/kaelon-watch.service /etc/systemd/system/kaelon-watch.service
+install -m 644 /opt/kaelon/deploy/kaelon-watch.timer /etc/systemd/system/kaelon-watch.timer
 systemctl daemon-reload
 systemctl enable kaelon >/dev/null
+systemctl enable --now kaelon-watch.timer >/dev/null
 systemctl restart kaelon
 REMOTE
 

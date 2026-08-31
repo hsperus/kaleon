@@ -15,6 +15,7 @@ function run(over: Partial<RunResult> = {}): RunResult {
   return {
     answer: "",
     toolCalls: [],
+    selfChecks: [],
     iterations: 1,
     costUsd: 0.002,
     stopReason: "end_turn",

@@ -218,6 +218,8 @@ async function runOne(
     return grade(q, {
       answer: `KOŞUM HATASI: ${(e as Error).message}`,
       toolCalls: [],
+      // Koşum hiç başlamadı: sağlanacak bir çıktı da yok.
+      selfChecks: [],
       iterations: 0,
       costUsd: 0,
       stopReason: "error",

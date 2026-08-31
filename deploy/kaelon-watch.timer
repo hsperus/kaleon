@@ -1,0 +1,21 @@
+# Saat başı koşar.
+#
+# NEDEN SAATTE BİR VE DAHA SIK DEĞİL: her koşu her aktif izlemenin
+# tool'unu çalıştırıyor, yani gerçek sorgular atıyor. Beş dakikada bir
+# koşmak, veritabanına on iki kat yük bindirir ve hiçbir işletme
+# kararı o hızda değişmez. Bir stok uyarısını bir saat sonra görmek,
+# hiç görmemekten çok daha iyidir.
+[Unit]
+Description=KAELON izleme koşusunu saat başı çalıştırır
+
+[Timer]
+OnCalendar=hourly
+# Sunucu kapalıyken kaçan koşu, açılışta bir kez yapılır: kaçırılan
+# bir saatin uyarısı da uyarıdır.
+Persistent=true
+# Bütün zamanlayıcılar tam saatte birden koşarsa sunucu bir anda
+# yüklenir; rastgele gecikme bunu dağıtır.
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

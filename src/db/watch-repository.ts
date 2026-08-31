@@ -129,6 +129,23 @@ export class WatchRepository {
     return rows.map((r) => toDefinition(r as never));
   }
 
+  /**
+   * Kiracıdaki TÜM aktif izlemeler — zamanlanmış koşu için.
+   *
+   * `activeFor` kullanıcı başına ve 25 ile sınırlı çünkü brifing bir
+   * saniyede bitmeli. Zamanlanmış koşunun böyle bir kısıtı yok ve
+   * olmamalı: kullanıcı başına kesilen bir liste, kesilen kısmı hiç
+   * kontrol edilmeyen izlemeler hâline getirirdi.
+   */
+  async allActive(): Promise<readonly WatchRow[]> {
+    const rows = await this.#db.watch.findMany({
+      where: { isActive: true },
+      orderBy: [{ ownerUserId: "asc" }, { level: "desc" }],
+      take: 1000,
+    });
+    return rows.map((r) => toDefinition(r as never));
+  }
+
   async remove(ownerUserId: string, name: string): Promise<boolean> {
     const r = await this.#db.watch.deleteMany({ where: { ownerUserId, name } });
     return r.count > 0;

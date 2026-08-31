@@ -1,0 +1,23 @@
+# KAELON izleme koşusu — nöbetçiyi gerçekten nöbete çıkarır.
+#
+# İzleme kuralları yalnızca kullanıcı uygulamayı AÇTIĞINDA
+# değerlendiriliyordu; yani "bakiye 500.000'in altına düşerse bildir"
+# kuralı, kullanıcı zaten bakmaya geldiğinde çalışıyordu. İzlemenin
+# bütün amacı, kimse bakmıyorken bakmaktır.
+[Unit]
+Description=KAELON izleme koşusu
+# Uygulama ayakta değilse veritabanı da hazır olmayabilir.
+After=network-online.target
+
+[Service]
+Type=oneshot
+User=kaelon
+WorkingDirectory=/opt/kaelon
+EnvironmentFile=/opt/kaelon/.env
+ExecStart=/usr/bin/npm run watch:run
+# Koşu uzun sürmemeli; sürüyorsa bir tool takılmıştır ve bir sonraki
+# koşuyu da bekletmemeli.
+TimeoutStartSec=300
+
+[Install]
+WantedBy=multi-user.target

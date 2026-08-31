@@ -31,6 +31,7 @@
  *     boşuna çalışmaya devam etmez.
  */
 
+import { verifyOutcomes, selfCheckRisk, type SelfCheck, type ToolOutcome } from "./self-check.js";
 import type Anthropic from "@anthropic-ai/sdk";
 import type { Completer } from "./gateway.js";
 import { MAX_TOOL_ITERATIONS, type TaskKind } from "./model.js";
@@ -146,6 +147,18 @@ export type RunEvent =
    */
   | { readonly type: "text_delta"; readonly text: string }
   /**
+   * Öz-denetim uyarısı — cevabın kendi sağlaması tutmadı.
+   *
+   * `risk` olarak değil AYRI bir olay olarak yayınlanıyor: tool
+   * riskleri o tool'un söylediği şeydir, bu ise SİSTEMİN cevaba
+   * itirazıdır ve arayüzde farklı görünmeli.
+   */
+  | {
+      readonly type: "self_check";
+      readonly severity: "critical" | "warning";
+      readonly message: string;
+    }
+  /**
    * Bir yazma işlemi hazırlandı ve ONAY BEKLİYOR — henüz çalışmadı.
    *
    * Arayüz bunu alınca formu açar. `tool_end` olarak yayınlansaydı
@@ -171,6 +184,14 @@ export interface RunResult {
   readonly budgetWarning?: string;
   /** Model güvenlik nedeniyle reddettiyse true. */
   readonly refused: boolean;
+  /**
+   * Öz-denetim sonucu.
+   *
+   * Mali çıktı üreten tool'ların denklik sağlaması. Boş dizi
+   * "sağlaması olan tool çağrılmadı" demektir — "her şey yolunda"
+   * demek değil.
+   */
+  readonly selfChecks: readonly SelfCheck[];
 }
 
 export interface RunnerDeps {
@@ -221,6 +242,14 @@ export async function runConversation(
   ];
 
   const toolCalls: ToolCallRecord[] = [];
+  /*
+   * ÖZ-DENETİM İÇİN HAM SONUÇLAR.
+   *
+   * `toolCalls` yalnızca ad ve süre tutuyor; sağlama için sonucun
+   * KENDİSİ gerekiyor (bilançonun `balanced` alanı gibi). Ayrı bir
+   * dizide toplanıyor ve tur sonunda değerlendiriliyor.
+   */
+  const outcomes: ToolOutcome[] = [];
   let costUsd = 0;
   let budgetWarning: string | undefined;
   /**
@@ -359,6 +388,13 @@ export async function runConversation(
           durationMs: invoked.durationMs,
           ...(invoked.outcome.ok ? {} : { code: invoked.outcome.code }),
         });
+        outcomes.push({
+          tool: use.name,
+          ok: invoked.outcome.ok,
+          ...(invoked.outcome.ok
+            ? { data: (invoked.outcome as { data?: unknown }).data }
+            : {}),
+        });
 
         // ONAY BEKLEYEN İŞLEM HATA DEĞİLDİR. `is_error` işaretlenseydi model
         // "işlem başarısız" diye özür dilerdi; oysa işlem hazırlandı ve
@@ -433,9 +469,25 @@ export async function runConversation(
     ...(budgetWarning ? { budgetWarning } : {}),
   });
 
-  function finish(result: RunResult): RunResult {
-    req.onEvent?.({ type: "done", result });
-    return result;
+  /**
+   * Turu bitirir ve ÖZ-DENETİMİ YAPAR.
+   *
+   * Sağlama burada, tek yerde: her çıkış noktasında ayrı ayrı
+   * yapılsaydı biri unutulur ve o yoldan çıkan cevap denetimsiz
+   * kalırdı — hem de tam olarak hata yollarında, yani en çok
+   * gerektiği yerde.
+   *
+   * BAŞARISIZ SAĞLAMA CEVABI GİZLEMEZ. Rakam yine verilir, yanında
+   * "bu rakam denk değil" uyarısıyla. Cevabı saklamak kullanıcıyı
+   * boş ekranla bırakır ve o da soruyu tekrar sorar.
+   */
+  function finish(result: Omit<RunResult, "selfChecks">): RunResult {
+    const selfChecks = verifyOutcomes(outcomes);
+    const tam: RunResult = { ...result, selfChecks };
+    const uyari = selfCheckRisk(selfChecks);
+    if (uyari) req.onEvent?.({ type: "self_check", ...uyari });
+    req.onEvent?.({ type: "done", result: tam });
+    return tam;
   }
 }
 

@@ -538,6 +538,18 @@ export default function Page() {
                   },
                 ],
               }));
+            } else if (ev.type === "self_check") {
+              /*
+               * ÖZ-DENETİM UYARISI RİSK LİSTESİNE GİRER AMA KAYNAĞI
+               * FARKLIDIR: tool riskleri o tool'un söylediği şeydir,
+               * bu ise sistemin cevaba itirazıdır. Aynı listede
+               * gösteriliyor çünkü kullanıcı için ikisi de "dikkat
+               * et" demek — ama metin kimin konuştuğunu söylüyor.
+               */
+              patch((t) => ({
+                ...t,
+                risks: dedupeRisks([...t.risks, { severity: ev.severity, message: ev.message }]),
+              }));
             } else if (ev.type === "text_delta") {
               // Parça parça yaz: ilk kelime saniyeler önce görünsün.
               patch((t) => ({ ...t, streaming: (t.streaming ?? "") + ev.text }));
