@@ -2589,20 +2589,6 @@ button.role, select.role {
 }
 .ft-logo { font-size: 13px; font-weight: 640; letter-spacing: .17em; color: var(--fg) }
 
-/* Denetim kaydı rozeti: eskiden ayak yazısının tamamıydı, şimdi
-   markanın altındaki bir imza. Nefes alan nokta sistemin çalıştığını
-   söyler; sabit bir nokta ölü görünür. */
-.ft-badge {
-  /* Metin iki satıra sarabiliyor; nokta ortalanırsa ikinci satırın
-     hizasına kayar. Üstten hizalanıp göz hizasına indiriliyor. */
-  display: inline-flex; align-items: flex-start; gap: 8px; margin-top: 18px;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10px; letter-spacing: .06em; color: var(--fg-6); line-height: 1.5;
-}
-.ft-badge i {
-  width: 5px; height: 5px; flex: 0 0 5px; border-radius: 50%; margin-top: .45em;
-  background: var(--green); animation: kBreathe 2.6s ease-in-out infinite;
-}
 
 .ft-col { display: flex; flex-direction: column; gap: 11px; align-items: flex-start }
 .ft-col h3 {
@@ -2625,4 +2611,3 @@ button.role, select.role {
 }
 .ft-note { color: var(--fg-6); line-height: 1.5 }
 
-@media (prefers-reduced-motion: reduce) { .ft-badge i { animation: none } }

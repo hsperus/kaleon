@@ -38,9 +38,6 @@ export function Footer() {
             Türk imalat sanayii için AI-native operasyonel işletim sistemi.
             Menü öğrenmeden, Türkçe sorarak.
           </p>
-          <span className="ft-badge">
-            <i /> Her işlem değiştirilemez bir denetim kaydına yazılır
-          </span>
         </div>
 
         <nav className="ft-col">
