@@ -760,7 +760,9 @@ export async function seedUls(
         name: "Taahhüt riski", tool: "get_shipment_risk",
         // ISO hafta zorunlu; içinde bulunulan hafta hesaplanıyor.
         toolInput: { isoWeek: isoHafta(new Date()) },
-        path: "atRiskCount", operator: "gt" as const, threshold: 0,
+        // `length`: riskli sevkiyat sayısı. `atRiskCount` diye bir
+        // alan yoktu ve izleme bu yüzden hiç çalışmıyordu.
+        path: "length", operator: "gt" as const, threshold: 0,
         level: 2 as const, message: "Taahhüt tarihi riske giren AWB var.",
       },
     ];

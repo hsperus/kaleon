@@ -31,9 +31,31 @@ export function financeTools(db: DataSource) {
     async execute(input, ctx) {
       const { rows, freshness, caveats } = await db.bankBalances(ctx.tenant.tenantId, input.currency);
       const blocked = rows.reduce((s, r) => s + r.blocked, 0);
+      const available = rows.reduce((s, r) => s + r.available, 0);
+      /*
+       * TOPLAM DA DÖNÜYOR, YALNIZCA SATIRLAR DEĞİL.
+       *
+       * "Kasada ne kadar var" sorusunun cevabı toplamdır ama tool
+       * yalnızca hesap satırlarını döndürüyordu; toplamı çıkarmak
+       * çağırana kalıyordu.
+       *
+       * Bunun bedeli somut çıktı: "banka bakiyesi 50 milyonun altına
+       * düşerse bildir" izlemesi `totalAvailable` alanını izliyordu ve
+       * o alan YOKTU. İzleme sessizce hiç çalışmadı — kullanıcı
+       * korunduğunu sanarken.
+       *
+       * Bir alanın var olmaması, onu izleyen kuralın da olmaması
+       * demektir; ve olmayan bir koruma, en çok güvenildiği anda
+       * yoktur.
+       */
       return {
         ok: true,
-        data: rows,
+        data: {
+          accounts: rows,
+          totalAvailable: Math.round(available * 100) / 100,
+          totalBlocked: Math.round(blocked * 100) / 100,
+          accountCount: rows.length,
+        },
         sources: [
           { system: "Banka entegratörü", kind: "integrator", recordCount: rows.length, syncedAt: freshness.syncedAt },
         ],
