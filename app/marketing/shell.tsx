@@ -15,6 +15,7 @@
  */
 
 import { useEffect, type ReactNode } from "react";
+import { Footer } from "./footer.js";
 
 const LINKS = [
   { href: "#ne-yapar", label: "Ne yapar" },
@@ -60,6 +61,8 @@ export function Shell({ children }: { children: ReactNode }) {
       </header>
 
       {children}
+
+      <Footer />
     </div>
   );
 }

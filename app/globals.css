@@ -2124,7 +2124,14 @@ button.role, select.role {
 .mk .mk-pill-ghost:hover { background: rgba(255, 255, 255, .07); border-color: rgba(255, 255, 255, .24) }
 
 /* ── Bölüm iskeleti ── */
-.mk-sec { position: relative; z-index: 1; max-width: 1120px; margin: 0 auto; padding: clamp(96px, 14vw, 170px) clamp(16px, 4vw, 28px) 0 }
+/* ALT BOŞLUK VAR, KASITLI. Önce sıfırdı: son bölüm sayfanın dibine
+   yapışıyor ve "Devam" düğmesi ekranın kenarında duruyordu. Bir
+   düğmenin altında boşluk olmaması, sayfanın orada bittiğini değil
+   KESİLDİĞİNİ düşündürür. */
+.mk-sec {
+  position: relative; z-index: 1; max-width: 1120px; margin: 0 auto;
+  padding: clamp(96px, 14vw, 170px) clamp(16px, 4vw, 28px) clamp(56px, 8vw, 96px);
+}
 .mk-hero { position: relative; z-index: 1; max-width: 1120px; margin: 0 auto; padding: clamp(120px, 16vw, 186px) clamp(16px, 4vw, 28px) 0; text-align: center }
 .mk-anchor { display: block; height: 0; scroll-margin-top: 80px }
 
@@ -2374,7 +2381,7 @@ button.role, select.role {
 .mk-role-d { font-size: 13px; color: var(--fg-4) }
 
 /* ── Kapanış ── */
-.mk-end { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: clamp(110px, 16vw, 180px) clamp(16px, 4vw, 28px) 150px; text-align: center }
+.mk-end { position: relative; z-index: 1; max-width: 900px; margin: 0 auto; padding: clamp(110px, 16vw, 180px) clamp(16px, 4vw, 28px) clamp(80px, 11vw, 130px); text-align: center }
 .mk-end h2 {
   margin: 0; font-size: clamp(30px, 5.4vw, 72px); font-weight: 640; letter-spacing: -.045em; line-height: 1.02;
 }
@@ -2545,3 +2552,77 @@ button.role, select.role {
    bağırmak, formu bırakma sebebidir. */
 .dm-field input[aria-invalid="true"] { border-color: rgba(240, 115, 106, .55) }
 .dm-field input[aria-invalid="true"] + em { color: var(--red) }
+
+
+/* ═══════════════════════════════════════════════════════════════════
+ * AYAK
+ *
+ * Sayfanın sonuna gelen kişi ya ikna olmuştur ve nereye tıklayacağını
+ * arar, ya bir şey kaçırdığını düşünür ve geri dönecek yer arar.
+ * Ayak ikisine de cevap verir — bu yüzden bir süs değil, ikinci bir
+ * gezinmedir.
+ *
+ * ZEMİNDEN AYRILIR. Üstteki bölümler saydam zeminde yüzüyor; ayak
+ * kendi yüzeyine oturuyor ve üstünde bir saç teli çizgi var. Sayfanın
+ * bittiğini söyleyen şey bu ayrım.
+ * ═══════════════════════════════════════════════════════════════════ */
+
+.ft {
+  position: relative; z-index: 1;
+  border-top: 1px solid var(--hair);
+  background: linear-gradient(180deg, rgba(11, 14, 18, .5), rgba(11, 14, 18, .9));
+}
+.ft-in {
+  max-width: 1120px; margin: 0 auto;
+  padding: clamp(48px, 7vw, 72px) clamp(16px, 4vw, 28px) clamp(36px, 5vw, 52px);
+  display: grid; gap: clamp(32px, 5vw, 56px);
+  grid-template-columns: minmax(240px, 1.6fr) repeat(3, minmax(140px, 1fr));
+}
+@media (max-width: 900px) {
+  .ft-in { grid-template-columns: 1fr 1fr }
+  .ft-brand { grid-column: 1 / -1 }
+}
+
+.ft-brand p {
+  margin: 14px 0 0; max-width: 34ch;
+  font-size: 13.5px; line-height: 1.6; color: var(--fg-4);
+}
+.ft-logo { font-size: 13px; font-weight: 640; letter-spacing: .17em; color: var(--fg) }
+
+/* Denetim kaydı rozeti: eskiden ayak yazısının tamamıydı, şimdi
+   markanın altındaki bir imza. Nefes alan nokta sistemin çalıştığını
+   söyler; sabit bir nokta ölü görünür. */
+.ft-badge {
+  /* Metin iki satıra sarabiliyor; nokta ortalanırsa ikinci satırın
+     hizasına kayar. Üstten hizalanıp göz hizasına indiriliyor. */
+  display: inline-flex; align-items: flex-start; gap: 8px; margin-top: 18px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px; letter-spacing: .06em; color: var(--fg-6); line-height: 1.5;
+}
+.ft-badge i {
+  width: 5px; height: 5px; flex: 0 0 5px; border-radius: 50%; margin-top: .45em;
+  background: var(--green); animation: kBreathe 2.6s ease-in-out infinite;
+}
+
+.ft-col { display: flex; flex-direction: column; gap: 11px; align-items: flex-start }
+.ft-col h3 {
+  margin: 0 0 3px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--fg-6); font-weight: 400;
+}
+.ft-col a { font-size: 13.5px; color: var(--fg-3); transition: color .2s var(--glide) }
+.ft-col a:hover { color: var(--fg) }
+/* Link OLMAYANLAR imleci değiştirmez: tıklanacak bir şey yok. */
+.ft-col span { font-size: 13px; color: var(--fg-5); line-height: 1.45 }
+
+.ft-base {
+  max-width: 1120px; margin: 0 auto;
+  padding: 18px clamp(16px, 4vw, 28px) clamp(34px, 5vw, 48px);
+  border-top: 1px solid var(--hair);
+  display: flex; flex-wrap: wrap; gap: 8px 24px; align-items: baseline;
+  font-size: 12px; color: var(--fg-6);
+}
+.ft-note { color: var(--fg-6); line-height: 1.5 }
+
+@media (prefers-reduced-motion: reduce) { .ft-badge i { animation: none } }
