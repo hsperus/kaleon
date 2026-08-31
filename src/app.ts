@@ -19,6 +19,8 @@ import { reconciliationTools } from "./modules/finance/reconciliation-tools.js";
 import { ReconciliationRepository } from "./db/reconciliation-repository.js";
 import { controllingTools } from "./modules/accounting/controlling-tools.js";
 import { ControllingRepository } from "./db/controlling-repository.js";
+import { creditTools } from "./modules/sales/credit-tools.js";
+import { CreditRepository } from "./db/credit-repository.js";
 import { batchTools } from "./modules/inventory/batch-tools.js";
 import { procurementTools } from "./modules/procurement/procurement-tools.js";
 import { leaveTools } from "./modules/hr/leave-tools.js";
@@ -209,6 +211,12 @@ export function buildRegistry(db: DataSource, repos: Repositories = {}): ToolReg
      * sistemde hiçbir cevabı yoktu.
      */
     ...(repos.tenantDb ? controllingTools(new ControllingRepository(repos.tenantDb)) : []),
+    /*
+     * KREDİ LİMİTİ VE TESLİM TAAHHÜDÜ. Bir imalatçı en çok tahsil
+     * edemediği satıştan zarar eder; faturadan sonra yapılan her
+     * kontrol geç kalmıştır.
+     */
+    ...(repos.tenantDb ? creditTools(new CreditRepository(repos.tenantDb)) : []),
     // Kur değerlemesi HEM defteri HEM kur tablosunu okur; ikisi de
     // yoksa tool hiç kurulmaz — yarım bir değerleme yanlış sayı üretir.
     ...(repos.revaluation && repos.valuation

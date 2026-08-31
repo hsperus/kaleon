@@ -123,8 +123,34 @@ function valueFor(key: string, def: Record<string, unknown>): unknown {
     if (/day|gun|gün/i.test(key)) return 30;
     return 1;
   }
-  if (type === "array") return [];
-  if (type === "object") return {};
+  /*
+   * DİZİ BOŞ DEĞİL, TEK ELEMANLI ÜRETİLİR.
+   *
+   * Boş dizi dönüyordu ve `.min(1)` isteyen her tool "geçersiz girdi"
+   * ile düşüyordu. Yazan tool'larda görünmüyordu çünkü onlar onay
+   * kapısında zaten duruyor; ilk OKUYAN tool bir dizi isteyince
+   * ortaya çıktı (`check_availability`).
+   *
+   * Eleman, dizinin kendi şemasından üretiliyor — uydurma bir nesne
+   * şemayı geçemezdi.
+   */
+  if (type === "array") {
+    const items = def["items"] as Record<string, unknown> | undefined;
+    if (!items) return [];
+    return [valueFor(key, items)];
+  }
+  if (type === "object") {
+    // Nesne şeması varsa zorunlu alanları doldurulur; boş nesne
+    // `strictObject` doğrulamasını geçemezdi.
+    const props = def["properties"] as Record<string, Record<string, unknown>> | undefined;
+    if (!props) return {};
+    const required = new Set((def["required"] as string[] | undefined) ?? Object.keys(props));
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(props)) {
+      if (required.has(k)) out[k] = valueFor(k, v);
+    }
+    return out;
+  }
 
   // string
   // Desen SINIRLI eşleşmeli: ilk sürümde /to/ deseni "tool" alanına da

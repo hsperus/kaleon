@@ -202,6 +202,8 @@ export function sessionContext(input: {
     `  bütçe, bütçe aşımı → budget (get_budget_vs_actual, set_budget)`,
     `  banka mutabakatı, ekstre → reconciliation (list_unreconciled)`,
     `  ihtar, borç hatırlatma → dunning (plan_dunning_run)`,
+    `  kredi limiti, risk, satış yapabilir miyiz → credit (get_credit_exposure)`,
+    `  teslim tarihi, ne zaman gönderebiliriz → availability (check_availability)`,
   );
 
   if (input.glossary && input.glossary.length > 0) {

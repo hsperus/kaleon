@@ -52,6 +52,20 @@ model Partner {
   /// türetilir. null = konuşulmamış; fatura girilirken vade SORULUR,
   /// varsayılan bir sayı uydurulmaz.
   paymentTermsDays Int? @map("payment_terms_days")
+
+  /// Kredi limiti — bu cariye açılabilecek azami risk.
+  ///
+  /// null = LİMİT BELİRLENMEMİŞ. "Sınırsız" demek değil: kontrol bunu
+  /// ne sıfır (her siparişi bloke ederdi) ne sonsuz (kontrolü
+  /// anlamsız kılardı) sayar; limitsiz olduğunu söyler ve kararı
+  /// insana bırakır.
+  creditLimit    Decimal? @map("credit_limit") @db.Decimal(18, 2)
+  creditCurrency String   @default("TRY") @map("credit_currency")
+  /// Elle konan blok — limit dolmasa da satış yapılmasın.
+  creditBlocked  Boolean  @default(false) @map("credit_blocked")
+  /// Blok varsa sebebi de vardır; sebepsiz blok kaldırılamaz olur.
+  creditBlockReason String? @map("credit_block_reason")
+
   isActive   Boolean  @default(true) @map("is_active")
   createdAt  DateTime @default(now()) @map("created_at")
   updatedAt  DateTime @updatedAt @map("updated_at")
@@ -346,10 +360,17 @@ model PurchaseOrderLine {
   quantity  Decimal @db.Decimal(18, 4)
   unitPrice Decimal @map("unit_price") @db.Decimal(18, 4)
   currency  String
+  /// Tedarikçinin verdiği termin. null = termin alınmamış.
+  ///
+  /// Tarihsiz bir bekleyen mal teslim taahhüdüne GİREMEZ: "yolda 500
+  /// adet var" cümlesi, ne zaman geleceği bilinmiyorsa müşteriye
+  /// söylenemez. ATP tarihsiz satırları hesaba katmaz.
+  promisedDate DateTime? @map("promised_date") @db.Date
 
   purchaseOrder PurchaseOrder @relation(fields: [poId], references: [id], onDelete: Cascade)
 
   @@unique([poId, lineNo])
+  @@index([itemId, promisedDate])
   @@map("purchase_order_lines")
 }
 
