@@ -17,7 +17,9 @@ import { parseBlocks, parseInline, type Block, type InlineToken } from "../src/u
 import { ChartPanel } from "./chart-panel.js";
 import {
   DocumentSheet,
-  TableActions,
+  FileCard,
+  dosyaAdi,
+  istenenBicim,
   TableBody,
   downloadFile,
   sheetFromTable,
@@ -158,7 +160,7 @@ export function RichText({
             <TableBlock
               key={i}
               table={b}
-              meta={{ title: titleFor(blocks, i), org, question }}
+              meta={{ title: titleFor(blocks, i, question), org, question }}
               onOpen={setOpen}
             />
           );
@@ -182,13 +184,78 @@ export function RichText({
  * "Tablo" gibi boş bir ad, indirilen dosyayı bir hafta sonra
  * tanınamaz yapar.
  */
-export function titleFor(blocks: readonly Block[], index: number): string {
+/**
+ * Sorudan belge başlığı.
+ *
+ * SÜTUN ADI KÖTÜ BİR BAŞLIKTIR. Cevapta başlık yoksa eskiden ilk
+ * sütunun adı kullanılıyordu: "çalışan listesini excel yap" sorusunun
+ * ürettiği dosya "Kod listesi.xlsx" oluyordu. Soru zaten kullanıcının
+ * kendi ifadesi — belgeye onun adını vermek hem doğru hem tanıdık.
+ *
+ * BİÇİM VE EYLEM KELİMELERİ ATILIR: "excel dosyası olarak hazırla"
+ * belgenin adı değil, onu isteme biçimidir.
+ */
+export function titleFromQuestion(question: string): string | null {
+  /*
+   * KELİME KELİME ELENİR, REGEX'LE DEĞİL.
+   *
+   * İlk yazımda `\b(excel|dosyası|...)\b` kullanmıştım ve Türkçede
+   * çalışmadı: JavaScript'te "ı", "ş", "ğ" sözcük karakteri sayılmaz,
+   * dolayısıyla `\b` bu harflerin çevresinde yanlış eşleşir.
+   * "dosyası" elenmiyor, "Çalışan listesini dosyası" gibi bir başlık
+   * çıkıyordu.
+   *
+   * Kelimeleri ayırıp listeyle karşılaştırmak hem doğru hem okunur.
+   */
+  const ATILACAK = new Set([
+    "excel", "word", "pdf", "dosya", "dosyası", "dosyasını", "dosyasi",
+    "olarak", "halinde", "hâlinde", "biçiminde", "formatında",
+    "hazırla", "hazırlar", "oluştur", "çıkar", "çıkart", "ver", "getir",
+    "listele", "göster", "yap", "indir", "kaydet", "aktar",
+    // "bu" ve "şu" ATILMAZ: "bu ayki bordro" ile "ayki bordro" aynı
+    // şey değil. Anlam taşıyan kelime, gürültü değildir.
+    "lütfen", "bana", "bir",
+  ]);
+
+  const kelimeler = question
+    .replace(/[?!.,;:]+/g, " ")
+    .split(/\s+/)
+    .filter(Boolean)
+    .filter((k) => !ATILACAK.has(k.toLocaleLowerCase("tr")));
+
+  if (kelimeler.length === 0) return null;
+
+  /*
+   * Belirtme eki başlıkta kulağı tırmalar: "listesini" → "listesi",
+   * "bilançoyu" → "bilanço".
+   *
+   * YALNIZCA GÜVENLİ İKİ KALIP. Ünsüzden sonra gelen -ı/-i/-u/-ü de
+   * belirtme ekidir ama iyelik ekiyle aynı görünür: "kârı" hem
+   * "kâr-ı" hem "onun kârı" olabilir. Ayırt edemediğimiz yerde
+   * dokunmuyoruz — yanlış kesilmiş bir kelime, ekli hâlinden kötüdür.
+   */
+  const son = kelimeler.length - 1;
+  kelimeler[son] = kelimeler[son]!
+    .replace(/(si|sı|su|sü)n[ıiuü]$/i, "$1")
+    .replace(/y[ıiuü]$/i, "");
+
+  const t = kelimeler.join(" ").trim();
+  if (t.length < 3) return null;
+
+  const baslik = t.charAt(0).toLocaleUpperCase("tr") + t.slice(1);
+  return baslik.length > 60 ? `${baslik.slice(0, 60).trimEnd()}…` : baslik;
+}
+
+export function titleFor(blocks: readonly Block[], index: number, question = ""): string {
   for (let k = index - 1; k >= 0; k -= 1) {
     const b = blocks[k]!;
     if (b.kind === "heading") return b.text.replace(/\*\*/g, "").trim();
     // Araya paragraf girmesi başlığı geçersiz kılmaz; başka bir tablo kılar.
     if (b.kind === "table") break;
   }
+  // Başlık yoksa SORU kullanılır; sütun adı ancak son çare.
+  const sorudan = titleFromQuestion(question);
+  if (sorudan) return sorudan;
   const t = blocks[index]!;
   if (t.kind === "table" && t.head[0]) return `${t.head[0]} listesi`;
   return "Rapor";
@@ -212,16 +279,33 @@ function TableBlock({
   const [err, setErr] = useState<string | null>(null);
   const doc: DocTable = { head: table.head, rows: table.rows, numeric: table.numeric };
   const still = { next: () => 0 };
+  const bicim = istenenBicim(meta.question);
 
   return (
     <figure className="md-table-fig">
-      <TableActions
-        onOpen={() => onOpen({ meta, table: doc, block: table })}
+      {/* Biçim SORUDAN gelir: "excel yap" diyen kişiye Word düğmesi
+          göstermek, cevabı bir menüye çevirir. */}
+      <FileCard
+        fileName={dosyaAdi(meta.org, meta.title, bicim === "pdf" ? "pdf" : bicim)}
+        format={bicim}
+        rowCount={table.rows.length}
         busy={busy}
-        onExport={(format) => {
+        onOpen={() => onOpen({ meta, table: doc, block: table })}
+        onDownload={() => {
+          // PDF tarayıcının yazdırma akışıyla üretilir; belge görünümü
+          // açılır ve yazdırma biçemi orada devreye girer.
+          if (bicim === "pdf") {
+            onOpen({ meta, table: doc, block: table });
+            return;
+          }
           setBusy(true);
           setErr(null);
-          void downloadFile(meta.title, [sheetFromTable(meta.title, doc)], format)
+          void downloadFile(
+            meta.title,
+            [sheetFromTable(meta.title, doc)],
+            bicim,
+            dosyaAdi(meta.org, meta.title, bicim),
+          )
             .then(setErr)
             .finally(() => setBusy(false));
         }}

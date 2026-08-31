@@ -184,3 +184,84 @@ describe("Word çıktısı", () => {
     expect(html).toContain("<h2>Pasif</h2>");
   });
 });
+
+describe("dosya adı ve biçim seçimi", () => {
+  /**
+   * Önce dosya adı sadece başlıktı: "Kadro.xlsx". Kullanıcı üç farklı
+   * gün indirdiğinde İndirilenler klasöründe "Kadro.xlsx",
+   * "Kadro (1).xlsx", "Kadro (2).xlsx" birikiyor ve hangisinin ne
+   * olduğu anlaşılmıyordu. Mali müşavire gönderilecek bir dosyanın
+   * adı, açılmadan ne olduğunu söylemeli.
+   */
+  it("ŞİRKET_BELGE_TARİH biçiminde ad üretir", async () => {
+    const { dosyaAdi } = await import("../app/document.js");
+    const ad = dosyaAdi("ULS Havayolları Kargo A.Ş.", "Çalışan Listesi", "xlsx");
+    expect(ad).toMatch(/^ULS-Havayollari-Kargo-A-S_Calisan-Listesi_\d{4}-\d{2}-\d{2}\.xlsx$/);
+  });
+
+  it("TÜRKÇE KARAKTER ÇEVRİLİR, ATILMAZ", async () => {
+    const { dosyaAdi } = await import("../app/document.js");
+    // Atılsaydı "Yldz Dkm" olurdu.
+    expect(dosyaAdi("Yıldız Döküm", "Şubat Çıktısı", "doc")).toContain("Yildiz-Dokum");
+    expect(dosyaAdi("Yıldız Döküm", "Şubat Çıktısı", "doc")).toContain("Subat-Ciktisi");
+  });
+
+  it("boş girdide bile geçerli bir ad kalır", async () => {
+    const { dosyaAdi } = await import("../app/document.js");
+    expect(dosyaAdi("", "", "xlsx")).toMatch(/^\d{4}-\d{2}-\d{2}\.xlsx$|^KAELON\.xlsx$/);
+  });
+
+  describe("istenen biçim", () => {
+    it("soruda geçen biçim seçilir", async () => {
+      const { istenenBicim } = await import("../app/document.js");
+      expect(istenenBicim("çalışan listesini word olarak ver")).toBe("doc");
+      expect(istenenBicim("bunun PDF'ini alabilir miyim")).toBe("pdf");
+      expect(istenenBicim("excel dosyası oluştur")).toBe("xlsx");
+    });
+
+    it("BİÇİM BELİRTİLMEZSE EXCEL — tablo çıktısının varsayılanı", async () => {
+      const { istenenBicim } = await import("../app/document.js");
+      expect(istenenBicim("mevcut çalışanlarımız kimler")).toBe("xlsx");
+    });
+  });
+});
+
+describe("belge başlığı sorudan", () => {
+  /**
+   * Cevapta başlık yoksa eskiden İLK SÜTUNUN adı kullanılıyordu:
+   * "çalışan listesini excel yap" sorusu "Kod listesi.xlsx" üretiyordu.
+   * Soru zaten kullanıcının kendi ifadesi.
+   */
+  it("BİÇİM VE EYLEM KELİMELERİ ATILIR", async () => {
+    const { titleFromQuestion } = await import("../app/rich-text.js");
+    expect(titleFromQuestion("çalışan listesini excel dosyası olarak hazırla")).toBe(
+      "Çalışan listesi",
+    );
+    expect(titleFromQuestion("bilançoyu word olarak ver")).toBe("Bilanço");
+  });
+
+  it('"BU" ATILMAZ — anlam taşıyan kelime gürültü değildir', async () => {
+    const { titleFromQuestion } = await import("../app/rich-text.js");
+    expect(titleFromQuestion("bu ayki bordroyu pdf yap")).toBe("Bu ayki bordro");
+  });
+
+  it("BELİRSİZ EKE DOKUNULMAZ — yanlış kesilmiş kelime ekli hâlinden kötüdür", async () => {
+    const { titleFromQuestion } = await import("../app/rich-text.js");
+    // "faturalarını" içinde belirtme eki var ama iyelikle karışıyor;
+    // ayırt edemediğimiz yerde bırakıyoruz.
+    expect(titleFromQuestion("ağustos faturalarını excel yap")).toBe("Ağustos faturalarını");
+  });
+
+  it("soru anlamlı bir başlık vermiyorsa null döner", async () => {
+    const { titleFromQuestion } = await import("../app/rich-text.js");
+    expect(titleFromQuestion("excel yap")).toBeNull();
+    expect(titleFromQuestion("   ")).toBeNull();
+  });
+
+  it("uzun soru kırpılır", async () => {
+    const { titleFromQuestion } = await import("../app/rich-text.js");
+    const t = titleFromQuestion("a".repeat(200))!;
+    expect(t.length).toBeLessThanOrEqual(61);
+    expect(t.endsWith("…")).toBe(true);
+  });
+});

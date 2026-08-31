@@ -75,10 +75,58 @@ export function sheetFromTable(name: string, table: DocTable): ExportSheet {
   };
 }
 
+/**
+ * Dosya adı — resmî ve tarihli.
+ *
+ * ÖNCE SADECE BAŞLIKTI: "Kadro.xlsx". Kullanıcı üç farklı gün üç kere
+ * indirdiğinde İndirilenler klasöründe "Kadro.xlsx", "Kadro (1).xlsx",
+ * "Kadro (2).xlsx" birikiyor ve hangisinin ne olduğu anlaşılmıyor.
+ * Bir müşteriye ya da mali müşavire gönderilecek dosyanın adı,
+ * açılmadan ne olduğunu söylemeli.
+ *
+ * Biçim: Şirket_Belge_YYYY-AA-GG.uzantı
+ *
+ * TÜRKÇE KARAKTER ÇEVRİLİR, ATILMAZ. "Yıldız" → "Yildiz"; atılsaydı
+ * "Yldz" olurdu. Windows'ta yasak karakterler ( \ / : * ? " < > | )
+ * ve boşluk tireye döner.
+ */
+export function dosyaAdi(org: string, title: string, ext: string): string {
+  const sadelestir = (v: string) =>
+    v
+      .normalize("NFKD")
+      .replace(/[çÇ]/g, "c").replace(/[ğĞ]/g, "g").replace(/[ıİ]/g, "i")
+      .replace(/[öÖ]/g, "o").replace(/[şŞ]/g, "s").replace(/[üÜ]/g, "u")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^A-Za-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 48);
+
+  const gun = new Date().toISOString().slice(0, 10);
+  const parcalar = [sadelestir(org), sadelestir(title), gun].filter(Boolean);
+  return `${parcalar.join("_") || "KAELON"}.${ext}`;
+}
+
+/**
+ * Sorudan istenen çıktı biçimi.
+ *
+ * KULLANICI NE İSTEDİYSE O GÖSTERİLİR. Üç düğmeyi birden koymak, her
+ * cevabı bir indirme menüsüne çeviriyordu; oysa "excel yap" diyen
+ * kişinin Word'e ihtiyacı yok — isterse ayrıca söyler.
+ *
+ * Hiçbiri geçmiyorsa Excel: tablo çıktısının varsayılanı odur.
+ */
+export function istenenBicim(question: string): "xlsx" | "doc" | "pdf" {
+  const q = question.toLocaleLowerCase("tr");
+  if (/\bpdf\b/.test(q)) return "pdf";
+  if (/\bword\b|\bdocx?\b/.test(q)) return "doc";
+  return "xlsx";
+}
+
 async function downloadFile(
   title: string,
   sheets: readonly ExportSheet[],
   format: "xlsx" | "doc",
+  fileName?: string,
 ): Promise<string | null> {
   const res = await fetch("/api/export", {
     method: "POST",
@@ -97,7 +145,7 @@ async function downloadFile(
   const url = URL.createObjectURL(blob);
   const a = window.document.createElement("a");
   a.href = url;
-  a.download = `${title}.${format}`;
+  a.download = fileName ?? `${title}.${format}`;
   window.document.body.appendChild(a);
   a.click();
   a.remove();
@@ -214,31 +262,33 @@ export function DocumentSheet({
             </div>
           )}
           <div className="doc-bar-acts">
-            {/* Excel VE Word aynı yükten üretilir; ikisi de yalnızca
-                aktarılabilir bir tablo varsa görünür. */}
-            {sheets && sheets.length > 0 && (
-              <>
-                {(["xlsx", "doc"] as const).map((f) => (
-                  <button
-                    key={f}
-                    type="button"
-                    className="doc-act"
-                    disabled={busy}
-                    onClick={() => {
-                      setBusy(true);
-                      setNote(null);
-                      void downloadFile(meta.title, sheets, f)
-                        .then(setNote)
-                        .finally(() => setBusy(false));
-                    }}
-                  >
-                    {f === "xlsx" ? "Excel" : "Word"}
-                  </button>
-                ))}
-              </>
-            )}
+            {/*
+              BELGE GÖRÜNÜMÜNDE ÜÇÜ DE DURUR — ve bu tutarsızlık değil.
+              Sohbetteki kart, sorulan biçimi tek seçenek olarak sunar
+              çünkü orada kullanıcının niyeti bellidir. Belgeyi AÇAN
+              kişi ise artık ona bakıyor ve "bunu Word'e de alayım"
+              demesi doğaldır. Kapalı kapı ile açık dolap farkı.
+            */}
+            {sheets && sheets.length > 0 &&
+              (["xlsx", "doc"] as const).map((f) => (
+                <button
+                  key={f}
+                  type="button"
+                  className="doc-act"
+                  disabled={busy}
+                  onClick={() => {
+                    setBusy(true);
+                    setNote(null);
+                    void downloadFile(meta.title, sheets, f, dosyaAdi(meta.org, meta.title, f))
+                      .then(setNote)
+                      .finally(() => setBusy(false));
+                  }}
+                >
+                  {f === "xlsx" ? "Excel" : "Word"}
+                </button>
+              ))}
             <button type="button" className="doc-act" onClick={() => window.print()}>
-              PDF olarak kaydet
+              PDF
             </button>
             <button ref={closeRef} type="button" className="doc-act doc-close" onClick={onClose}>
               Kapat
@@ -309,29 +359,58 @@ export function TableBody({ meta, table }: { meta: DocMeta; table: DocTable }) {
 }
 
 /** Tablonun üstünde beliren eylem şeridi. */
-export function TableActions({
+/**
+ * Tablo altındaki dosya kartı.
+ *
+ * ÜÇ DÜĞME YERİNE TEK KART. Önce Excel, Word ve PDF düğmeleri yan yana
+ * duruyordu ve her cevap bir indirme menüsüne dönüyordu. Oysa "excel
+ * yap" diyen kişinin Word'e ihtiyacı yok — isterse ayrıca söyler.
+ *
+ * KART DOSYANIN KENDİSİNİ GÖSTERİR: adı, türü, kaç satır olduğu. İnen
+ * şeyin ne olduğunu indirmeden önce görmek, "acaba doğru dosya mı"
+ * sorusunu ortadan kaldırır.
+ */
+const BICIM_ETIKET = {
+  xlsx: { kisa: "XLS", ad: "Excel çalışma kitabı" },
+  doc: { kisa: "DOC", ad: "Word belgesi" },
+  pdf: { kisa: "PDF", ad: "Yazdırılabilir belge" },
+} as const;
+
+export function FileCard({
+  fileName,
+  format,
+  rowCount,
+  onDownload,
   onOpen,
-  onExport,
   busy,
 }: {
+  fileName: string;
+  format: "xlsx" | "doc" | "pdf";
+  rowCount: number;
+  onDownload: () => void;
   onOpen: () => void;
-  onExport: (format: "xlsx" | "doc") => void;
   busy: boolean;
 }) {
+  const etiket = BICIM_ETIKET[format];
   return (
-    <div className="tbl-acts">
-      <button type="button" className="tbl-act" onClick={onOpen}>
-        Belge
-      </button>
-      {/* Excel ve Word sohbetin İÇİNDEKİ tabloda da var: belgeyi
-          açmadan indirebilmek, en sık istenen şeyi bir tık uzağa
-          koyar. PDF için belge açılır — yazdırma biçemi orada. */}
-      <button type="button" className="tbl-act" onClick={() => onExport("xlsx")} disabled={busy}>
-        {busy ? "…" : "Excel"}
-      </button>
-      <button type="button" className="tbl-act" onClick={() => onExport("doc")} disabled={busy}>
-        Word
-      </button>
+    <div className={`fcard ${format}`}>
+      <span className="fcard-ico" aria-hidden>
+        {etiket.kisa}
+      </span>
+      <span className="fcard-meta">
+        <b title={fileName}>{fileName}</b>
+        <span>
+          {etiket.ad} · {rowCount} satır
+        </span>
+      </span>
+      <span className="fcard-acts">
+        <button type="button" className="fcard-open" onClick={onOpen}>
+          Önizle
+        </button>
+        <button type="button" className="fcard-dl" onClick={onDownload} disabled={busy}>
+          {busy ? "Hazırlanıyor…" : format === "pdf" ? "Yazdır" : "İndir"}
+        </button>
+      </span>
     </div>
   );
 }
